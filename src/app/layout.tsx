@@ -1,0 +1,1 @@
+import type { Metadata } from 'next';\nimport './globals.css';\nexport const metadata: Metadata = { title: 'Style Studio — your everyday stylist', description: 'Build your digital wardrobe and find a look for every day.' };\nexport default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body>{children}</body></html>; }\n

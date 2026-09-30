@@ -12,5 +12,6 @@ Features
 Requires Node.js 18+.
 \n\n```bash\nnpm install\nnpm run dev\n```\nOpen http://localhost:3000. 
 
-To create a production build: `npm run build`.\n\n## 
+To create a production build: `npm run build`. 
+
 Current implementation and production work\nThis initial version is a working front-end demo. It does not yet provide production authentication, cloud image storage, weather-aware styling, or a remote AI inference service. Sign-in is a local demo and wardrobe photos are kept in the current browser. Before production, add a secure auth provider and database/storage service, implement server-side wardrobe APIs, and connect an AI vision/styling provider with consent, retention, and deletion controls for personal photos.

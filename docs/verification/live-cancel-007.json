@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "date": "2026-10-12T03:01:30.294Z",
+  "nextStartMs": 2610,
+  "completedAfterCancelSeconds": 214.303,
+  "items": 1,
+  "checks": [
+    "real local model request cancelled",
+    "next account job begins promptly",
+    "cancelled result unavailable",
+    "next real analysis completes"
+  ],
+  "limitation": "Backend verification against the currently compiled build; browser stale-response repairs still pending."
+}

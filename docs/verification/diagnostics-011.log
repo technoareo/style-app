@@ -1,0 +1,25 @@
+✔ the percentile helper is nearest-rank and keeps the exact maximum (1.7722ms)
+✔ the acquire measurement brackets the real SQLite wait, the gate wait and the queue depth (922.3214ms)
+✔ the hold measurement runs from a successful BEGIN to COMMIT or ROLLBACK, on the auth path and on the write path (437.8348ms)
+✔ concurrent observer contexts stay isolated; the process observer sees only what no context claims (236.0604ms)
+✔ a refused lock never runs the body, reports where the budget went, and leaves no transaction or gate behind (469.1627ms)
+✔ a gate that times out is reported, the body never runs, and the original error type is unchanged (125.0777ms)
+✔ an observer that throws cannot change a result, mask a failure, keep a transaction open or hold the gate (622.9056ms)
+✔ observers whose property lookup throws (getter, Proxy) cannot change an outcome, leave a transaction begun, or hold the gate (62.8918ms)
+✔ a mutating observer cannot alter the metrics attached to a refusal (247.9313ms)
+✔ REAL child, strict about unhandled rejections: throwing getters, a throwing Proxy, rejecting async observers and hostile thenables change no outcome, row or gate, and raise no unhandled rejection (4330.5487ms)
+✔ the diagnostics add no cost without an observer: no events are produced and the result is unchanged (28.1376ms)
+✔ arguments: whole numbers only; fractions, zero, negatives, exponents, words and out-of-range values are refused (2.7528ms)
+✔ arguments: valid values are taken as given and the plan is never empty (1.5369ms)
+✔ environment: only allow-listed names survive, forced local settings win, and no sentinel value reaches the result (0.3964ms)
+✔ a REAL child started with the built environment sees none of the sentinels (93.5432ms)
+✔ the real runner's dry plan lists the matrix and environment NAMES, and prints no sentinel value (292.2121ms)
+✔ the real runner refuses a malformed or empty matrix before starting anything, without echoing values (901.4992ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8762.2292

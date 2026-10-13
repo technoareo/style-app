@@ -1,0 +1,11 @@
+{
+  "experiment": "live-owner-process-backup-lock-009-corrected",
+  "syntheticOnly": true,
+  "blockedOwnerMs": 80000,
+  "secondStartedAfterMs": 65000,
+  "ownerStillLiveBeforeSecond": true,
+  "partialPresentBeforeSecond": true,
+  "secondBackupSucceeded": false,
+  "activePartialRemoved": false,
+  "firstOwnerExitCode": 0
+}

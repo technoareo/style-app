@@ -1,0 +1,89 @@
+{
+  "planned": 1,
+  "completed": 1,
+  "complete": true,
+  "allChildrenStopped": true,
+  "problems": [],
+  "results": [
+    {
+      "scenario": "default",
+      "rep": 1,
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "allChildrenStopped": true,
+      "stopProblems": [],
+      "durationSec": 115,
+      "counts": {
+        "tests": 140,
+        "pass": 136,
+        "fail": 0,
+        "skipped": 4
+      },
+      "report": {
+        "phasesMs": {
+          "setup": 5021,
+          "wait": 8051,
+          "stress": 47067
+        },
+        "problems": 0,
+        "childFailures": [
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "worker",
+            "ok": 60,
+            "failures": 0,
+            "code": 0
+          }
+        ],
+        "writeAcquireMaxMs": 7402.8,
+        "writeAcquireP99MaxMs": 5390.4,
+        "writeInitMaxMs": 81,
+        "writeGateMaxMs": 5369.6,
+        "writeSqliteMaxMs": 7321.3,
+        "writeAcquireFailed": 0,
+        "authAcquireMaxMs": 5458.8,
+        "authAcquireFailed": 0,
+        "authHoldMaxMs": 626.1,
+        "queueDepthMax": 3
+      },
+      "log": "docs\\verification\\matrix-011-corrected-default\\default-1.log"
+    }
+  ]
+}

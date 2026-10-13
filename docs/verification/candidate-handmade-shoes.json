@@ -1,0 +1,45 @@
+{
+  "fixture": "handmade-shoes",
+  "model": "qwen3-vl:4b-instruct",
+  "recordedAt": "2026-10-12T00:46:53.411Z",
+  "seconds": 86.288,
+  "analysis": {
+    "items": [
+      {
+        "name": "shoe",
+        "category": "Shoes",
+        "color": "beige",
+        "pattern": "perforated",
+        "formality": "casual",
+        "brand": "",
+        "size": "",
+        "confidence": 0.75,
+        "evidence": "perforated leather shoe with laces, beige color, on fabric surface",
+        "box": [
+          0.558,
+          0.214,
+          0.384,
+          0.404
+        ]
+      },
+      {
+        "name": "shoe",
+        "category": "Shoes",
+        "color": "beige",
+        "pattern": "unknown",
+        "formality": "casual",
+        "brand": "",
+        "size": "",
+        "confidence": 0.75,
+        "evidence": "upside-down shoe with visible stitching, beige color, on fabric surface",
+        "box": [
+          0.382,
+          0.3,
+          0.183,
+          0.625
+        ]
+      }
+    ],
+    "warning": "Only visible physical garments. Ignore patterns as separate items."
+  }
+}

@@ -1,0 +1,6 @@
+import http from 'node:http';import fs from 'node:fs';
+const out='docs/verification/proxy-keepalive-success-014.json';if(fs.existsSync(out))throw Error('Preserve evidence');
+const agent=new http.Agent({keepAlive:true,maxSockets:1});let firstSocket;const results=[];
+try{for(let i=0;i<3;i++){const r=await new Promise((resolve,reject)=>{const start=performance.now();const req=http.get({hostname:'127.0.0.1',port:3000,path:'/api/health',agent},res=>{res.resume();res.on('end',()=>resolve({status:res.statusCode,reusedSocket:req.reusedSocket,sameSocket:firstSocket===req.socket,connection:res.headers.connection??null,elapsedMs:performance.now()-start}));});req.on('socket',s=>{firstSocket??=s;});req.on('error',reject);req.setTimeout(3000,()=>req.destroy(Error('Timeout')));});results.push(r);}
+const problems=[];if(results.some(r=>r.status!==200||r.connection==='close'||!r.sameSocket)||results.slice(1).some(r=>!r.reusedSocket))problems.push('Healthy connection was not reused');fs.writeFileSync(out,JSON.stringify({candidateOnly:true,windowsLoopbackHttp1:true,results,problems},null,2),{flag:'wx'});console.log(JSON.stringify({results,problems}));if(problems.length)process.exitCode=1;
+}finally{agent.destroy();}

@@ -1,0 +1,20 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env*.local
+.DS_Store
+# Capacitor build output
+android/app/build/
+ios/App/Pods/
+ios/App/build/
+
+.runtime/
+.data/
+.env*
+!.env.example
+playwright-report/
+test-results/
+
+test-results-*/
+!.env.compose.example

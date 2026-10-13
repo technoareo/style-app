@@ -1,0 +1,15 @@
+# Read-path lock demand: source findings for the next Claude batch
+
+Read-only inspection during the unchanged corrected build-011 matrix. No implementation changes are made here. These findings support review G5; they do not prove which mechanism caused the earlier failed stress run.
+
+- `src/app/api/wardrobe/route.ts` GET always wraps `loadWardrobe` in `runWriteTransaction`.
+- `src/server/wardrobes.ts` `loadWardrobe` always joins/opens an immediate transaction and calls `reclaimPhotos`, even if no photo needs deleting. A missing wardrobe returns an empty revision-zero response; it does **not** create a wardrobe row. Therefore a read-first implementation must preserve this existing empty-account behavior, not add a row unnecessarily.
+- `src/app/api/analysis-jobs/[id]/route.ts` GET always wraps `getAnalysisJobForOwner` in `runWriteTransaction`.
+- `getAnalysisJobForOwner` opens a write transaction to check whether the owner's job is expired, then reads the result. Its conditional expiry clears temporary data and performs a one-time quota refund. These mutations and privacy guarantees must remain atomic when making the common unexpired path read-only.
+- `listJobsForOwner` already excludes expired entries by age without sweeping them. `ensureSchema` still executes fixed `CREATE TABLE IF NOT EXISTS worker_state` on its first call, although the table also belongs to the application migration schema. Cold-call behavior should be reviewed before calling the entire discovery path write-free.
+
+Candidate approach to give Claude after the baseline matrix and review: read the owner's current row first, return the unchanged response without a write lock when no maintenance is due, and enter the existing bounded write path only for necessary cleanup/expiry. Recheck all cleanup decisions within the transaction; a read-before-write observation cannot authorize deletion after a concurrent save. Preserve owner-only 404, result expiry, refunds, cancellation, source-photo references and 24-hour unused-photo reclamation. Do not change public response shapes, quotas or acquisition timeouts to hide contention.
+
+Meaningful verification: while another connection/process holds BEGIN IMMEDIATE, common existing-wardrobe and unexpired-job reads succeed promptly through real HTTP routes; due cleanup/expiry still uses the bounded write path; concurrent save versus cleanup does not remove newly referenced photos; concurrent expiry versus cancel cannot refund twice; an expired completed result is never served. Include first-time accounts and latest owner-isolation regressions. Existing stress workload and counts remain unchanged for before/after comparison.
+
+Any scheduling mitigation is a separate measured change. The current three-millisecond sleep occurs after the in-process gate releases, so queued writers may retake SQLite before the pause matters. A policy triggered only by the holder observing SQLITE_BUSY may miss a dominant writer that never experiences contention; ask Claude to assess that condition against the matrix evidence instead of assuming the proposed trigger establishes fairness.

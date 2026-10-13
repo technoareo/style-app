@@ -1,0 +1,9 @@
+{
+  "release": "v2.11.7",
+  "zipSha256": "0A1EDC0B799512051C57071CE0E798D3F2CF67DC98171366F1D2B326072E3B06",
+  "zipSha512": "c308154504e53755958ffc62d8a2657ab17eefd6dd25c45dbb2c3d93d29519971f77ca652f7d0f2bcb7f980b9ba3822478865e29969d0272d7613550a43152b1",
+  "officialDigestVerified": true,
+  "checksumListVerified": true,
+  "initialVerificationFailure": "Root expected SHA256 checksum list but official list uses SHA512; verified correct algorithm before extraction",
+  "exeSha256": "5F93A9BD555F3AAC9D33AF2756BA14B3519D8CCA4FFD55256BDAEAB444C9DB2A"
+}

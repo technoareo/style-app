@@ -1,0 +1,11 @@
+# Independent local HTTPS / HTTP2 findings
+
+The unshipped all-error response-close Caddy candidate was tested with a task-local internal CA, certificate validation enabled, no operating-system trust installation, loopback binding and HTTP1/HTTP2 only. Root probe `proxy-tls-h2-probe-014-corrected.json` reports an authorized TLS connection with ALPN h2. Initial health and three health requests during the stalled upload succeeded. The stalled authentication body returned private 408 JSON at 20.333 seconds, but GOAWAY at 21.037 seconds and session closure at 21.089 seconds prevented subsequent health reuse (`ERR_HTTP2_INVALID_SESSION`). This is a compatibility limitation of the unshipped unconditional connection-close proposal, not a shipped change or public HTTPS acceptance.
+
+The first probe result is retained separately: a Node lookup callback shape error prevented setup. Correcting that root probe exposed the real session-reuse failure above.
+
+Owned Caddy session 71194 was stopped before the next proposed test. The intended HTTP1.1-only response-header matcher was NOT created or validated: automatic approval review failed because the account reached its usage limit. The action was not executed; this was inability to complete approval review, not a determination that the action was unsafe. No alternate execution route is authorized to bypass that review failure. Tests requiring that approval remain pending.
+
+The user reports Cancel was selected on the Windows Security prompt. Code was subsequently brought forward and a fresh independent Claude build014 review was dispatched through its message field. The completed verdict is `docs/reviews/build-014-claude.md`: unconditional error-close rejected; release and public launch not approved. Claude reports no execution or private files. It additionally read compose.yaml and searched the deployment guide as related public configuration.
+
+After review dispatch, the unused owned diagnostic application session 3283 was stopped with Ctrl+C (exit 1). Its final output included a Better Auth cold-schema mismatch warning listing user/session/account/verification/rateLimit; that warning is retained as a cold-start gate, not proof of a migration failure. No known task-owned diagnostic proxy or app remains running after this cleanup.

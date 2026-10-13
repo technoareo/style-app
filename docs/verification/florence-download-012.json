@@ -1,0 +1,93 @@
+{
+  "model": "onnx-community/Florence-2-base-ft",
+  "revision": "e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f",
+  "license": "mit",
+  "networkPhotoTransmission": false,
+  "applicationChange": false,
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2665,
+      "sha256": "dbf8928d1bf7201ceab13775837bc1364cec189da370f8561b56303cf4c22932",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "config.json",
+      "bytes": 5432,
+      "sha256": "d90c22ed72eb55291f183fcd9b98ebd3bd3d92bfcffb6c7f6e1606085e793525",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "generation_config.json",
+      "bytes": 292,
+      "sha256": "7b8eb17bbd6cf8a07f619ad83ae03881eff05b6b9237bab89005b40e77783c29",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "preprocessor_config.json",
+      "bytes": 2673,
+      "sha256": "c892857e34a7082284983a7717717d39c9bf7e574f1f41d80d4c918c97502efa",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "tokenizer.json",
+      "bytes": 2297961,
+      "sha256": "d69dcdb2323e124ac4f800cb9863ddccea0d7bb11e16125e8df3bd60f2f8aeac",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "tokenizer_config.json",
+      "bytes": 197658,
+      "sha256": "d8e64607233cb53b619fb46664f6cad08176c26e0e8735b2d30d888364f19600",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "special_tokens_map.json",
+      "bytes": 146627,
+      "sha256": "72ff172dc769bc1551b1b4211628ce3271643bc60379e4da45d85a9be9332c39",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "added_tokens.json",
+      "bytes": 22410,
+      "sha256": "ba67457c577895525996e7a42d7da60a05856506ea4fd25ff9a023a64662f74b",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "vocab.json",
+      "bytes": 1099884,
+      "sha256": "394fdc63c71aabe0a9b97117f5d62fb5fcc4d59b2b3ea929a3929e6a53217b3c",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "merges.txt",
+      "bytes": 456318,
+      "sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5",
+      "upstreamLfsVerified": false
+    },
+    {
+      "file": "onnx/embed_tokens_quantized.onnx",
+      "bytes": 39390433,
+      "sha256": "6b2258db1c8ee9b160576ccde3cd3814d83a2edaed0dd1c6ca9ff3c38fa62214",
+      "upstreamLfsVerified": true
+    },
+    {
+      "file": "onnx/vision_encoder_quantized.onnx",
+      "bytes": 93746540,
+      "sha256": "3b79d54f23f666f731549db23cb070c35a979ce19cbd9720e90e67a78dc9768c",
+      "upstreamLfsVerified": true
+    },
+    {
+      "file": "onnx/encoder_model_quantized.onnx",
+      "bytes": 43651493,
+      "sha256": "f4ad7a68f1fb875d3bcf735ea14a7021b7ba7e83baf7cf10289881b4ed6d9b85",
+      "upstreamLfsVerified": true
+    },
+    {
+      "file": "onnx/decoder_model_merged_quantized.onnx",
+      "bytes": 98177697,
+      "sha256": "f22f52f980c33df0efa15932c2f3db6d9d3595ce6387eca938b8cfe23dc4c641",
+      "upstreamLfsVerified": true
+    }
+  ]
+}

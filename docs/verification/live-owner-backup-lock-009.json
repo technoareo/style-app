@@ -1,0 +1,12 @@
+{
+  "experiment": "live-owner-stale-backup-lock-009",
+  "syntheticOnly": true,
+  "blockedOwnerMs": 80000,
+  "secondStartedAfterMs": 65000,
+  "ownerStillLiveBeforeSecond": true,
+  "partialPresentBeforeSecond": true,
+  "secondBackupSucceeded": true,
+  "secondFile": "style-2026-10-12T05-29-10-884Z.db",
+  "activePartialRemoved": true,
+  "firstOwnerExitCode": 1
+}

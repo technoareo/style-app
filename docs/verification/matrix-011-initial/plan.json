@@ -1,0 +1,13 @@
+{
+  "stamp": "2026-10-12T09-32-38-002Z",
+  "planned": 2,
+  "plan": [
+    {
+      "scenario": "stress",
+      "reps": 2,
+      "timeoutSec": 180,
+      "burners": 0,
+      "command": "node --import tsx --test tests/concurrency.test.ts"
+    }
+  ]
+}

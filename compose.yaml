@@ -1,0 +1,143 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      STYLE_PUBLIC_DEPLOYMENT: "true"
+      STYLE_DATA_DIR: /data
+      OLLAMA_URL: http://ollama:11434
+      # Starting values, NOT measured capacity and not yet run in Docker.
+      # Override in .env.production (STYLE_* names are in docs/DEPLOYMENT.md).
+      NODE_OPTIONS: --max-old-space-size=768
+    # Starting memory ceiling for the web process; size from the target-server
+    # load test. Untested here because Docker is unavailable.
+    mem_limit: 1536m
+    volumes:
+      - app-data:/data
+    expose:
+      - "3000"
+    depends_on:
+      - ollama
+    command:
+      [
+        "sh",
+        "-c",
+        "./node_modules/.bin/tsx scripts/init-auth.ts && node server.js",
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      STYLE_PUBLIC_DEPLOYMENT: "true"
+      STYLE_DATA_DIR: /data
+      OLLAMA_URL: http://ollama:11434
+    volumes:
+      - app-data:/data
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["./node_modules/.bin/tsx", "scripts/analysis-worker.ts"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  # Account mail (verification, password reset). Its own process so SMTP never
+  # waits behind slow AI inference and never runs inside the web process.
+  # Delivery is at-least-once. Build 009; the container has NOT been run yet.
+  mailer:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      STYLE_PUBLIC_DEPLOYMENT: "true"
+      STYLE_DATA_DIR: /data
+      NODE_OPTIONS: --max-old-space-size=256
+    mem_limit: 512m
+    volumes:
+      - app-data:/data
+    depends_on:
+      app:
+        condition: service_healthy
+    # `node --import tsx` (not the tsx launcher) so node itself is PID 1 and
+    # receives SIGTERM directly instead of through a launcher process.
+    command: ["node", "--import", "tsx", "scripts/mail-worker.ts"]
+    # On SIGTERM the worker cancels the send in flight, records the message as
+    # queued within a few seconds, and exits; anything still running after
+    # STYLE_MAIL_SHUTDOWN_EXIT_MS (25 s) is abandoned and the row returns to
+    # the queue when its lease lapses. The worst bounded shutdown work is
+    # about 16.5 s with defaults (tests/mailWorker.test.ts checks that this
+    # value stays above both numbers). Docker's default of 10 s is too short.
+    stop_grace_period: 40s
+    healthcheck:
+      test:
+        ["CMD", "node", "--import", "tsx", "scripts/mail-worker.ts", "--check"]
+      interval: 30s
+      timeout: 20s
+      start_period: 60s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  ollama:
+    image: ollama/ollama:0.40.3
+    restart: unless-stopped
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - model-data:/root/.ollama
+    expose:
+      - "11434"
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    # Least privilege (build 015): the public proxy needs ONE value, the site
+    # address read by deploy/Caddyfile as {$STYLE_DOMAIN}. It must not load
+    # .env.production, which holds AUTH_SECRET and SMTP credentials.
+    # Compose fills ${STYLE_DOMAIN} from the shell, from the project-level
+    # `.env` next to this file (domain only: copy .env.compose.example to .env,
+    # see docs/DEPLOYMENT.md), or from `--env-file`. It does NOT come from the
+    # app services' env_file. The `:-` default keeps every other compose command
+    # (exec, run, logs) working when it is unset, so the guard below is what
+    # makes a missing value fail clearly.
+    environment:
+      STYLE_DOMAIN: ${STYLE_DOMAIN:-}
+    # Startup guard (build 015 revision 2; AUTHORED, NOT RUN): refuse to start
+    # with a clear log line when the domain is empty, instead of handing Caddy a
+    # Caddyfile with no site address. `$$` is Compose's escape: the container's
+    # shell expands $STYLE_DOMAIN at start, Compose does not. The exec line is
+    # the standard caddy:2 image command, unchanged. Assumes the image has
+    # /bin/sh (unverified).
+    command:
+      - sh
+      - -c
+      - 'test -n "$$STYLE_DOMAIN" || { echo "STYLE_DOMAIN is not set. Copy .env.compose.example to .env and set it, see docs/DEPLOYMENT.md" >&2; exit 1; }; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - proxy-data:/data
+      - proxy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  app-data:
+  model-data:
+  proxy-data:
+  proxy-config:

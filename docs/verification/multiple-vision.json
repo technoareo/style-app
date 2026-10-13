@@ -1,0 +1,41 @@
+{
+  "status": 200,
+  "seconds": 44.465,
+  "items": [
+    {
+      "name": "White T-shirt",
+      "category": "Tops",
+      "color": "White",
+      "pattern": "Graphic print",
+      "formality": "casual",
+      "brand": "",
+      "size": "",
+      "confidence": 0.75,
+      "evidence": "White short-sleeved t-shirt with circular graphic print and text 'WIKIPEDIA'.",
+      "box": [
+        0.073,
+        0.195,
+        0.357,
+        0.61
+      ]
+    },
+    {
+      "name": "Black Zip-Up Hoodie",
+      "category": "Outerwear",
+      "color": "Black",
+      "pattern": "Graphic print",
+      "formality": "casual",
+      "brand": "",
+      "size": "",
+      "confidence": 0.75,
+      "evidence": "Black zip-up hoodie with small circular graphic print on left chest.",
+      "box": [
+        0.608,
+        0.16,
+        0.284,
+        0.675
+      ]
+    }
+  ],
+  "warning": "Only describe visible physical garments. Do not count drawings or hidden items."
+}

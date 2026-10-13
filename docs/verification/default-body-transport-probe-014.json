@@ -1,0 +1,97 @@
+{
+  "compiledBuild": "AyhSS6LYgUPv-LCv9p02d",
+  "defaultBudgetMs": 20000,
+  "caddyVersion": "2.11.7",
+  "windowsLoopbackHttp1Only": true,
+  "noClientDestroyUntilResponseThenFiveSecondObservationOrWatchdog": true,
+  "results": [
+    {
+      "port": 3000,
+      "mode": "stall",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "status": 408,
+      "responseHeaders": {
+        "connection": "keep-alive",
+        "keepAlive": "timeout=5",
+        "cacheControl": "private, no-store"
+      },
+      "responseFinishedAtMs": 20296.388,
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "observationExpired": true,
+      "socketOpenBeforeClientCleanup": true,
+      "clientCleanupAtMs": 25304.0214,
+      "socketClosedAtMs": 25304.2703,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": false
+    },
+    {
+      "port": 3000,
+      "mode": "trickle",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "status": 408,
+      "responseHeaders": {
+        "connection": "keep-alive",
+        "keepAlive": "timeout=5",
+        "cacheControl": "private, no-store"
+      },
+      "responseFinishedAtMs": 20190.837199999998,
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "observationExpired": true,
+      "socketOpenBeforeClientCleanup": true,
+      "clientCleanupAtMs": 25192.8791,
+      "socketClosedAtMs": 25193.6736,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": false
+    },
+    {
+      "port": 3001,
+      "mode": "stall",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "watchdog": true,
+      "socketOpenBeforeClientCleanup": true,
+      "clientCleanupAtMs": 35001.8402,
+      "requestError": "ECONNRESET",
+      "socketClosedAtMs": 35002.4911,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": false
+    },
+    {
+      "port": 3001,
+      "mode": "trickle",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "watchdog": true,
+      "socketOpenBeforeClientCleanup": true,
+      "clientCleanupAtMs": 35001.8549,
+      "requestError": "ECONNRESET",
+      "socketClosedAtMs": 35002.2122,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": false
+    }
+  ],
+  "health": [
+    {
+      "port": 3000,
+      "status": 200
+    },
+    {
+      "port": 3001,
+      "status": 200
+    }
+  ],
+  "problems": [
+    "socket-open-five-seconds-after-response:3000:stall",
+    "socket-open-five-seconds-after-response:3000:trickle",
+    "deadline-response:3001:stall",
+    "socket-open-five-seconds-after-response:3001:stall",
+    "deadline-response:3001:trickle",
+    "socket-open-five-seconds-after-response:3001:trickle"
+  ]
+}

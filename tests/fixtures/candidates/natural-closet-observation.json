@@ -1,0 +1,13 @@
+{
+  "stage": "development observation before any model inference",
+  "notHeldOut": true,
+  "notHumanGoldStandard": true,
+  "observer": "Codex visual inspection",
+  "minimumClearlyDistinctVisibleGarments": 10,
+  "exactVisibleCount": null,
+  "conditions": ["low light", "heavy overlap", "side-facing garments", "partial lower-body crops", "many empty or partially occluded hangers"],
+  "visibleExamples": ["white garment on the left", "cream/beige garment with decorative trim", "coral/pink garment", "brown and cream checked garment", "navy garment with pale leaf-like print", "navy dotted garment", "dark green garment", "bright green floral garment", "dark garment with yellow flowers", "olive outer garment near the right"],
+  "uncertainAttributes": ["many top-versus-dress categories", "exact garment count", "fabric", "size", "brand", "fit", "warmth"],
+  "negativeObjects": ["hangers", "closet frame", "hanging rail"],
+  "note": "This lower-bound observation is provisional, not a precision/recall annotation. Exact boxes/counts/categories require independent confirmation before a launch benchmark. Do not count hangers as garments or treat hidden length as known."
+}

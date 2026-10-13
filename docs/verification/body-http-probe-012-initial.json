@@ -1,0 +1,55 @@
+{
+  "compiledLoopbackOnly": true,
+  "deployedProxyTest": false,
+  "operatorBudgetMs": 1000,
+  "productionDefaultMs": 20000,
+  "results": [
+    {
+      "label": "auth-stall",
+      "mode": "stall",
+      "network": true,
+      "expectedBudgetMs": 1000,
+      "status": 408,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "elapsedMs": 1320.4690999999998
+    },
+    {
+      "label": "auth-trickle",
+      "mode": "trickle",
+      "network": true,
+      "expectedBudgetMs": 1000,
+      "status": 408,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "elapsedMs": 1009.8717000000001
+    },
+    {
+      "label": "auth-abort",
+      "mode": "abort",
+      "network": true,
+      "expectedBudgetMs": 1000,
+      "networkError": "ECONNRESET",
+      "elapsedMs": 202.0672999999997
+    },
+    {
+      "label": "auth-oversize",
+      "mode": "oversize",
+      "network": true,
+      "expectedBudgetMs": 1000,
+      "status": 413,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "Account request is too large."
+      },
+      "elapsedMs": 9.178899999999885
+    }
+  ],
+  "healthStatus": 200,
+  "problems": [],
+  "notes": "Direct-handler default20s evidence is separate. A real client disconnect cannot receive an application reply; subsequent health confirms the strict-rejection server remains running."
+}

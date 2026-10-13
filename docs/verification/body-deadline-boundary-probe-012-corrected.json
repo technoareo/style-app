@@ -1,0 +1,11 @@
+{
+  "syntheticOnly": true,
+  "directHelper": true,
+  "networkTest": false,
+  "budgetMs": 50,
+  "elapsedMs": 127.92699999999996,
+  "status": "timeout",
+  "acceptedAfterDeadline": false,
+  "readerReleased": true,
+  "explanation": "A queued microtask delays the read continuation while timers cannot run. An absolute deadline needs an elapsed-clock check, not only a timer flag."
+}

@@ -1,0 +1,96 @@
+✔ the shipped Caddyfile answers 404 for the upload counters and still proxies everything else (2.0913ms)
+✔ earlier protections of the Caddyfile are intact (0.4887ms)
+✔ the checker flags a Caddyfile without the block, with a wrong response, or with the order reversed (0.6978ms)
+✔ the app port is not published, so the counters stay internal; the route itself still exists (0.4682ms)
+✔ the deployment guide documents the default block and the operator way in (0.491ms)
+✔ boxes that are non-finite, mis-sized, out of range, reversed or zero-size are rejected, never repaired (2.1082ms)
+✔ IoU is exact for identical, half-overlapping, touching and disjoint boxes (0.2255ms)
+✔ native 0..1000 corner items are validated exactly; the only change is division by the declared scale (0.5681ms)
+✔ maximum matching beats greedy best-IoU-first on a known counterexample (0.4677ms)
+✔ matching is one-to-one, inclusive at the threshold, and prefers the larger total IoU at equal size (0.6673ms)
+✔ category disagreement is reported apart from geometry (1.2137ms)
+✔ a duplicate box is a duplicate false positive; a far box is another false positive (0.4125ms)
+✔ empty truth and empty prediction is explicit agreement, not a perfect precision/recall (0.6328ms)
+✔ attributes count only against human gold and only on matched garments (0.8749ms)
+✔ failed, timed-out, truncated, invalid and missing cases stay in the denominators (1.3001ms)
+✔ manifests reject unknown fields, bad paths, duplicates and missing licenses (3.1031ms)
+✔ a held-out manifest cannot hold a known development image, an already-inferred image, or lack a freeze time (0.8668ms)
+✔ the same image or id in the development and held-out manifests is contamination (0.5181ms)
+✔ annotations: unlabeled, model-made, inconsistent and mis-wired labels are not gold (2.418ms)
+✔ annotations are checked against their manifest: hash, split, strata and missing records (0.7816ms)
+✔ prediction reports reject inconsistent counts, salvaged items on failures, unknown fields and duplicates (2.3287ms)
+✔ a consistent development evaluation scores and reports no readiness claim (1.2455ms)
+✔ scoring is refused for missing images, hash or dimension mismatches (1.0889ms)
+✔ scoring is refused without human gold labels (0.825ms)
+✔ scoring is refused for predictions of the wrong image, an unknown fixture, or an unmeasured threshold (0.8704ms)
+✖ held-out scoring is refused after contamination or for a run that began before the split was fixed (9.2042ms)
+✔ development and held-out, and single-item and crowded photos, are aggregated separately (0.8119ms)
+✔ the report is reproducible and independent of prediction order (1.4637ms)
+✔ the saved Qwen compact-corners evidence is adapted honestly: one reversed box makes the whole case a failure (1.009ms)
+✔ the Qwen adapter maps timeouts, failures, token-limit stops and malformed records to failures (0.3005ms)
+✔ another model plugs in through the adapter interface, and truncated JSON text is never repaired (0.3022ms)
+✔ the shipped development manifest is development-only and the held-out manifest is empty (0.8697ms)
+✔ image headers give stored size and EXIF orientation; anything damaged gives null (0.614ms)
+✔ a report is written to a new file and an existing file is never overwritten (2.7037ms)
+✖ the command line scores a consistent set, refuses inconsistent sets without writing, and never overwrites (15.8814ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 33
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.033
+
+✖ failing tests:
+
+test at tests\visionEvaluation.test.ts:2:25369
+✖ held-out scoring is refused after contamination or for a run that began before the split was fixed (9.2042ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal matching /known development image/
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:170:10)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:590:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: EvaluationRefusal: Refusing to score (2 problems):
+    - fixture "h": annotation sha256 differs from the manifest's immutable hash
+    - fixture "h": the prediction was made on a different image (sha256 mismatch)
+        at evaluate (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\scripts\vision-evaluation\evaluate.ts:122:34)
+        at <anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:171:11)
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:170:10)
+        at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:590:3)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1397:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+        at Test.postRun (node:internal/test_runner/test:1537:19),
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests\visionEvaluation.test.ts:2:37605
+✖ the command line scores a consistent set, refuses inconsistent sets without writing, and never overwrites (15.8814ms)
+  AssertionError [ERR_ASSERTION]: a zero threshold is refused
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionEvaluation.test.ts:867:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

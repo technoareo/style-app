@@ -1,0 +1,8 @@
+{
+  "syntheticOnly": true,
+  "requests": 100,
+  "configuredGlobalCapacity": 3,
+  "peakAccountHolders": 3,
+  "afterDrain": 0,
+  "boundExceeded": false
+}

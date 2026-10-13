@@ -1,0 +1,119 @@
+✔ time spent waiting for the gate is deducted from the SQLite budget, and the failed begin releases the gate (695.3296ms)
+✔ a gate wait that is shorter than the budget still leaves the rest for the SQLite lock, which is then acquired (508.8376ms)
+✔ a gate wait that uses the whole budget fails as a gate timeout: no BEGIN is attempted and nothing is left held (153.0141ms)
+✔ STATIC: begin() derives the SQLite timeout from one deadline and the shared retry accepts an explicit remaining budget (1.2137ms)
+✔ the shipped Caddyfile answers 404 for the upload counters and still proxies everything else (3.3479ms)
+✔ earlier protections of the Caddyfile are intact (0.8872ms)
+✔ the checker flags a Caddyfile without the block, with a wrong response, or with the order reversed (1.0955ms)
+✔ the compose reader sees one-line, block-list and long-form ports, and ignores comments and `expose` (3.8546ms)
+✔ the compose reader throws, instead of answering a false-safe empty result, for absent or unsupported input (1.781ms)
+✔ the real compose.yaml is in a shape the reader supports, and nothing next to it overrides it (2.093ms)
+✔ the app port is not published, so the counters stay internal; the route itself still exists (3.8616ms)
+✔ the proxy receives only STYLE_DOMAIN: no env_file, no app secrets, and the Caddyfile reads nothing else (3.6743ms)
+✔ the proxy command refuses to start without STYLE_DOMAIN before it execs caddy, with Compose-escaped variables and the standard caddy command (1.5102ms)
+✔ .env.compose.example is a domain-only, secret-free Compose template with a public placeholder (1.7534ms)
+✔ the deployment guide has the domain file steps before the compose commands, keeps --env-file as an alternative, and claims no Compose version (1.8361ms)
+✔ the deployment guide documents the default block and the operator way in (0.6213ms)
+✔ an ordinary read takes neither the write gate nor the SQLite write lock, and a missing wardrobe stays revision 0 without a row (2434.0535ms)
+✔ STATIC (supplementary text check, not runtime evidence; the real handlers are exercised in wardrobeRoutes015.test.ts): the wardrobe GET handler does not use the write path; PUT prepares before it acquires (0.6608ms)
+✖ reclamation re-reads the CURRENT wardrobe inside its committing transaction: a save that attaches the photo after the read keeps it (321.2346ms)
+✔ a missing wardrobe is reclaimed without creating a row; an unreadable stored document fails closed (475.976ms)
+✔ a reclamation that cannot start inside its budget fails retryably and deletes nothing; the same call works afterwards (285.3502ms)
+✔ reads see the same shape as before, and the legacy loadWardrobe still reads and reclaims in one transaction (190.5526ms)
+✔ prepareWardrobeSave is pure: it validates, enumerates references and serializes without the database or gate (1.3693ms)
+✔ everything that depends on database state is decided at commit time, in the transaction (554.2656ms)
+✔ saveWardrobe keeps its direct-caller behaviour (prepare then commit in one call) (151.9295ms)
+✔ F1: forged, cloned, spread, derived, proxied and non-object saves are refused before any database access, and a real one still commits (285.7676ms)
+✔ F1: an issued save is frozen with real frozen arrays, and attempts to mutate it cannot change what is committed (286.4181ms)
+✔ F1: ownership is decided for the committing account; reusing one prepared save is idempotent and harmless across accounts (756.6893ms)
+✖ F2: a photo referenced by a saved look item's image only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (587.3084ms)
+✖ F2: a photo referenced by a wardrobe item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (469.0426ms)
+✖ F2: a photo referenced by a saved look item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (440.3779ms)
+✔ F6: a stored document that cannot be read answers one fixed 500 on read, is never repaired and never becomes an empty wardrobe (348.6893ms)
+✔ F6: a save over an unreadable replaced document succeeds with an empty old set, keeps the current references, still applies the 24 h grace, and keeps its revision and ownership checks (3270.4051ms)
+✔ F6: the corrupt-document read refusal never deletes through loadWardrobe either (189.0054ms)
+✔ an oversize document that also references an unavailable photo answers 413 from the pure step, without any database access; a small one is refused later with 400 (216.8853ms)
+✔ GET answers 200 inside a deadline while the write gate and a foreign SQLite write lock are held, queues nothing and creates no row (2684.7919ms)
+✔ GET with an expired unreferenced photo and a stalled cleanup still succeeds, after about the bounded cleanup wait, and deletes nothing; the next GET cleans up (2470.9858ms)
+✔ PUT admission: origin, session and account binding are refused at once under a held gate and use no quota; an authenticated PUT waits in ADMISSION (the quota write), whatever its body (845.865ms)
+✔ PUT validation precedes the wardrobe transaction: after admission, invalid documents are refused while the gate is held; a valid one queues for the gate and then commits (1059.33ms)
+✔ PUT: a body over 3 MB is a 413 even when it references an unavailable photo, and writes nothing (499.7187ms)
+✔ F6 routes: an unreadable stored document answers GET with one fixed 500 and no repair; PUT with the right revision replaces it, and a wrong revision is a 409 (1987.7954ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 37
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15441.3538
+
+✖ failing tests:
+
+test at tests\wardrobeContention015.test.ts:115:1
+✖ reclamation re-reads the CURRENT wardrobe inside its committing transaction: a save that attaches the photo after the read keeps it (321.2346ms)
+  AssertionError [ERR_ASSERTION]: the reclamation is waiting for the gate
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\wardrobeContention015.test.ts:132:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\wardrobeContention015.test.ts:482:3
+✖ F2: a photo referenced by a saved look item's image only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (587.3084ms)
+  AssertionError [ERR_ASSERTION]: the reclamation is waiting for the gate
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\wardrobeContention015.test.ts:497:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\wardrobeContention015.test.ts:482:3
+✖ F2: a photo referenced by a wardrobe item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (469.0426ms)
+  AssertionError [ERR_ASSERTION]: the reclamation is waiting for the gate
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\wardrobeContention015.test.ts:497:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\wardrobeContention015.test.ts:482:3
+✖ F2: a photo referenced by a saved look item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (440.3779ms)
+  AssertionError [ERR_ASSERTION]: the reclamation is waiting for the gate
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\wardrobeContention015.test.ts:497:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

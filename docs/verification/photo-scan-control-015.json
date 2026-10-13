@@ -1,0 +1,152 @@
+{
+  "kind": "synthetic-sql-alternating-small-blob-control",
+  "repetitions": 12,
+  "largePayloadBytes": 2400000,
+  "smallPayloadBytes": 128,
+  "results": [
+    {
+      "query": "readHint",
+      "variant": "largeOwner",
+      "timingsMs": [
+        88.84380000000004,
+        86.05219999999997,
+        89.94560000000001,
+        85.34680000000003,
+        86.2541,
+        84.17330000000015,
+        98.19349999999986,
+        89.29169999999999,
+        96.79849999999988,
+        86.09310000000005,
+        84.70479999999998,
+        87.2202000000002
+      ],
+      "medianMs": 87.2202000000002,
+      "maxMs": 98.19349999999986,
+      "plan": [
+        "SEARCH photo_assets USING INDEX photo_owner_probe (user_id=?)"
+      ]
+    },
+    {
+      "query": "readHint",
+      "variant": "largeCovering",
+      "timingsMs": [
+        0.020899999999983265,
+        0.04899999999997817,
+        0.05409999999994852,
+        0.05010000000004311,
+        0.022199999999884312,
+        0.05490000000008877,
+        0.02539999999999054,
+        0.01880000000005566,
+        0.019499999999879947,
+        0.04600000000004911,
+        0.037699999999858846,
+        0.03230000000030486
+      ],
+      "medianMs": 0.037699999999858846,
+      "maxMs": 0.05490000000008877,
+      "plan": [
+        "SEARCH photo_assets USING COVERING INDEX photo_cover_probe (user_id=? AND created_at<?)"
+      ]
+    },
+    {
+      "query": "readHint",
+      "variant": "smallOwner",
+      "timingsMs": [
+        0.024099999999975807,
+        0.020899999999983265,
+        0.029999999999972715,
+        0.031400000000076034,
+        0.01929999999993015,
+        0.02909999999997126,
+        0.01619999999979882,
+        0.01749999999992724,
+        0.015000000000100044,
+        0.03789999999980864,
+        0.023699999999735155,
+        0.015600000000176806
+      ],
+      "medianMs": 0.023699999999735155,
+      "maxMs": 0.03789999999980864,
+      "plan": [
+        "SEARCH small_assets USING INDEX small_owner (user_id=?)"
+      ]
+    },
+    {
+      "query": "saveSweep",
+      "variant": "largeOwner",
+      "timingsMs": [
+        83.40410000000003,
+        85.55080000000004,
+        87.22140000000002,
+        86.11850000000004,
+        84.16630000000009,
+        85.9973,
+        85.1398999999999,
+        89.3632,
+        88.2645,
+        85.31799999999998,
+        85.7239999999997,
+        93.79430000000002
+      ],
+      "medianMs": 85.9973,
+      "maxMs": 93.79430000000002,
+      "plan": [
+        "SEARCH photo_assets USING INDEX photo_owner_probe (user_id=?)"
+      ]
+    },
+    {
+      "query": "saveSweep",
+      "variant": "largeCovering",
+      "timingsMs": [
+        0.051999999999964075,
+        0.07589999999993324,
+        0.03150000000005093,
+        0.04250000000001819,
+        0.048900000000003274,
+        0.04949999999985266,
+        0.0543999999999869,
+        0.050700000000006185,
+        0.037400000000161526,
+        0.03110000000015134,
+        0.06410000000005311,
+        0.029500000000098225
+      ],
+      "medianMs": 0.04949999999985266,
+      "maxMs": 0.07589999999993324,
+      "plan": [
+        "SEARCH photo_assets USING COVERING INDEX photo_cover_probe (user_id=?)"
+      ]
+    },
+    {
+      "query": "saveSweep",
+      "variant": "smallOwner",
+      "timingsMs": [
+        0.026099999999985357,
+        0.06029999999998381,
+        0.028099999999994907,
+        0.04720000000008895,
+        0.047499999999899956,
+        0.024499999999989086,
+        0.04809999999997672,
+        0.043400000000019645,
+        0.023899999999912325,
+        0.503400000000056,
+        0.04620000000022628,
+        0.04040000000031796
+      ],
+      "medianMs": 0.04620000000022628,
+      "maxMs": 0.503400000000056,
+      "plan": [
+        "SEARCH small_assets USING INDEX small_owner (user_id=?)"
+      ]
+    }
+  ],
+  "limitations": [
+    "Forced index SQL microbenchmark, not application GET/PUT or concurrency.",
+    "Synthetic bytes, no real images/accounts.",
+    "Main database read-only; small table TEMP in memory.",
+    "OS caches not cleared; physical read counts not captured."
+  ]
+}

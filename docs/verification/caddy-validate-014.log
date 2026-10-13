@@ -1,0 +1,7 @@
+{"level":"info","ts":1791819314.1623237,"msg":"using config from file","file":"deploy/Caddyfile"}
+{"level":"info","ts":1791819314.1634912,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1791819314.1634912,"msg":"Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies","adapter":"caddyfile","file":"deploy/Caddyfile","line":2}
+{"level":"info","ts":1791819314.164043,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x11be8d42580"}
+{"level":"info","ts":1791819314.164555,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1791819314.164555,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x11be8d42580"}
+Valid configuration

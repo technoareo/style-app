@@ -1,0 +1,88 @@
+{
+  "developmentOnly": true,
+  "heldOut": false,
+  "accuracyBenchmark": false,
+  "backend": "wasm",
+  "dtype": "fp32",
+  "threads": 1,
+  "network": false,
+  "revision": "ff690b0a8050566c290287545bd059350f3e9096",
+  "source": "tests/fixtures/candidates/natural-closet.jpg",
+  "runs": [
+    {
+      "index": 1,
+      "inferenceMs": 25790,
+      "thresholds": [
+        {
+          "threshold": 0.25,
+          "count": 0,
+          "structurallyValid": 0,
+          "proposals": []
+        },
+        {
+          "threshold": 0.35,
+          "count": 0,
+          "structurallyValid": 0,
+          "proposals": []
+        },
+        {
+          "threshold": 0.45,
+          "count": 0,
+          "structurallyValid": 0,
+          "proposals": []
+        },
+        {
+          "threshold": 0.05,
+          "error": "token_ids must be a non-empty array of integers."
+        },
+        {
+          "threshold": 0.1,
+          "error": "token_ids must be a non-empty array of integers."
+        },
+        {
+          "threshold": 0.15,
+          "error": "token_ids must be a non-empty array of integers."
+        }
+      ],
+      "outputs": {
+        "logits": {
+          "type": "float32",
+          "dims": [
+            1,
+            900,
+            256
+          ],
+          "min": -8.28045654296875,
+          "max": -1.174012303352356,
+          "nonFinite": 211500
+        },
+        "pred_boxes": {
+          "type": "float32",
+          "dims": [
+            1,
+            900,
+            4
+          ],
+          "min": 0.00822979211807251,
+          "max": 0.9999071359634399,
+          "nonFinite": 0
+        }
+      }
+    }
+  ],
+  "loadMs": 3037,
+  "query": "shirt. dress. jacket. coat. trousers. skirt. shorts. shoes. handbag.",
+  "preprocessMs": 73,
+  "tensorShape": [
+    1,
+    3,
+    800,
+    800
+  ],
+  "imageSize": [
+    1600,
+    1200
+  ],
+  "totalMs": 29370,
+  "notes": "Public development fixture only. Counts are raw proposals, not validated garment counts, recall or accuracy. No application changes."
+}

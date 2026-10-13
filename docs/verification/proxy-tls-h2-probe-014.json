@@ -1,0 +1,22 @@
+{
+  "candidateOnly": true,
+  "windowsLoopbackTls": true,
+  "systemTrustInstallationDisabled": true,
+  "tlsVerificationDisabled": false,
+  "publicCaSha256": "dc1e2a46f0717061880ef3305fe98724685ceb0841b189ee79fc0b00cc2d50cb",
+  "goaway": [],
+  "sessionErrors": [
+    "ERR_INVALID_IP_ADDRESS"
+  ],
+  "requests": [],
+  "problems": [
+    "Probe setup/runtime failure"
+  ],
+  "sessionClosedAtMs": 18.997300000000003,
+  "failure": {
+    "name": "TypeError",
+    "code": "ERR_INVALID_IP_ADDRESS",
+    "message": "Invalid IP address: undefined"
+  },
+  "elapsedMs": 56.0834
+}

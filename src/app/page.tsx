@@ -1,20 +1,246 @@
-'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { Shirt, Sparkles, Camera, Plus, Sun, Heart, UserRound, LogOut, CloudSun, ChevronRight, X, Upload, Check, Scissors, Pencil, Trash2, UserPlus } from 'lucide-react';
-type Garment={id:string;name:string;category:string;color:string;brand:string;size:string;image:string;sourcePhoto?:string};
-type Space={name:string;wardrobe:Garment[];saved:boolean};
-const starter:Garment[]=[{id:'1',name:'Relaxed blazer',category:'Outerwear',color:'Sand',brand:'',size:'',image:'🧥'},{id:'2',name:'Everyday tee',category:'Tops',color:'White',brand:'',size:'',image:'👕'},{id:'3',name:'Straight-leg denim',category:'Bottoms',color:'Indigo',brand:'',size:'',image:'👖'},{id:'4',name:'Leather loafers',category:'Shoes',color:'Black',brand:'',size:'',image:'👞'}];
-const PROFILE_KEY='style-profiles-v2';const activeKey='style-active-profile-v2';
-export default function Home(){const [wardrobe,setWardrobe]=useState<Garment[]>(starter);const [tab,setTab]=useState('Today');const [user,setUser]=useState('');const [auth,setAuth]=useState(false);const [email,setEmail]=useState('');const [toast,setToast]=useState('');const [person,setPerson]=useState('');const [saved,setSaved]=useState(false);const [ready,setReady]=useState(false);const [editing,setEditing]=useState<Garment|null>(null);const [source,setSource]=useState<string|null>(null);const [profileName,setProfileName]=useState('');
-useEffect(()=>{try{const active=localStorage.getItem(activeKey)||'';setUser(active);setEmail(active);const raw=localStorage.getItem(PROFILE_KEY);const spaces:Record<string,Space>=raw?JSON.parse(raw):{};const space=active?spaces[active]:undefined;if(space){setWardrobe(space.wardrobe||[]);setSaved(!!space.saved);setProfileName(space.name||'');}else if(!active){setWardrobe(starter);setSaved(false);}}catch{setWardrobe(starter)}setReady(true);},[]);
-useEffect(()=>{if(!ready)return;try{const raw=localStorage.getItem(PROFILE_KEY);const spaces:Record<string,Space>=raw?JSON.parse(raw):{};if(user){spaces[user]={name:profileName||user.split('@')[0],wardrobe,saved};localStorage.setItem(PROFILE_KEY,JSON.stringify(spaces));localStorage.setItem(activeKey,user);}else localStorage.removeItem(activeKey);}catch{notify('Could not save locally. Your browser storage may be full.')}},[user,wardrobe,saved,profileName,ready]);
-const notify=(s:string)=>{setToast(s);setTimeout(()=>setToast(''),2500)};
-const changeProfile=(address:string)=>{const normalized=address.trim().toLowerCase();if(!normalized.includes('@'))return notify('Enter a valid email address');try{const spaces:Record<string,Space>=JSON.parse(localStorage.getItem(PROFILE_KEY)||'{}');const space=spaces[normalized];setUser(normalized);setEmail(normalized);setWardrobe(space?.wardrobe||[]);setSaved(!!space?.saved);setProfileName(space?.name||normalized.split('@')[0]);setAuth(false);notify(space?'Profile loaded':'New personal space created');}catch{notify('Could not load profile')}};
-const addBlank=()=>{const g:Garment={id:crypto.randomUUID(),name:'New wardrobe piece',category:'Other',color:'',brand:'',size:'',image:'👚'};setWardrobe(w=>[g,...w]);setEditing(g);};
-const uploadPhotos=()=>{const input=document.createElement('input');input.type='file';input.accept='image/*';input.multiple=true;input.onchange=()=>{const files=Array.from(input.files||[]);if(!files.length)return;files.forEach(file=>{const reader=new FileReader();reader.onload=()=>{const data=String(reader.result);const g:Garment={id:crypto.randomUUID(),name:file.name.replace(/\.[^.]+$/,''),category:'Unsorted',color:'',brand:'',size:'',image:data,sourcePhoto:data};setWardrobe(w=>[g,...w]);};reader.onerror=()=>notify(`Couldn't read ${file.name}`);reader.readAsDataURL(file);});notify(`${files.length} photo${files.length===1?'':'s'} added as wardrobe item${files.length===1?'':'s'} to review`);};input.click();};
-const addExtracted=()=>{if(!source)return;const g:Garment={id:crypto.randomUUID(),name:'Extracted item',category:'Unsorted',color:'',brand:'',size:'',image:source,sourcePhoto:source};setWardrobe(w=>[g,...w]);setEditing(g);notify('Separate item created from the source photo. Crop or image recognition is not applied in this demo.');};
-const saveEdit=()=>{if(!editing)return;setWardrobe(w=>w.map(g=>g.id===editing.id?editing:g));setEditing(null);notify('Wardrobe item updated')};
-const remove=(id:string)=>{setWardrobe(w=>w.filter(g=>g.id!==id));setEditing(null);notify('Wardrobe item removed')};
-const look=useMemo(()=>wardrobe.slice(0,4),[wardrobe]);const login=()=>changeProfile(email);const uploadPerson=()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>{const f=i.files?.[0];if(f){const r=new FileReader();r.onload=()=>setPerson(String(r.result));r.readAsDataURL(f);}};i.click();};
-const card=(g:Garment)=><article className="wardrobe-card" key={g.id}><div className="wardrobe-image">{g.image.startsWith('data:')?<img src={g.image} alt={g.name}/>:<span>{g.image}</span>}<button className="edit-fab" onClick={()=>setEditing({...g})} aria-label={`Edit ${g.name}`}><Pencil size={14}/></button></div><div className="wardrobe-info"><b>{g.name}</b><span>{g.category}{g.color?` · ${g.color}`:''}</span><span className="item-meta">{g.brand||'Brand not set'}{g.size?` · Size ${g.size}`:' · Size not set'}</span></div></article>;
-return <main><aside className="sidebar"><a className="brand" href="#"><span className="brand-mark"><Sparkles size={19}/></span> style<span className="brand-light">studio</span></a><div className="side-label">YOUR SPACE</div>{['Today','My wardrobe','Saved looks'].map((x,i)=><button key={x} className={`nav ${tab===x?'active':''}`} onClick={()=>setTab(x)}>{i===0?<Sun size={17}/>:i===1?<Shirt size={17}/>:<Heart size={17}/>} {x}</button>)}<div className="side-bottom"><div className="avatar">{user?user[0].toUpperCase():'A'}</div><div className="user-meta"><b>{user?profileName||user.split('@')[0]:'Guest space'}</b><span>{user||'Personal stylist'}</span></div>{user?<button className="icon-button" onClick={()=>{setUser('');setWardrobe(starter);setSaved(false);setProfileName('');notify('Signed out; showing guest space')}} aria-label="Sign out"><LogOut size={16}/></button>:<button className="text-link" onClick={()=>setAuth(true)}>Sign in</button>}</div></aside><section className="main"><header className="topbar"><div className="mobile-brand">✦ style studio</div><span className="date"><Sun size={15}/> YOUR DAILY EDIT</span><button className="profile-button" onClick={()=>{setEmail(user);setAuth(true)}}><UserRound size={17}/><span>{user?profileName||'My profile':'Sign in / switch profile'}</span></button></header>{tab==='Today'?<><section className="hero"><div className="hero-copy"><div className="eyebrow">YOUR SPACE, YOUR STYLE</div><h1>Get dressed.<br/><em>Feel like you.</em></h1><p>Your wardrobe, thoughtfully put together. A little inspiration for whatever today brings.</p><button className="primary" onClick={()=>document.getElementById('look')?.scrollIntoView({behavior:'smooth'})}><Sparkles size={16}/> Style my day <ChevronRight size={15}/></button></div><div className="hero-art"><div className="sun-disc"/><div className="editorial-card"><span className="look-tag">THE DAILY LOOK</span><div className="outfit-emoji">🧥<br/>👕<br/>👖<br/>👞</div><span className="card-caption">A good day starts here</span></div><span className="art-star star-one">✳</span><span className="art-star star-two">✳</span></div></section><div className="section-heading" id="look"><div><span className="eyebrow">MADE FOR YOUR DAY</span><h2>Today’s outfit</h2></div><button className={`save-button ${saved?'is-saved':''}`} onClick={()=>{setSaved(!saved);notify(saved?'Removed from saved looks':'Look saved for later')}}><Heart size={16} fill={saved?'currentColor':'none'}/> {saved?'Saved':'Save look'}</button></div><div className="outfit-panel"><div className="outfit-top"><div><div className="look-name">The easy polish</div><span className="look-description">A few pieces from your personal wardrobe.</span></div><span className="weather"><CloudSun size={17}/> Easy all-day</span></div><div className="look-items">{look.map((g,i)=><div className="look-item" key={g.id}><div className="item-visual">{g.image.startsWith('data:')?<img src={g.image} alt={g.name}/>:<span>{g.image}</span>}</div><div className="item-info"><small>{['LAYER','TOP','BOTTOM','FINISH'][i]||'PIECE'}</small><b>{g.name}</b><span>{g.brand||g.color||g.category}</span></div></div>)}</div><div className="styling-note"><Sparkles size={16}/><span><b>Why it works</b> A clean base and easy layers make this a no-fuss combination. Swap in your favorite accessory to make it yours.</span></div></div><div className="section-heading wardrobe-head"><div><span className="eyebrow">{user?`${profileName||'YOUR'}’S PERSONAL COLLECTION`:'YOUR PERSONAL COLLECTION'}</span><h2>In your wardrobe <span className="count">{wardrobe.length}</span></h2></div><button className="outline-button" onClick={uploadPhotos}><Plus size={16}/> Add photos</button></div><div className="wardrobe-grid">{wardrobe.slice(0,4).map(card)}</div><section className="personalize"><div className="personal-icon"><Camera size={21}/></div><div><b>Make it feel more you</b><p>Add a photo and your style preferences to personalize your daily outfit ideas.</p></div><button className="outline-button" onClick={uploadPerson}>{person?<Check size={16}/>:<Upload size={16}/>} {person?'Photo added':'Add your photo'}</button></section></>:tab==='My wardrobe'?<><div className="page-title"><span className="eyebrow">{user?`${profileName||'YOUR'}’S PERSONAL COLLECTION`:'YOUR PERSONAL COLLECTION'}</span><h1>My wardrobe</h1><p>Everything you love, all in one place. Brand and size can be added to every piece.</p></div><div className="upload-banner"><div><b>Upload photos of your clothes</b><p>Choose one or more photos in any image format supported by your device. Each photo creates a reviewable item record.</p><small>Prototype: automated clothing detection and background segmentation are not connected. Use “Add item from photo” to represent another item in the same source photo.</small></div><button className="primary" onClick={uploadPhotos}><Upload size={16}/> Upload photos</button></div><div className="wardrobe-grid full-grid">{wardrobe.map(card)}<button className="add-card" onClick={addBlank}><Plus/><b>Add an item manually</b><span>Create a piece and enter its brand and size</span></button></div></>:<div className="page-title"><span className="eyebrow">YOUR PERSONAL EDIT</span><h1>Saved looks</h1>{saved?<div className="outfit-panel"><div className="look-name">The easy polish</div><p>Your everyday outfit is saved in this profile. Come back whenever you need a little inspiration.</p>{look.map(g=><span className="saved-pill" key={g.id}>{g.image.startsWith('data:')?'👚':g.image} {g.name}</span>)}</div>:<div className="empty-state"><Heart size={30}/><h2>Looks you love, kept close.</h2><p>Save an outfit and it will be waiting here for you.</p><button className="primary" onClick={()=>setTab('Today')}>Explore today’s look</button></div>}</div>}<footer>STYLE, WITHOUT THE SECOND-GUESSING <span>Made for real-life mornings&nbsp; ✳</span></footer></section>{toast&&<div className="toast"><Check size={16}/>{toast}</div>}{auth&&<div className="modal-backdrop" onClick={()=>setAuth(false)}><div className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setAuth(false)}><X/></button><div className="brand-mark"><UserPlus size={19}/></div><span className="eyebrow">SEPARATE PERSONAL SPACES</span><h2>{user?'Switch profile':'Create your space'}</h2><p>Use an email address as a local demo profile key. Each profile keeps its own wardrobe and saved look on this browser.</p><label>Email address</label><input type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()}/><label className="field-label">Display name (optional)</label><input type="text" placeholder="Your name" value={profileName} onChange={e=>setProfileName(e.target.value)}/><button className="primary modal-submit" onClick={login}>{user?'Open profile':'Create / open profile'} <ChevronRight size={16}/></button><small>Demo profiles and photos are stored only in this browser. This is not secure server-side authentication or cloud sync.</small></div></div>}{editing&&<div className="modal-backdrop" onClick={()=>setEditing(null)}><div className="modal item-modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setEditing(null)}><X/></button><span className="eyebrow">WARDROBE ITEM</span><h2>Edit item details</h2>{editing.image.startsWith('data:')&&<img className="edit-preview" src={editing.image} alt="Wardrobe item preview"/>}<label>Item name</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})}/><label>Category</label><input value={editing.category} onChange={e=>setEditing({...editing,category:e.target.value})}/><label>Brand</label><input placeholder="e.g. COS" value={editing.brand} onChange={e=>setEditing({...editing,brand:e.target.value})}/><label>Size</label><input placeholder="e.g. M, 8, 30x32" value={editing.size} onChange={e=>setEditing({...editing,size:e.target.value})}/><div className="modal-actions"><button className="danger-button" onClick={()=>remove(editing.id)}><Trash2 size={15}/> Remove</button><button className="primary" onClick={saveEdit}><Check size={15}/> Save details</button></div>{editing.sourcePhoto&&<button className="outline-button extraction-button" onClick={()=>{setSource(editing.sourcePhoto||null);addExtracted()}}><Scissors size={15}/> Add another item from this photo</button>}<small>Photo extraction is a manual-review concept in this prototype; no image-recognition model runs.</small></div></div>}</main>}
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Download, UserRound } from "lucide-react";
+import { ItemEditor } from "../components/ItemEditor";
+import { AccountDialog } from "../components/AccountDialog";
+import { AuthScreen } from "../components/AuthScreen";
+import { authClient } from "../services/authClient";
+import { SavedView } from "../components/SavedView";
+import { Sidebar, type Tab } from "../components/Sidebar";
+import { TodayView } from "../components/TodayView";
+import { WardrobeView } from "../components/WardrobeView";
+import { UploadDialog } from "../components/UploadDialog";
+import { AnalysisBanner } from "../components/AnalysisBanner";
+import { useAnalysisJobs } from "../hooks/useAnalysisJobs";
+import { buildLook, type StyleContext } from "../domain/outfit";
+import type { Garment } from "../domain/types";
+import { useStyleStore } from "../hooks/useStyleStore";
+export default function Home() {
+  const { data: session, isPending, error } = authClient.useSession();
+  const [booted, setBooted] = useState(false);
+  useEffect(() => {
+    if (!isPending) setBooted(true);
+  }, [isPending]);
+  if (isPending && !booted)
+    return (
+      <main className="loading-screen" role="status">
+        Opening Style Studio…
+      </main>
+    );
+  if (error)
+    return (
+      <main className="loading-screen">
+        <p>Style Studio is temporarily unavailable.</p>
+        <button onClick={() => window.location.reload()}>Try again</button>
+      </main>
+    );
+  if (!session) return <AuthScreen />;
+  return <WardrobeApp key={session.user.id} user={session.user} />;
+}
+function WardrobeApp({
+  user,
+}: {
+  user: { id: string; name: string; email: string };
+}) {
+  const store = useStyleStore(user);
+  const [tab, setTab] = useState<Tab>("Today");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [editing, setEditing] = useState<Garment | null>(null);
+  const analysisJobs = useAnalysisJobs(uploadOpen, user.id);
+  const [context, setContext] = useState<StyleContext>({
+    occasion: "everyday",
+    temperature: 25,
+    variation: 0,
+  });
+  useEffect(() => {
+    const date = new Date();
+    const day = Math.floor(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000,
+    );
+    setContext((current) => ({ ...current, variation: day }));
+  }, []);
+  // Warn before a reload/close silently discards a save that is still
+  // pending or has failed, mirroring the explicit sign-out guard below.
+  useEffect(() => {
+    if (!store.hasUnsavedChanges) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [store.hasUnsavedChanges]);
+  const result = useMemo(
+    () => buildLook(store.wardrobe, context),
+    [store.wardrobe, context],
+  );
+  const collectionLabel = store.profileName
+    ? `${store.profileName}’S COLLECTION`
+    : "YOUR PERSONAL COLLECTION";
+  const addBlank = () =>
+    setEditing({
+      id: crypto.randomUUID(),
+      name: "",
+      category: "Unsorted",
+      color: "",
+      brand: "",
+      size: "",
+      image: "👚",
+      available: true,
+      reviewed: false,
+      warmth: "unknown",
+      formality: "unknown",
+    });
+  const saveEdit = (g: Garment) => {
+    if (store.wardrobe.some((x) => x.id === g.id)) store.updateGarment(g);
+    else store.addGarment(g);
+    setEditing(null);
+    store.notify("Item updated. Saving to your account…");
+  };
+  if (!store.ready)
+    return (
+      <main className="loading-screen" role="status">
+        {store.loadFailed ? (
+          <>
+            <p>{store.error}</p>
+            <button onClick={() => window.location.reload()}>Try again</button>
+          </>
+        ) : (
+          "Opening your wardrobe…"
+        )}
+      </main>
+    );
+  return (
+    <main>
+      <Sidebar
+        tab={tab}
+        onTab={setTab}
+        profileId={store.profileId}
+        profileName={store.profileName || "My wardrobe"}
+        onSignIn={() => setProfileOpen(true)}
+        onSignOut={store.signOut}
+      />
+      <section className="main">
+        {store.error && (
+          <div role="alert" className="save-warning">
+            <p>{store.error} Export your draft before reloading.</p>
+            <button onClick={() => void store.exportBackup()}>
+              Export draft
+            </button>
+            <button onClick={store.retrySave}>Retry save</button>
+          </div>
+        )}
+        <header className="topbar">
+          <div className="mobile-brand">✦ style studio</div>
+          <span className="date">YOUR WARDROBE. YOUR POSSIBILITIES.</span>
+          <button
+            className="profile-button"
+            onClick={() => setProfileOpen(true)}
+          >
+            <UserRound size={17} />
+            {store.profileName || "My wardrobe"}
+          </button>
+        </header>
+        {!uploadOpen && (
+          <AnalysisBanner
+            jobs={analysisJobs}
+            onOpen={() => setUploadOpen(true)}
+          />
+        )}
+        {tab === "Today" && (
+          <TodayView
+            wardrobe={store.wardrobe}
+            result={result}
+            context={context}
+            onContext={setContext}
+            onSave={() =>
+              store.saveLook(result.items, result.message, context.occasion)
+            }
+            onAddPhotos={() => setUploadOpen(true)}
+            onSample={store.loadSample}
+            onEdit={setEditing}
+          />
+        )}
+        {tab === "My wardrobe" && (
+          <WardrobeView
+            wardrobe={store.wardrobe}
+            collectionLabel={collectionLabel}
+            onUpload={() => setUploadOpen(true)}
+            onAddBlank={addBlank}
+            onEdit={setEditing}
+          />
+        )}
+        {tab === "Saved looks" && (
+          <SavedView
+            looks={store.looks}
+            onRemove={store.removeLook}
+            onExplore={() => setTab("Today")}
+          />
+        )}
+        <footer>
+          <span>PRIVATE TO YOUR ACCOUNT · {store.status.toUpperCase()}</span>
+          <button className="text-link" onClick={store.exportBackup}>
+            <Download size={13} /> Export backup
+          </button>
+          <label className="backup-import">
+            Restore backup
+            <input
+              aria-label="Restore backup"
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void store.importBackup(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </footer>
+      </section>
+      {store.toast && (
+        <div className="toast" role="status">
+          <Check size={16} />
+          {store.toast}
+        </div>
+      )}
+      {profileOpen && (
+        <AccountDialog
+          name={user.name}
+          email={user.email}
+          hasUnsavedChanges={store.hasUnsavedChanges}
+          onExportBackup={store.exportBackup}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
+      {uploadOpen && (
+        <UploadDialog
+          accountId={user.id}
+          wardrobe={store.wardrobe}
+          // Resolves only after the server acknowledged the saved wardrobe;
+          // the dialog closes itself afterwards. A rejection keeps the dialog,
+          // the photo results and the review choices.
+          onSave={async (items) => {
+            await store.commitGarments(items);
+            setTab("My wardrobe");
+            store.notify(`${items.length} items added and saved`);
+          }}
+          onClose={() => setUploadOpen(false)}
+        />
+      )}
+      {editing && (
+        <ItemEditor
+          key={editing.id}
+          garment={editing}
+          onSave={saveEdit}
+          onRemove={(id) => {
+            store.removeGarment(id);
+            setEditing(null);
+          }}
+          onAddFromPhoto={() => setUploadOpen(true)}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </main>
+  );
+}

@@ -1,0 +1,49 @@
+{
+  "compiledLoopback": true,
+  "operatorBudgetMs": 1000,
+  "productionDefaultMs": 20000,
+  "fixtureVerificationBypass": true,
+  "results": [
+    {
+      "label": "wardrobe-stall",
+      "mode": "stall",
+      "status": 408,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "The upload took too long. Please try again."
+      },
+      "elapsedMs": 1288.3314999999998
+    },
+    {
+      "label": "wardrobe-trickle",
+      "mode": "trickle",
+      "status": 408,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "The upload took too long. Please try again."
+      },
+      "elapsedMs": 1105.6147999999994
+    },
+    {
+      "label": "photo-stall",
+      "mode": "stall",
+      "status": 408,
+      "cacheControl": "private, no-store",
+      "reply": {
+        "error": "The upload took too long. Please try again."
+      },
+      "elapsedMs": 1286.7014
+    },
+    {
+      "label": "photo-abort",
+      "mode": "abort",
+      "networkError": "ECONNRESET",
+      "elapsedMs": 201.45870000000014
+    }
+  ],
+  "wardrobeStatus": 200,
+  "revision": 0,
+  "photoAssets": 0,
+  "healthStatus": 200,
+  "problems": []
+}

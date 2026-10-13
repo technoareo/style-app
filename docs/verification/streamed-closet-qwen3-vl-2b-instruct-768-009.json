@@ -1,0 +1,27 @@
+{
+  "experiment": "streamed-full-schema-009",
+  "model": "qwen3-vl:2b-instruct",
+  "maxSide": 768,
+  "developmentOnly": true,
+  "heldOut": false,
+  "qualityBenchmark": false,
+  "timeoutMs": 240000,
+  "firstContentMs": 37537,
+  "firstThinkingMs": null,
+  "completed": true,
+  "validated": false,
+  "itemCount": 0,
+  "modelStats": {
+    "done_reason": "length",
+    "total_duration": 218696685700,
+    "load_duration": 3338609500,
+    "prompt_eval_count": 1266,
+    "prompt_eval_duration": 34057816000,
+    "eval_count": 2048,
+    "eval_duration": 181262169000
+  },
+  "failure": "invalid-or-unavailable",
+  "durationMs": 218796,
+  "frames": 1795,
+  "outputCharacters": 6509
+}

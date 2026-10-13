@@ -1,0 +1,254 @@
+{
+  "developmentOnly": true,
+  "heldOut": false,
+  "accuracyBenchmark": false,
+  "applicationChange": false,
+  "network": false,
+  "model": "onnx-community/Florence-2-base-ft",
+  "revision": "e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f",
+  "dtype": "q8",
+  "threads": 1,
+  "sessionsCreated": 4,
+  "runs": [
+    {
+      "source": "tests/fixtures/candidates/natural-closet.jpg",
+      "task": "<CAPTION_TO_PHRASE_GROUNDING>",
+      "query": "shirts, dresses, jackets, coats, trousers, skirts, shorts, shoes, and handbags",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "tensorShape": [
+        1,
+        3,
+        768,
+        768
+      ],
+      "inferenceMs": 14310.3502,
+      "tokenCount": 53,
+      "endedWithEos": true,
+      "generatedText": "</s><s>shirts<loc_0><loc_278><loc_998><loc_998><loc_0><loc_280><loc_936><loc_998>dresses<loc_0><loc_280><loc_935><loc_998>jackets<loc_0><loc_280><loc_934><loc_998>coats<loc_0><loc_280><loc_933><loc_998>skirts<loc_0><loc_863><loc_998><loc_998>shorts<loc_0><loc_863><loc_0><loc_998>shoes<loc_0><loc_863><loc_1><loc_998>handbags<loc_0><loc_0><loc_998><loc_998></s>",
+      "parsed": {
+        "<CAPTION_TO_PHRASE_GROUNDING>": {
+          "labels": [
+            "shirts",
+            "shirts",
+            "dresses",
+            "jackets",
+            "coats",
+            "skirts",
+            "shorts",
+            "shoes",
+            "handbags"
+          ],
+          "bboxes": [
+            [
+              0.8,
+              334.20000000000005,
+              1597.6000000000001,
+              1198.2
+            ],
+            [
+              0.8,
+              336.6,
+              1498.4,
+              1198.2
+            ],
+            [
+              0.8,
+              336.6,
+              1496.8,
+              1198.2
+            ],
+            [
+              0.8,
+              336.6,
+              1495.2,
+              1198.2
+            ],
+            [
+              0.8,
+              336.6,
+              1493.6,
+              1198.2
+            ],
+            [
+              0.8,
+              1036.2,
+              1597.6000000000001,
+              1198.2
+            ],
+            [
+              0.8,
+              1036.2,
+              0.8,
+              1198.2
+            ],
+            [
+              0.8,
+              1036.2,
+              2.4,
+              1198.2
+            ],
+            [
+              0.8,
+              0.6,
+              1597.6000000000001,
+              1198.2
+            ]
+          ]
+        }
+      },
+      "proposals": [
+        {
+          "label": "shirts",
+          "corners": [
+            0.8,
+            334.20000000000005,
+            1597.6000000000001,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.2785,
+            0.9985,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "shirts",
+          "corners": [
+            0.8,
+            336.6,
+            1498.4,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.2805,
+            0.9365000000000001,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "dresses",
+          "corners": [
+            0.8,
+            336.6,
+            1496.8,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.2805,
+            0.9355,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "jackets",
+          "corners": [
+            0.8,
+            336.6,
+            1495.2,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.2805,
+            0.9345,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "coats",
+          "corners": [
+            0.8,
+            336.6,
+            1493.6,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.2805,
+            0.9335,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "skirts",
+          "corners": [
+            0.8,
+            1036.2,
+            1597.6000000000001,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.8635,
+            0.9985,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "shorts",
+          "corners": [
+            0.8,
+            1036.2,
+            0.8,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.8635,
+            0.0005,
+            0.9985
+          ],
+          "structurallyValid": false
+        },
+        {
+          "label": "shoes",
+          "corners": [
+            0.8,
+            1036.2,
+            2.4,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.8635,
+            0.0015,
+            0.9985
+          ],
+          "structurallyValid": true
+        },
+        {
+          "label": "handbags",
+          "corners": [
+            0.8,
+            0.6,
+            1597.6000000000001,
+            1198.2
+          ],
+          "normalizedCorners": [
+            0.0005,
+            0.0005,
+            0.9985,
+            0.9985
+          ],
+          "structurallyValid": true
+        }
+      ],
+      "rssBytes": 954052608
+    }
+  ],
+  "complete": true,
+  "loadMs": 3065.0621,
+  "totalMs": 17809.1754
+}

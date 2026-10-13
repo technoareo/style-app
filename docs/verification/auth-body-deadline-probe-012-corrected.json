@@ -1,0 +1,12 @@
+{
+  "syntheticOnly": true,
+  "directHandler": true,
+  "deploymentDeadlineTest": false,
+  "observationMs": 21030.1834,
+  "settledByObservation": true,
+  "bodyCanceledByObservation": true,
+  "settledAtMs": 20038.954700000002,
+  "finding": "No application-level twenty-second auth body deadline if the handler is still pending; upstream HTTP defaults are outside this probe.",
+  "cleanupResponseStatus": 408,
+  "totalMs": 21030.2749
+}

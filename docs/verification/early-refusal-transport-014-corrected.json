@@ -1,0 +1,42 @@
+{
+  "diagnosticProxyOnly": true,
+  "caddyVersion": "2.11.7",
+  "windowsLoopbackHttp1Only": true,
+  "clientRequestNeverEndedBeforeResponse": true,
+  "results": [
+    {
+      "url": "/api/auth/sign-up/email",
+      "declaredBytes": 100000,
+      "sentBytes": 32769,
+      "expectedStatus": 413,
+      "status": 413,
+      "connection": "close",
+      "responseMs": 59.3883,
+      "reply": {
+        "error": "Account request is too large."
+      },
+      "closedBeforeCleanup": true,
+      "closedMs": 60.195899999999995,
+      "socketOpenBeforeCleanup": false,
+      "clientCleanupMs": 60.266999999999996
+    },
+    {
+      "url": "/api/photos",
+      "declaredBytes": 1000,
+      "sentBytes": 1,
+      "expectedStatus": 401,
+      "status": 401,
+      "connection": "close",
+      "responseMs": 57.977399999999996,
+      "reply": {
+        "error": "Please sign in to continue."
+      },
+      "closedBeforeCleanup": true,
+      "closedMs": 58.1256,
+      "socketOpenBeforeCleanup": false,
+      "clientCleanupMs": 58.1376
+    }
+  ],
+  "health": 200,
+  "problems": []
+}

@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "kind": "predictions",
+  "run": {
+    "model": "qwen3-vl:2b-instruct",
+    "modelVersion": "unrecorded",
+    "prompt": {
+      "id": "qwen-compact-corners-013",
+      "sha256": null
+    },
+    "strategy": "single pass over the whole image; category and native 0..1000 corner boxes only; at most 20 items; no attributes",
+    "adapter": "qwen-compact-corners-013",
+    "startedAt": null,
+    "timeoutMs": 240000,
+    "imageHashSource": "asserted-by-operator",
+    "notes": "Adapted from saved public evidence (docs/verification/qwen-compact-corners-013.json). Start time and image hash were not recorded by the original run; the operator asserts the image."
+  },
+  "cases": [
+    {
+      "fixtureId": "natural-closet",
+      "imageSha256": "71e077ab678b3b692e579d8cd9423d03967816e5f62919f071c0554f8b0f05d0",
+      "status": "completed",
+      "elapsedMs": 87247.7046,
+      "firstContentMs": 38749.085199999994,
+      "error": null,
+      "rawCount": 20,
+      "invalidCount": 1,
+      "items": [
+        {
+          "category": "top",
+          "box": [
+            0.01,
+            0.435,
+            0.13,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.13,
+            0.435,
+            0.2,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.2,
+            0.435,
+            0.27,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.27,
+            0.435,
+            0.34,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.34,
+            0.435,
+            0.41,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.41,
+            0.435,
+            0.48,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.48,
+            0.435,
+            0.55,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.55,
+            0.435,
+            0.62,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.62,
+            0.435,
+            0.69,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.69,
+            0.435,
+            0.76,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.76,
+            0.435,
+            0.83,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.83,
+            0.435,
+            0.9,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.9,
+            0.435,
+            0.97,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.104,
+            0.435,
+            0.174,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.174,
+            0.435,
+            0.244,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.244,
+            0.435,
+            0.314,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.314,
+            0.435,
+            0.384,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.384,
+            0.435,
+            0.454,
+            0.999
+          ],
+          "attributes": null
+        },
+        {
+          "category": "top",
+          "box": [
+            0.454,
+            0.435,
+            0.524,
+            0.999
+          ],
+          "attributes": null
+        }
+      ],
+      "invalidReasons": [
+        "item 13: x2 must be greater than x1 (corner order is x1, y1, x2, y2)"
+      ]
+    }
+  ]
+}

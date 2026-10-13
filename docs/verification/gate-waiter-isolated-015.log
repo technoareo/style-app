@@ -1,0 +1,28 @@
+✖ reclamation re-reads the CURRENT wardrobe inside its committing transaction: a save that attaches the photo after the read keeps it (1841.1698ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5495.0122
+
+✖ failing tests:
+
+test at tests\wardrobeContention015.test.ts:2:4426
+✖ reclamation re-reads the CURRENT wardrobe inside its committing transaction: a save that attaches the photo after the read keeps it (1841.1698ms)
+  AssertionError [ERR_ASSERTION]: the reclamation is waiting for the gate
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\wardrobeContention015.test.ts:132:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

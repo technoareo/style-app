@@ -1,0 +1,33 @@
+✔ an ordinary read takes neither the write gate nor the SQLite write lock, and a missing wardrobe stays revision 0 without a row (1361.9131ms)
+✔ STATIC (supplementary text check, not runtime evidence; the real handlers are exercised in wardrobeRoutes015.test.ts): the wardrobe GET handler does not use the write path; PUT prepares before it acquires (0.6687ms)
+✔ reclamation re-reads the CURRENT wardrobe inside its committing transaction: a save that attaches the photo after the read keeps it (171.7384ms)
+✔ a missing wardrobe is reclaimed without creating a row; an unreadable stored document fails closed (190.0386ms)
+✔ a reclamation that cannot start inside its budget fails retryably and deletes nothing; the same call works afterwards (151.8388ms)
+✔ reads see the same shape as before, and the legacy loadWardrobe still reads and reclaims in one transaction (120.7129ms)
+✔ prepareWardrobeSave is pure: it validates, enumerates references and serializes without the database or gate (2.2599ms)
+✔ everything that depends on database state is decided at commit time, in the transaction (262.1145ms)
+✔ saveWardrobe keeps its direct-caller behaviour (prepare then commit in one call) (57.2458ms)
+✔ F1: forged, cloned, spread, derived, proxied and non-object saves are refused before any database access, and a real one still commits (97.7319ms)
+✔ F1: an issued save is frozen with real frozen arrays, and attempts to mutate it cannot change what is committed (96.7611ms)
+✔ F1: ownership is decided for the committing account; reusing one prepared save is idempotent and harmless across accounts (152.9615ms)
+✔ F2: a photo referenced by a saved look item's image only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (248.0171ms)
+✔ F2: a photo referenced by a wardrobe item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (280.7988ms)
+✔ F2: a photo referenced by a saved look item's sourcePhoto only survives a concurrent-save race and later cleanups, and is deleted when a save removes it (247.8517ms)
+✔ F6: a stored document that cannot be read answers one fixed 500 on read, is never repaired and never becomes an empty wardrobe (148.1518ms)
+✔ F6: a save over an unreadable replaced document succeeds with an empty old set, keeps the current references, still applies the 24 h grace, and keeps its revision and ownership checks (1033.9678ms)
+✔ F6: the corrupt-document read refusal never deletes through loadWardrobe either (56.8773ms)
+✔ an oversize document that also references an unavailable photo answers 413 from the pure step, without any database access; a small one is refused later with 400 (104.6614ms)
+✔ one photo referenced by two kinds survives the removal of one reference and is reclaimed only when the last is removed (117.3737ms)
+✔ L1: ownership ids and reclamation references come from one set, for every reference shape (0.4486ms)
+✔ DIAGNOSTIC A/B/C (not a release pass criterion, no substitute for the retention tests): which account setup puts a second writer behind the held gate (839.3454ms)
+ℹ A direct row: queue=1, account outbox rows=0
+ℹ B real sign-up, unsettled: queue=2, account outbox rows=1
+ℹ C real sign-up, settled: queue=1, account outbox rows=1
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7363.5771

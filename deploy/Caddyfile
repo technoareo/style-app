@@ -1,0 +1,22 @@
+{$STYLE_DOMAIN} {
+  encode zstd gzip
+  request_body {
+    max_size 10MB
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "same-origin"
+    X-Frame-Options "DENY"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+  # Operator-only upload counters: never served through the public proxy.
+  # They stay reachable inside the app container; see docs/DEPLOYMENT.md.
+  @upload_counters path /api/health/uploads /api/health/uploads/*
+  handle @upload_counters {
+    respond 404
+  }
+  handle {
+    reverse_proxy app:3000
+  }
+}

@@ -1,0 +1,13 @@
+Refusing to score (12 problems):
+- fixture "natural-closet": labelStatus "unlabeled" is not gold (needs single_human or double_human_adjudicated)
+- fixture "natural-closet": emptyTruth is not set
+- fixture "natural-closet": stratum crowded but 0 gold garment(s)
+- fixture "handmade-shoes": labelStatus "unlabeled" is not gold (needs single_human or double_human_adjudicated)
+- fixture "handmade-shoes": emptyTruth is not set
+- fixture "handmade-shoes": stratum is not set in the manifest
+- fixture "handbag": labelStatus "unlabeled" is not gold (needs single_human or double_human_adjudicated)
+- fixture "handbag": emptyTruth is not set
+- fixture "handbag": stratum is not set in the manifest
+- fixture "natural-closet": originalDimensions not recorded in the manifest (measure with the inspect command)
+- fixture "handmade-shoes": originalDimensions not recorded in the manifest (measure with the inspect command)
+- fixture "handbag": originalDimensions not recorded in the manifest (measure with the inspect command)

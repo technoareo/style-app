@@ -1,0 +1,6 @@
+{
+  "diagnosticOnly": true,
+  "noDatabaseOpened": true,
+  "getterEscaped": false,
+  "asyncUnhandled": false
+}

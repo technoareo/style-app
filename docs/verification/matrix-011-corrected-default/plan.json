@@ -1,0 +1,13 @@
+{
+  "stamp": "2026-10-12T11-12-14-657Z",
+  "planned": 1,
+  "plan": [
+    {
+      "scenario": "default",
+      "reps": 1,
+      "timeoutSec": 300,
+      "burners": 0,
+      "command": "node --import tsx --test tests/accounts.test.ts tests/admission.test.ts tests/backup.test.ts tests/backupDurability.test.ts tests/backupLarge.test.ts tests/backupSafety.test.ts tests/concurrency.test.ts tests/contention.test.ts tests/contention007.test.ts tests/deletionLedger.test.ts tests/domain.test.ts tests/lockDiagnostics.test.ts tests/mailCapture.test.ts tests/mailOutbox.test.ts tests/mailWorker.test.ts tests/matrixConfig.test.ts tests/migration007.test.ts tests/migration008.test.ts tests/migrations.test.ts tests/packaging.test.ts tests/pairs.test.ts tests/processPresence.test.ts tests/queue.test.ts tests/queue007.test.ts tests/restoreCredentials.test.ts tests/restoreFresh.test.ts"
+    }
+  ]
+}

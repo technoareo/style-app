@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import sharp from 'sharp';
+const categories=['Tops','Bottoms','Dresses','Outerwear','Shoes','Accessories','Unsorted'];
+const VISION_PROMPT='Locate every distinct visible garment in this closet photo up to30. Exclude hangers, furniture, printed drawings and background. For each garment return c=category, k=visible main color, p=pattern or Unknown, b=[x1,y1,x2,y2] bounding corners in normalized integer0to1000 coordinates. x1 left, y1 top, x2 right, y2 bottom; entire photo spans0to1000 in both axes. Do not combine separate garments. No brand, fabric, names, explanation or extra fields. Return complete concise JSON.';
+const visionOutputSchema={type:'object',additionalProperties:false,required:['items'],properties:{items:{type:'array',maxItems:30,items:{type:'object',additionalProperties:false,required:['c','k','p','b'],properties:{c:{type:'string',enum:categories},k:{type:'string',maxLength:20},p:{type:'string',maxLength:20},b:{type:'array',minItems:4,maxItems:4,items:{type:'integer',minimum:0,maximum:1000}}}}}}};
+const analysisSchema={safeParse(v){if(!v||!Array.isArray(v.items)||v.items.length>30)return{success:false};const issues=v.items.map(a=>{const e=[];if(!categories.includes(a?.c))e.push('category');if(typeof a?.k!=='string'||a.k.length>20)e.push('color');if(typeof a?.p!=='string'||a.p.length>20)e.push('pattern');if(!Array.isArray(a?.b)||a.b.length!==4||a.b.some(n=>!Number.isInteger(n)||n<0||n>1000))e.push('box-shape');else if(a.b[2]-a.b[0]<30||a.b[3]-a.b[1]<30)e.push('box-size-order');return e;});return{success:issues.every(a=>a.length===0),data:{items:v.items,issues,validCandidateCount:issues.filter(a=>a.length===0).length}};}};const model=process.argv[2]||'qwen3-vl:2b-instruct';
+const maxSide=Number(process.argv[3]||768);
+const started=Date.now();
+const image=await sharp('tests/fixtures/candidates/natural-closet.jpg').rotate().resize(maxSide,maxSide,{fit:'inside',withoutEnlargement:true}).jpeg({quality:80}).toBuffer();
+const record={experiment:'streamed-native-corners-schema-009',model,maxSide,developmentOnly:true,heldOut:false,qualityBenchmark:false,timeoutMs:240000,firstContentMs:null,firstThinkingMs:null,completed:false,validated:false,itemCount:0};
+let content='',frames=0;
+try{
+const response=await fetch('http://127.0.0.1:11434/api/chat',{method:'POST',headers:{'content-type':'application/json'},signal:AbortSignal.timeout(240000),body:JSON.stringify({model,stream:true,think:false,format:visionOutputSchema,keep_alive:'10m',options:{temperature:0,num_ctx:4096,num_predict:2048},messages:[{role:'user',images:[image.toString('base64')],content:VISION_PROMPT+' Keep evidence and warning concise. Do not detect drawings or prints on clothing as separate items.'}]})});
+if(!response.ok)throw new Error('http-'+response.status);
+const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
+function frame(line){if(!line.trim())return;const obj=JSON.parse(line);frames++;if(obj.error)throw new Error('model-error');const text=obj.message?.content??'';if(text&&record.firstContentMs===null){record.firstContentMs=Date.now()-started;console.log('First content received: '+record.firstContentMs+'ms');}if(obj.message?.thinking&&record.firstThinkingMs===null)record.firstThinkingMs=Date.now()-started;content+=text;if(content.length>100000)throw new Error('oversize-output');if(obj.done){record.completed=true;record.modelStats=Object.fromEntries(['done_reason','total_duration','load_duration','prompt_eval_count','prompt_eval_duration','eval_count','eval_duration'].filter(k=>obj[k]!==undefined).map(k=>[k,obj[k]]));}}
+for(;;){const part=await reader.read();if(part.done)break;buffer+=decoder.decode(part.value,{stream:true});let pos;while((pos=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,pos);buffer=buffer.slice(pos+1);frame(line);}}
+if(buffer.trim())frame(buffer);
+if(record.completed){const parsed=analysisSchema.safeParse(JSON.parse(content));record.validated=parsed.success;if(parsed.data){record.candidateCount=parsed.data.items.length;record.validCandidateCount=parsed.data.validCandidateCount;record.perItemIssues=parsed.data.issues;}if(parsed.success){record.itemCount=parsed.data.items.length;record.analysis=parsed.data;}}
+}catch(error){record.failure=error?.name==='TimeoutError'||error?.name==='AbortError'?'timeout-or-aborted':error?.message?.startsWith('http-')?error.message:'invalid-or-unavailable';}
+record.durationMs=Date.now()-started;record.frames=frames;record.outputCharacters=content.length;
+const name=model.replace(/[^A-Za-z0-9.-]/g,'-');fs.writeFileSync('docs/verification/streamed-native-corners-closet-'+name+'-'+maxSide+'-009.json',JSON.stringify(record,null,2));console.log(JSON.stringify({...record,analysis:undefined}));
+

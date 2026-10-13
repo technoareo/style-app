@@ -1,0 +1,40 @@
+{
+  "diagnosticProxyOnly": true,
+  "caddyVersion": "2.11.7",
+  "windowsLoopbackHttp1Only": true,
+  "clientRequestNeverEndedBeforeResponse": true,
+  "results": [
+    {
+      "url": "/api/auth/sign-up/email",
+      "declaredBytes": 100000,
+      "expectedStatus": 413,
+      "watchdog": true,
+      "socketOpenBeforeCleanup": true,
+      "clientCleanupMs": 5012.9835,
+      "error": "ECONNRESET",
+      "closedBeforeCleanup": false,
+      "closedMs": 5014.0916
+    },
+    {
+      "url": "/api/photos",
+      "declaredBytes": 1000,
+      "expectedStatus": 401,
+      "status": 401,
+      "connection": "close",
+      "responseMs": 65.6092,
+      "reply": {
+        "error": "Please sign in to continue."
+      },
+      "closedBeforeCleanup": true,
+      "closedMs": 66.42139999999999,
+      "socketOpenBeforeCleanup": false,
+      "clientCleanupMs": 66.4892,
+      "watchdog": true
+    }
+  ],
+  "health": 200,
+  "problems": [
+    "/api/auth/sign-up/email",
+    "/api/photos"
+  ]
+}

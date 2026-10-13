@@ -1,0 +1,116 @@
+{
+  "model": "onnx-community/Florence-2-base-ft",
+  "revision": "e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f",
+  "license": "mit",
+  "files": [
+    {
+      "rfilename": ".gitattributes",
+      "size": 1519,
+      "lfs": null
+    },
+    {
+      "rfilename": "README.md",
+      "size": 2665,
+      "lfs": null
+    },
+    {
+      "rfilename": "added_tokens.json",
+      "size": 22410,
+      "lfs": null
+    },
+    {
+      "rfilename": "config.json",
+      "size": 5432,
+      "lfs": null
+    },
+    {
+      "rfilename": "generation_config.json",
+      "size": 292,
+      "lfs": null
+    },
+    {
+      "rfilename": "merges.txt",
+      "size": 456318,
+      "lfs": null
+    },
+    {
+      "rfilename": "onnx/decoder_model_merged_quantized.onnx",
+      "size": 98177697,
+      "lfs": {
+        "sha256": "f22f52f980c33df0efa15932c2f3db6d9d3595ce6387eca938b8cfe23dc4c641",
+        "size": 98177697,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "onnx/decoder_model_quantized.onnx",
+      "size": 97760937,
+      "lfs": {
+        "sha256": "c529b26bafce2ee76f886f3a0e374bb646b07a6d8b7640fd8a50d7a48843dd67",
+        "size": 97760937,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "onnx/decoder_with_past_model_quantized.onnx",
+      "size": 90568893,
+      "lfs": {
+        "sha256": "edb4ad2c8a65e48c3ddc840275c6cf2b916acabd04ec9cae536d346c6bf8fbea",
+        "size": 90568893,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "onnx/embed_tokens_quantized.onnx",
+      "size": 39390433,
+      "lfs": {
+        "sha256": "6b2258db1c8ee9b160576ccde3cd3814d83a2edaed0dd1c6ca9ff3c38fa62214",
+        "size": 39390433,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "onnx/encoder_model_quantized.onnx",
+      "size": 43651493,
+      "lfs": {
+        "sha256": "f4ad7a68f1fb875d3bcf735ea14a7021b7ba7e83baf7cf10289881b4ed6d9b85",
+        "size": 43651493,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "onnx/vision_encoder_quantized.onnx",
+      "size": 93746540,
+      "lfs": {
+        "sha256": "3b79d54f23f666f731549db23cb070c35a979ce19cbd9720e90e67a78dc9768c",
+        "size": 93746540,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "preprocessor_config.json",
+      "size": 2673,
+      "lfs": null
+    },
+    {
+      "rfilename": "special_tokens_map.json",
+      "size": 146627,
+      "lfs": null
+    },
+    {
+      "rfilename": "tokenizer.json",
+      "size": 2297961,
+      "lfs": null
+    },
+    {
+      "rfilename": "tokenizer_config.json",
+      "size": 197658,
+      "lfs": null
+    },
+    {
+      "rfilename": "vocab.json",
+      "size": 1099884,
+      "lfs": null
+    }
+  ]
+}

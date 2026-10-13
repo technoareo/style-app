@@ -1,0 +1,50 @@
+{
+  "synthetic": true,
+  "inference": false,
+  "applicationChange": false,
+  "network": false,
+  "cases": [
+    {
+      "variant": "native-int64",
+      "result": [
+        {
+          "scores": [
+            0.8807970881462097
+          ],
+          "boxes": [
+            [
+              200,
+              200,
+              600,
+              600
+            ]
+          ],
+          "labels": [
+            "shirt"
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "converted-int32",
+      "result": [
+        {
+          "scores": [
+            0.8807970881462097
+          ],
+          "boxes": [
+            [
+              200,
+              200,
+              600,
+              600
+            ]
+          ],
+          "labels": [
+            "shirt"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "diagnosticOnly": true,
+  "processes": [
+    {
+      "pid": 14816,
+      "role": "worker",
+      "events": 302,
+      "truncated": false,
+      "successfulBegins": 122,
+      "failedBegins": 58,
+      "maxNativeMs": 173.173583984375,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 22432,
+      "role": "register",
+      "events": 43,
+      "truncated": false,
+      "successfulBegins": 7,
+      "failedBegins": 29,
+      "maxNativeMs": 79.8154296875,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 24272,
+      "role": "register",
+      "events": 25,
+      "truncated": false,
+      "successfulBegins": 7,
+      "failedBegins": 11,
+      "maxNativeMs": 79.165771484375,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "events": 193,
+      "truncated": false,
+      "successfulBegins": 92,
+      "failedBegins": 8,
+      "maxNativeMs": 110.36279296875,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 3692,
+      "role": "write",
+      "events": 371,
+      "truncated": false,
+      "successfulBegins": 150,
+      "failedBegins": 71,
+      "maxNativeMs": 123.942626953125,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 6736,
+      "role": "register",
+      "events": 30,
+      "truncated": false,
+      "successfulBegins": 7,
+      "failedBegins": 16,
+      "maxNativeMs": 79.84423828125,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 8808,
+      "role": "write",
+      "events": 364,
+      "truncated": false,
+      "successfulBegins": 150,
+      "failedBegins": 64,
+      "maxNativeMs": 124.2412109375,
+      "unpairedHolds": 0
+    },
+    {
+      "pid": 900,
+      "role": "write",
+      "events": 360,
+      "truncated": false,
+      "successfulBegins": 150,
+      "failedBegins": 60,
+      "maxNativeMs": 125.23828125,
+      "unpairedHolds": 0
+    }
+  ],
+  "pairedHolds": 685,
+  "byRole": {
+    "worker": {
+      "count": 122,
+      "lowerSumMs": 36.869140625,
+      "upperSumMs": 6767.469482421875,
+      "maxLowerMs": 1.693115234375,
+      "maxUpperMs": 236.207763671875
+    },
+    "register": {
+      "count": 21,
+      "lowerSumMs": 882.85498046875,
+      "upperSumMs": 1450.940185546875,
+      "maxLowerMs": 93.47216796875,
+      "maxUpperMs": 174.4619140625
+    },
+    "test-parent-or-runner": {
+      "count": 92,
+      "lowerSumMs": 1018.361572265625,
+      "upperSumMs": 2775.506591796875,
+      "maxLowerMs": 113.110107421875,
+      "maxUpperMs": 133.7578125
+    },
+    "write": {
+      "count": 450,
+      "lowerSumMs": 91.360107421875,
+      "upperSumMs": 28047.313232421875,
+      "maxLowerMs": 1.296630859375,
+      "maxUpperMs": 196.6611328125
+    }
+  },
+  "lowerOverlapBeyond2ms": [],
+  "upperOverlapBeyond2msCount": 765,
+  "largestLowerHolds": [
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820263614.7312,
+        1791820263727.8413
+      ],
+      "upper": [
+        1791820263614.682,
+        1791820263748.4397
+      ],
+      "lowerMs": 113.110107421875,
+      "upperMs": 133.7578125
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820254457.595,
+        1791820254564.0027
+      ],
+      "upper": [
+        1791820254457.5571,
+        1791820254584.0872
+      ],
+      "lowerMs": 106.40771484375,
+      "upperMs": 126.530029296875
+    },
+    {
+      "pid": 24272,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820264635.8691,
+        1791820264729.3413
+      ],
+      "upper": [
+        1791820264635.8062,
+        1791820264749.0034
+      ],
+      "lowerMs": 93.47216796875,
+      "upperMs": 113.197265625
+    },
+    {
+      "pid": 6736,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820265388.2073,
+        1791820265479.7175
+      ],
+      "upper": [
+        1791820265325.9016,
+        1791820265500.3635
+      ],
+      "lowerMs": 91.51025390625,
+      "upperMs": 174.4619140625
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820253640.7307,
+        1791820253722.5876
+      ],
+      "upper": [
+        1791820253640.6814,
+        1791820253742.8574
+      ],
+      "lowerMs": 81.85693359375,
+      "upperMs": 102.176025390625
+    },
+    {
+      "pid": 22432,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820266996.154,
+        1791820267077.456
+      ],
+      "upper": [
+        1791820266980.3381,
+        1791820267097.3145
+      ],
+      "lowerMs": 81.302001953125,
+      "upperMs": 116.976318359375
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820263834.3594,
+        1791820263907.7283
+      ],
+      "upper": [
+        1791820263834.331,
+        1791820263927.3662
+      ],
+      "lowerMs": 73.368896484375,
+      "upperMs": 93.03515625
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820263308.8433,
+        1791820263381.0283
+      ],
+      "upper": [
+        1791820263308.8022,
+        1791820263400.4507
+      ],
+      "lowerMs": 72.18505859375,
+      "upperMs": 91.6484375
+    },
+    {
+      "pid": 26392,
+      "role": "test-parent-or-runner",
+      "connection": 2,
+      "exit": "COMMIT",
+      "lower": [
+        1791820254772.4375,
+        1791820254844.2717
+      ],
+      "upper": [
+        1791820254772.4087,
+        1791820254899.1975
+      ],
+      "lowerMs": 71.834228515625,
+      "upperMs": 126.788818359375
+    },
+    {
+      "pid": 6736,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820265500.7441,
+        1791820265571.5378
+      ],
+      "upper": [
+        1791820265500.7163,
+        1791820265591.717
+      ],
+      "lowerMs": 70.793701171875,
+      "upperMs": 91.000732421875
+    },
+    {
+      "pid": 24272,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820264856.6025,
+        1791820264925.9668
+      ],
+      "upper": [
+        1791820264856.5625,
+        1791820264945.6719
+      ],
+      "lowerMs": 69.3642578125,
+      "upperMs": 89.109375
+    },
+    {
+      "pid": 6736,
+      "role": "register",
+      "connection": 1,
+      "exit": "COMMIT",
+      "lower": [
+        1791820265612.3188,
+        1791820265681.3462
+      ],
+      "upper": [
+        1791820265612.2705,
+        1791820265702.2134
+      ],
+      "lowerMs": 69.02734375,
+      "upperMs": 89.94287109375
+    }
+  ],
+  "limits": [
+    "Native-call instrumentation adds overhead; this is not the unchanged full-suite release result.",
+    "Lower interval is successful BEGIN return until COMMIT/ROLLBACK invocation, with native active-transaction flags. Upper brackets include lock acquisition wait and post-unlock work; their overlaps are not ownership violations.",
+    "Same-host epoch alignment and floating timings have uncertainty; all connections are assumed to be the unchanged scenario shared database. No SQL text or database paths were captured.",
+    "No exact native unlock instant, auth mutex timing, live CPU utilization or scheduling fairness is established."
+  ]
+}

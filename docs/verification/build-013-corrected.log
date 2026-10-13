@@ -1,0 +1,42 @@
+
+> style-studio@1.0.0 build
+> next build && tsx scripts/sanitize-build-output.ts && tsx scripts/verify-packaging.ts
+
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 5.9s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/8) ...
+   Generating static pages (2/8) 
+   Generating static pages (4/8) 
+   Generating static pages (6/8) 
+ ✓ Generating static pages (8/8)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    44.1 kB         158 kB
+├ ○ /_not-found                            995 B         104 kB
+├ ƒ /api/analysis-jobs                     146 B         103 kB
+├ ƒ /api/analysis-jobs/[id]                146 B         103 kB
+├ ƒ /api/analyze                           146 B         103 kB
+├ ƒ /api/auth/[...all]                     146 B         103 kB
+├ ƒ /api/health                            146 B         103 kB
+├ ƒ /api/health/uploads                    146 B         103 kB
+├ ƒ /api/photos                            146 B         103 kB
+├ ƒ /api/photos/[id]                       146 B         103 kB
+├ ƒ /api/wardrobe                          146 B         103 kB
+└ ○ /reset-password                      3.98 kB         118 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-ce8c7c75002f810b.js       46.5 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)          1.99 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+Sanitized build output: 102726 trace entries dropped from 18 manifests, 1 bundled private paths or escaping links removed (generated output only).
+Packaging check passed in style-app: trace manifests and the standalone tree contain no private runtime paths (paths only; no file contents were read).

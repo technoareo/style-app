@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "seconds": 74.742,
+  "items": [
+    {
+      "name": "T-shirt",
+      "category": "Tops",
+      "color": "white",
+      "pattern": "none",
+      "formality": "casual",
+      "brand": "",
+      "size": "",
+      "confidence": 0.75,
+      "evidence": "Box [120,145,880,855]",
+      "box": [
+        0.12,
+        0.14,
+        0.86,
+        0.71
+      ]
+    }
+  ],
+  "warning": "Only count physical garments. Ignore prints, drawings, text, or people."
+}

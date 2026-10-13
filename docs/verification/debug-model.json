@@ -1,0 +1,17 @@
+{
+  "model": "qwen3-vl:2b-instruct",
+  "created_at": "2026-10-11T14:06:08.6259071Z",
+  "message": {
+    "role": "assistant",
+    "content": "{\n  \"warning\": \"There are no visible garments that are not part of the clothing items.\",\n  \"items\": [\n    {\n      \"name\": \"T-shirt\",\n      \"category\": \"Tops\",\n      \"color\": \"White\",\n      \"pattern\": \"Illustration\",\n      \"formality\": \"unknown\",\n      \"brand\": \"\",\n      \"size\": \"\",\n      \"confidence\": 0.5,\n      \"evidence\": \"A white T-shirt with a graphic design on the front, featuring various small illustrations and the word 'WIKIPEDIA' at the bottom. The garment has a c-\",\n      \"box\": [75, 19, 43, 95]\n    },\n    {\n      \"name\": \"Hoodie\",\n      \"category\": \"Outerwear\",\n      \"color\": \"Black\",\n      \"pattern\": \"Logo\",\n      \"formality\": \"unknown\",\n      \"brand\": \"\",\n      \"size\": \"\",\n      \"confidence\": 0.5,\n      \"evidence\": \"A black hoodie with a small white circular logo on the left chest area. The garment has a hood, a zipper, and long sleeves. The hoodie is displayed in\",\n      \"box\": [60, 19, 95, 95]\n    }\n  ]\n}"
+  },
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 58259204500,
+  "load_duration": 13880500,
+  "prompt_eval_count": 1242,
+  "prompt_eval_cached_count": 4,
+  "prompt_eval_duration": 37294991000,
+  "eval_count": 284,
+  "eval_duration": 20889997000
+}

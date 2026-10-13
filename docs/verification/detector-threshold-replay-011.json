@@ -1,0 +1,325 @@
+{
+  "developmentOnly": true,
+  "heldOut": false,
+  "accuracyBenchmark": false,
+  "applicationChange": false,
+  "source": "docs/verification/detector-wasm-fp32-closet-010-raw.json",
+  "paddingRestored": 211500,
+  "unmaskedValuesValidated": true,
+  "thresholds": [
+    {
+      "threshold": 0.1,
+      "textThreshold": 0.1,
+      "count": 21,
+      "proposals": [
+        {
+          "label": "shirt jacket shorts handbag",
+          "score": 0.2361305058002472,
+          "corners": [
+            0.004963874816894531,
+            0.2798614203929901,
+            0.9421792030334473,
+            0.9974224865436554
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.19151261448860168,
+          "corners": [
+            0.2977517545223236,
+            0.43852032721042633,
+            0.3895867168903351,
+            0.9278722852468491
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt jacket shorts handbag",
+          "score": 0.18389944732189178,
+          "corners": [
+            0.003011643886566162,
+            0.18521863222122192,
+            0.9475470185279846,
+            0.9975412487983704
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.178145170211792,
+          "corners": [
+            0.7254865020513535,
+            0.280478298664093,
+            0.9355467706918716,
+            0.9984720349311829
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11053916066884995,
+          "corners": [
+            0.4723365902900696,
+            0.46630963683128357,
+            0.515329897403717,
+            0.6670682728290558
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11518477648496628,
+          "corners": [
+            0.7759669423103333,
+            0.28030672669410706,
+            0.9359068274497986,
+            0.9986318051815033
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11896799504756927,
+          "corners": [
+            0.49400414526462555,
+            0.33371129631996155,
+            0.6657785028219223,
+            0.9838546216487885
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shorts handbag",
+          "score": 0.14687630534172058,
+          "corners": [
+            0.003729701042175293,
+            0.2826820909976959,
+            0.9419828653335571,
+            0.9964636266231537
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "hand",
+          "score": 0.11718574166297913,
+          "corners": [
+            0.0018688738346099854,
+            0.17785105109214783,
+            0.9547940790653229,
+            0.9986570179462433
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.12871286273002625,
+          "corners": [
+            0.4963815212249756,
+            0.33958232402801514,
+            0.6629409790039062,
+            0.9247069358825684
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11060348153114319,
+          "corners": [
+            0.4218450337648392,
+            0.6418216675519943,
+            0.4931132644414902,
+            0.8976292163133621
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shorts",
+          "score": 0.13953961431980133,
+          "corners": [
+            0.5216474235057831,
+            0.8396871984004974,
+            0.6670002043247223,
+            0.9986826479434967
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.14319242537021637,
+          "corners": [
+            0.5475652366876602,
+            0.5396371334791183,
+            0.661978229880333,
+            0.9218309670686722
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.10487589985132217,
+          "corners": [
+            0.6854771226644516,
+            0.666752427816391,
+            0.7447768598794937,
+            0.9965076744556427
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11095990985631943,
+          "corners": [
+            0.4250781834125519,
+            0.6450224220752716,
+            0.4923052489757538,
+            0.867690771818161
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.11511765420436859,
+          "corners": [
+            0.20285314321517944,
+            0.424635112285614,
+            0.339383065700531,
+            0.9984031319618225
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.10037251561880112,
+          "corners": [
+            0.0008609145879745483,
+            0.44380486011505127,
+            0.07053978741168976,
+            0.6302694082260132
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shorts",
+          "score": 0.10494239628314972,
+          "corners": [
+            0.5251468271017075,
+            0.8989276587963104,
+            0.6661460548639297,
+            0.9987860023975372
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.10574883222579956,
+          "corners": [
+            0.5730987340211868,
+            0.38613300025463104,
+            0.6606344431638718,
+            0.8319506198167801
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.14461089670658112,
+          "corners": [
+            0.5468594431877136,
+            0.3413924276828766,
+            0.6619639992713928,
+            0.9249449670314789
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.12361359596252441,
+          "corners": [
+            0.0011047571897506714,
+            0.4493144750595093,
+            0.13590295612812042,
+            0.9992666244506836
+          ],
+          "strictlyInFrame": true
+        }
+      ]
+    },
+    {
+      "threshold": 0.15,
+      "textThreshold": 0.1,
+      "count": 4,
+      "proposals": [
+        {
+          "label": "shirt jacket shorts handbag",
+          "score": 0.2361305058002472,
+          "corners": [
+            0.004963874816894531,
+            0.2798614203929901,
+            0.9421792030334473,
+            0.9974224865436554
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.19151261448860168,
+          "corners": [
+            0.2977517545223236,
+            0.43852032721042633,
+            0.3895867168903351,
+            0.9278722852468491
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt jacket shorts handbag",
+          "score": 0.18389944732189178,
+          "corners": [
+            0.003011643886566162,
+            0.18521863222122192,
+            0.9475470185279846,
+            0.9975412487983704
+          ],
+          "strictlyInFrame": true
+        },
+        {
+          "label": "shirt",
+          "score": 0.178145170211792,
+          "corners": [
+            0.7254865020513535,
+            0.280478298664093,
+            0.9355467706918716,
+            0.9984720349311829
+          ],
+          "strictlyInFrame": true
+        }
+      ]
+    },
+    {
+      "threshold": 0.2,
+      "textThreshold": 0.1,
+      "count": 1,
+      "proposals": [
+        {
+          "label": "shirt jacket shorts handbag",
+          "score": 0.2361305058002472,
+          "corners": [
+            0.004963874816894531,
+            0.2798614203929901,
+            0.9421792030334473,
+            0.9974224865436554
+          ],
+          "strictlyInFrame": true
+        }
+      ]
+    },
+    {
+      "threshold": 0.25,
+      "textThreshold": 0.1,
+      "count": 0,
+      "proposals": []
+    }
+  ],
+  "notes": "Complete numerical inference output replay only, not partial generated JSON salvage. Lower threshold proposals require human matching and duplicate evaluation; not accuracy evidence."
+}

@@ -1,0 +1,44 @@
+✔ the shipped Caddyfile answers 404 for the upload counters and still proxies everything else (1.9923ms)
+✔ earlier protections of the Caddyfile are intact (0.4943ms)
+✔ the checker flags a Caddyfile without the block, with a wrong response, or with the order reversed (0.7513ms)
+✔ the app port is not published, so the counters stay internal; the route itself still exists (0.5378ms)
+✔ the deployment guide documents the default block and the operator way in (0.3529ms)
+✔ boxes that are non-finite, mis-sized, out of range, reversed or zero-size are rejected, never repaired (3.5207ms)
+✔ IoU is exact for identical, half-overlapping, touching and disjoint boxes (0.2809ms)
+✔ native 0..1000 corner items are validated exactly; the only change is division by the declared scale (0.5571ms)
+✔ maximum matching beats greedy best-IoU-first on a known counterexample (0.4656ms)
+✔ matching is one-to-one, inclusive at the threshold, and prefers the larger total IoU at equal size (0.6791ms)
+✔ category disagreement is reported apart from geometry (1.2077ms)
+✔ a duplicate box is a duplicate false positive; a far box is another false positive (0.3831ms)
+✔ empty truth and empty prediction is explicit agreement, not a perfect precision/recall (0.4769ms)
+✔ attributes count only against human gold and only on matched garments (0.5313ms)
+✔ failed, timed-out, truncated, invalid and missing cases stay in the denominators (0.7579ms)
+✔ manifests reject unknown fields, bad paths, duplicates and missing licenses (1.9015ms)
+✔ a held-out manifest cannot hold a known development image, an already-inferred image, or lack a freeze time (0.5342ms)
+✔ the same image or id in the development and held-out manifests is contamination (0.3126ms)
+✔ annotations: unlabeled, model-made, inconsistent and mis-wired labels are not gold (2.3854ms)
+✔ annotations are checked against their manifest: hash, split, strata and missing records (0.6031ms)
+✔ prediction reports reject inconsistent counts, salvaged items on failures, unknown fields and duplicates (1.3508ms)
+✔ a consistent development evaluation scores and reports no readiness claim (0.9476ms)
+✔ scoring is refused for missing images, hash or dimension mismatches (0.9252ms)
+✔ scoring is refused without human gold labels (1.0362ms)
+✔ scoring is refused for predictions of the wrong image, an unknown fixture, or an unmeasured threshold (0.809ms)
+✔ held-out scoring is refused after contamination or for a run that began before the split was fixed (1.1442ms)
+✔ direct typed calls cannot bypass schema or contamination checks (0.5027ms)
+✔ development and held-out, and single-item and crowded photos, are aggregated separately (0.4731ms)
+✔ the report is reproducible and independent of prediction order (1.337ms)
+✔ the saved Qwen compact-corners evidence is adapted honestly: one reversed box makes the whole case a failure (0.7469ms)
+✔ the Qwen adapter maps timeouts, failures, token-limit stops and malformed records to failures (0.285ms)
+✔ another model plugs in through the adapter interface, and truncated JSON text is never repaired (0.2926ms)
+✔ the shipped development manifest is development-only and the held-out manifest is empty (0.7496ms)
+✔ image headers give stored size and EXIF orientation; anything damaged gives null (0.5818ms)
+✔ a report is written to a new file and an existing file is never overwritten (2.1376ms)
+✔ the command line scores a consistent set, refuses inconsistent sets without writing, and never overwrites (13.8875ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 414.5567

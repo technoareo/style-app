@@ -1,0 +1,8 @@
+{"level":"info","ts":1791824362.01248,"msg":"using config from file","file":".runtime/caddy-probe-014/tls-h2-candidate.Caddyfile"}
+{"level":"info","ts":1791824362.014496,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1791824362.014496,"msg":"Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies","adapter":"caddyfile","file":".runtime/caddy-probe-014/tls-h2-candidate.Caddyfile","line":2}
+{"level":"info","ts":1791824362.014496,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x252d5e046380"}
+{"level":"info","ts":1791824362.1516068,"logger":"http.auto_https","msg":"automatic HTTP->HTTPS redirects are disabled","server_name":"srv0"}
+{"level":"info","ts":1791824362.1522026,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1791824362.1522026,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x252d5e046380"}
+Valid configuration

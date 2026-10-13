@@ -1,0 +1,62 @@
+{
+  "model": "onnx-community/owlv2-base-patch16-ONNX",
+  "revision": "a3437c2503c0e86fb06736fcaf19f38aa0300e31",
+  "conversionLicenseMetadata": null,
+  "researchOnly": true,
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 340,
+      "sha256": "9914e32e6137a19340a45e1de5420538de8477abecb83cca47907ce7c07e6514",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "config.json",
+      "bytes": 535,
+      "sha256": "e4cfb1bbfdcf239855a6ba31a4e65b3f38069813b923af364abfa633a351ed93",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "preprocessor_config.json",
+      "bytes": 425,
+      "sha256": "cf3e396635b797ee1a464e1b2836e98748f8edac19e89aaa2c93b55ac15b0064",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "tokenizer_config.json",
+      "bytes": 960,
+      "sha256": "bf011c6d421981c3102428c6390472e83d8c097653262b15573ff10af44348ee",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "tokenizer.json",
+      "bytes": 3642208,
+      "sha256": "e277946093d72c7748281a6a344d6c79a5226c48954d6797dc36984aea23ac60",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "special_tokens_map.json",
+      "bytes": 576,
+      "sha256": "c4dbb96da703fb38f10ccf0490df2fd476811c5a3e71b7e0189cffeed3224e25",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "vocab.json",
+      "bytes": 862328,
+      "sha256": "5047b556ce86ccaf6aa22b3ffccfc52d391ea4accdab9c2f2407da5b742d4363",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "merges.txt",
+      "bytes": 524619,
+      "sha256": "9fd691f7c8039210e0fced15865466c65820d09b63988b0174bfe25de299051a",
+      "upstreamLfsHashVerified": false
+    },
+    {
+      "file": "onnx/model_quantized.onnx",
+      "bytes": 163173645,
+      "sha256": "9459ff29ad085c2609ec969e4610b191ddd77023607107e36703def382bf9ed6",
+      "upstreamLfsHashVerified": true
+    }
+  ]
+}

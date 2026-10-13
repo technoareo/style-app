@@ -1,0 +1,15 @@
+# Authentication upload deadline: source finding
+
+Read-only inspection on 2026-10-12 of corrected build 011, followed by a root synthetic direct-handler probe. No application implementation change is made here.
+
+`src/app/api/auth/[...all]/route.ts` reads every non-GET/HEAD body in a `reader.read()` loop. It rejects above 32768 bytes, then calls the auth delegate only after the stream finishes. The loop contains neither an absolute timer nor an abort listener. `src/server/auth.ts`'s configurable lock budget applies to later database acquisition, not this upload. `scripts/start-server.ts` supplies no custom HTTP request deadline. `deploy/Caddyfile` limits body size to 10 MB but contains no explicit upload deadline. No application middleware file was found in the source inventory. Upstream/Node defaults can still bound the HTTP connection; therefore this finding is an absent **application-level** body deadline, not proof that every deployed connection lasts forever.
+
+The twenty-second bounded body-reader used for photo admission is not used by this authentication wrapper. Previous contextual shorthand describing all uploads as twenty-second bounded must not be relied on for authentication.
+
+After the baseline matrix, root should probe the exported auth handler with a synthetic never-finishing/trickling stream, disposable data configuration and no actual credentials. Record whether it settles and cancels the input by the intended deadline; clean up the exact synthetic stream. A direct handler probe does not test Node/Caddy network deadlines. Add a real loopback HTTP check with the compiled candidate after Claude's correction.
+
+Proposed Claude correction: preserve the 32 KB cap and current supported auth content types, add a fixed total read budget (twenty seconds is consistent with photo uploads) and cancellation on client abort, cancel/release the reader on every early exit, clear timers/listeners, and return a fixed 408 on upload timeout before invoking any auth/database work. Test a steady trickle as well as a stalled body so progress cannot reset the total deadline; test disconnect, over-limit input, normal valid signup/signin and ordinary invalid requests. Avoid secrets in logs and avoid a public switch that disables the bound. Review capacity/admission separately if necessary.
+
+This is a candidate release finding requiring Claude review and execution evidence. It does not explain the previously observed SQLite contention failure, and source must remain unchanged until the baseline matrix completes.
+
+Runtime evidence after the matrix completed: `auth-body-deadline-probe-011.mjs` imported the actual exported POST handler with isolated disposable data configuration and supplied an unfinished synthetic JSON stream. At 21013.3 ms the handler was still pending and the body had not been cancelled. Root ended only that synthetic stream; the handler returned fixed 503 during cleanup. Probe exited zero with no pending work. Exact evidence: `auth-body-deadline-probe-011.json`. Thus the application-level twenty-second bound is absent; Node/Caddy timeout behavior is still untested by this probe.

@@ -1,0 +1,15 @@
+{
+  "experiment": "compact-locate-only-008",
+  "fixture": "natural-closet.jpg",
+  "developmentOnly": true,
+  "heldOut": false,
+  "recognitionBenchmark": false,
+  "imageMaxSide": 768,
+  "predictionBudget": 1200,
+  "context": 4096,
+  "timeoutMs": 240000,
+  "items": [],
+  "valid": false,
+  "failure": "timeout",
+  "durationMs": 240149
+}

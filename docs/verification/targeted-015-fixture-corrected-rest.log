@@ -1,0 +1,36 @@
+✔ time spent waiting for the gate is deducted from the SQLite budget, and the failed begin releases the gate (676.2003ms)
+✔ a gate wait that is shorter than the budget still leaves the rest for the SQLite lock, which is then acquired (502.9699ms)
+✔ a gate wait that uses the whole budget fails as a gate timeout: no BEGIN is attempted and nothing is left held (166.3945ms)
+✔ STATIC: begin() derives the SQLite timeout from one deadline and the shared retry accepts an explicit remaining budget (1.0322ms)
+✔ idle: with nothing scheduled, settle resolves at once and changes nothing (4372.7533ms)
+✔ a scheduled kick and a real drain are waited for: afterwards nothing is queued or sending and the mail was captured (307.6495ms)
+✔ timeout: a drain blocked on the held gate is NOT masked; settle rejects at its cap, the writer stays queued, and settling works once the gate is free (545.8849ms)
+✔ non-finite or wrongly typed options are rejected promptly with a fixed RangeError, on an idle capture (0.9891ms)
+✔ non-finite or wrongly typed options are rejected promptly while a drain is blocked on the gate, and the pending writer is not cleared (327.4777ms)
+✔ the cap is clamped to a hard bound and a non-positive cap still rejects rather than hanging (233.5135ms)
+✔ the shipped Caddyfile answers 404 for the upload counters and still proxies everything else (4.5323ms)
+✔ earlier protections of the Caddyfile are intact (0.8924ms)
+✔ the checker flags a Caddyfile without the block, with a wrong response, or with the order reversed (1.1895ms)
+✔ the compose reader sees one-line, block-list and long-form ports, and ignores comments and `expose` (3.7588ms)
+✔ the compose reader throws, instead of answering a false-safe empty result, for absent or unsupported input (2.0481ms)
+✔ the real compose.yaml is in a shape the reader supports, and nothing next to it overrides it (2.619ms)
+✔ the app port is not published, so the counters stay internal; the route itself still exists (5.058ms)
+✔ the proxy receives only STYLE_DOMAIN: no env_file, no app secrets, and the Caddyfile reads nothing else (3.9302ms)
+✔ the proxy command refuses to start without STYLE_DOMAIN before it execs caddy, with Compose-escaped variables and the standard caddy command (2.0382ms)
+✔ .env.compose.example is a domain-only, secret-free Compose template with a public placeholder (1.7709ms)
+✔ the deployment guide has the domain file steps before the compose commands, keeps --env-file as an alternative, and claims no Compose version (1.8104ms)
+✔ the deployment guide documents the default block and the operator way in (0.6752ms)
+✔ GET answers 200 inside a deadline while the write gate and a foreign SQLite write lock are held, queues nothing and creates no row (2823.5631ms)
+✔ GET with an expired unreferenced photo and a stalled cleanup still succeeds, after about the bounded cleanup wait, and deletes nothing; the next GET cleans up (2746.2504ms)
+✔ PUT admission: origin, session and account binding are refused at once under a held gate and use no quota; an authenticated PUT waits in ADMISSION (the quota write), whatever its body (786.1434ms)
+✔ PUT validation precedes the wardrobe transaction: after admission, invalid documents are refused while the gate is held; a valid one queues for the gate and then commits (1343.1907ms)
+✔ PUT: a body over 3 MB is a 413 even when it references an unavailable photo, and writes nothing (608.186ms)
+✔ F6 routes: an unreadable stored document answers GET with one fixed 500 and no repair; PUT with the right revision replaces it, and a wrong revision is a 409 (2427.5968ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14387.0144

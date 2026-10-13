@@ -1,0 +1,25 @@
+{
+  "developmentFixture": true,
+  "heldOut": false,
+  "model": "qwen3-vl:4b-instruct",
+  "endpoint": "owned research loopback11435 CPU",
+  "timeoutMs": 240000,
+  "completed": true,
+  "geometryValid": true,
+  "firstContentMs": 53976.4608,
+  "doneReason": "stop",
+  "evalCount": 44,
+  "items": [
+    {
+      "c": "top",
+      "b": [
+        0,
+        368,
+        1000,
+        999
+      ]
+    }
+  ],
+  "elapsedMs": 60054.9662,
+  "outputCharacters": 81
+}

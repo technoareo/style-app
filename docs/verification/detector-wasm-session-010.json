@@ -1,0 +1,21 @@
+{
+  "developmentOnly": true,
+  "applicationChange": false,
+  "network": false,
+  "backend": "wasm",
+  "threads": 1,
+  "inferencePerformed": false,
+  "sessionCreated": true,
+  "inputNames": [
+    "pixel_values",
+    "input_ids",
+    "token_type_ids",
+    "attention_mask",
+    "pixel_mask"
+  ],
+  "outputNames": [
+    "logits",
+    "pred_boxes"
+  ],
+  "elapsedMs": 6092
+}

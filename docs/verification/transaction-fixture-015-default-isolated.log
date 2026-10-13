@@ -1,0 +1,28 @@
+✖ deferred BEGIN fails read-to-write upgrade at once; BEGIN IMMEDIATE does not (1.3375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 467.9039
+
+✖ failing tests:
+
+test at tests\concurrency.test.ts:24:1
+✖ deferred BEGIN fails read-to-write upgrade at once; BEGIN IMMEDIATE does not (1.3375ms)
+  Error: EPERM: operation not permitted, realpath 'C:\Users\arjun\AppData\Local\Packages\sandbox.{c4644d4f-f271-4899-a7cd-2af1b8d05450}\AC\Temp'
+      at realpathSync.native (node:fs:2910:18)
+      at realTmp (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\helpers\tempDir.ts:17:23)
+      at makeTempDir (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\helpers\tempDir.ts:23:52)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\concurrency.test.ts:25:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'realpath',
+    path: 'C:\\Users\\arjun\\AppData\\Local\\Packages\\sandbox.{c4644d4f-f271-4899-a7cd-2af1b8d05450}\\AC\\Temp'
+  }

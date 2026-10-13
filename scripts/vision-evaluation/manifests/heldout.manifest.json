@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "kind": "fixture-manifest",
+  "split": "heldout",
+  "splitFrozenAt": null,
+  "purpose": "Held-out fixtures. EMPTY on purpose: no held-out image exists yet. Add fixtures, hashes, licenses and strata, then set splitFrozenAt, all BEFORE any model sees these images. Never list an image here that a model has already run on.",
+  "fixtures": []
+}

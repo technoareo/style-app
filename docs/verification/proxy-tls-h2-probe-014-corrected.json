@@ -1,0 +1,105 @@
+{
+  "candidateOnly": true,
+  "windowsLoopbackTls": true,
+  "systemTrustInstallationDisabled": true,
+  "tlsVerificationDisabled": false,
+  "publicCaSha256": "dc1e2a46f0717061880ef3305fe98724685ceb0841b189ee79fc0b00cc2d50cb",
+  "goaway": [
+    {
+      "code": 0,
+      "lastStreamID": 9,
+      "atMs": 21037.1211
+    }
+  ],
+  "sessionErrors": [],
+  "requests": [
+    {
+      "label": "initial-health",
+      "path": "/api/health",
+      "startedAtMs": 22.9268,
+      "status": 200,
+      "connectionHeader": null,
+      "responseMs": 732.0448,
+      "reply": {
+        "ready": true
+      },
+      "finishedAtMs": 755.1148,
+      "streamClosedAtMs": 757.9603999999999,
+      "rstCode": 0
+    },
+    {
+      "label": "health-during-stall-0",
+      "path": "/api/health",
+      "startedAtMs": 5266.490000000001,
+      "status": 200,
+      "connectionHeader": null,
+      "responseMs": 4.199099999999817,
+      "reply": {
+        "ready": true
+      },
+      "finishedAtMs": 5270.7066,
+      "streamClosedAtMs": 5270.771000000001,
+      "rstCode": 0
+    },
+    {
+      "label": "health-during-stall-1",
+      "path": "/api/health",
+      "startedAtMs": 9781.8596,
+      "status": 200,
+      "connectionHeader": null,
+      "responseMs": 20.360000000000582,
+      "reply": {
+        "ready": true
+      },
+      "finishedAtMs": 9802.2856,
+      "streamClosedAtMs": 9802.7935,
+      "rstCode": 0
+    },
+    {
+      "label": "health-during-stall-2",
+      "path": "/api/health",
+      "startedAtMs": 14303.564199999999,
+      "status": 200,
+      "connectionHeader": null,
+      "responseMs": 3.8016000000006898,
+      "reply": {
+        "ready": true
+      },
+      "finishedAtMs": 14307.3814,
+      "streamClosedAtMs": 14307.4268,
+      "rstCode": 0
+    },
+    {
+      "label": "stalled-auth-default-deadline",
+      "path": "/api/auth/sign-up/email",
+      "startedAtMs": 755.2115,
+      "status": 408,
+      "connectionHeader": null,
+      "responseMs": 20332.5195,
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "finishedAtMs": 21087.760299999998,
+      "streamClosedAtMs": 21087.9439,
+      "rstCode": 0
+    },
+    {
+      "label": "health-after-error-same-session",
+      "path": "/api/health",
+      "startedAtMs": 22096.1341,
+      "error": "ERR_HTTP2_INVALID_SESSION",
+      "finishedAtMs": 22096.9596,
+      "streamClosedAtMs": 22096.9643,
+      "rstCode": 2
+    }
+  ],
+  "problems": [
+    "HTTP2 session cannot be reused after error"
+  ],
+  "authorized": true,
+  "alpn": "h2",
+  "sessionClosedAtMs": 21089.2548,
+  "sessionDestroyedBeforeClientCleanup": true,
+  "clientCleanupAtMs": 22096.9795,
+  "elapsedMs": 22142.3692
+}

@@ -1,0 +1,159 @@
+{
+  "developmentOnly": true,
+  "heldOut": false,
+  "accuracyBenchmark": false,
+  "complete": true,
+  "network": false,
+  "backend": "wasm",
+  "dtype": "fp32",
+  "threads": 1,
+  "source": "tests/fixtures/candidates/natural-closet.jpg",
+  "sourceSha256": "71e077ab678b3b692e579d8cd9423d03967816e5f62919f071c0554f8b0f05d0",
+  "revision": "ff690b0a8050566c290287545bd059350f3e9096",
+  "query": "shirt. dress. jacket. coat. trousers. skirt. shorts. shoes. handbag.",
+  "boxThreshold": 0.25,
+  "textThreshold": 0.25,
+  "nmsIou": 0.5,
+  "tiles": [
+    {
+      "index": 0,
+      "tile": {
+        "left": 0,
+        "top": 0,
+        "width": 700,
+        "height": 1200
+      },
+      "preprocessMs": 106.82089999999971,
+      "tensorShape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "inferenceMs": 27262.786,
+      "proposals": [],
+      "rssBytes": 3166113792
+    },
+    {
+      "index": 1,
+      "tile": {
+        "left": 450,
+        "top": 0,
+        "width": 700,
+        "height": 1200
+      },
+      "preprocessMs": 134.67159999999785,
+      "tensorShape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "inferenceMs": 41192.8221,
+      "proposals": [
+        {
+          "label": "shorts",
+          "score": 0.31958380341529846,
+          "localCorners": [
+            387.50211000442505,
+            1005.6636214256287,
+            612.1606230735779,
+            1198.3478665351868
+          ],
+          "structurallyValid": true,
+          "normalizedSourceCorners": [
+            0.5234388187527657,
+            0.8380530178546906,
+            0.6638503894209862,
+            0.9986232221126556
+          ]
+        }
+      ],
+      "rssBytes": 3175600128
+    },
+    {
+      "index": 2,
+      "tile": {
+        "left": 900,
+        "top": 0,
+        "width": 700,
+        "height": 1200
+      },
+      "preprocessMs": 133.43020000000251,
+      "tensorShape": [
+        1,
+        3,
+        800,
+        800
+      ],
+      "inferenceMs": 40964.0334,
+      "proposals": [
+        {
+          "label": "shirt",
+          "score": 0.2763310670852661,
+          "localCorners": [
+            265.5665546655655,
+            334.9119186401367,
+            594.3585008382797,
+            1197.9487895965576
+          ],
+          "structurallyValid": true,
+          "normalizedSourceCorners": [
+            0.7284790966659784,
+            0.27909326553344727,
+            0.9339740630239248,
+            0.9982906579971313
+          ]
+        }
+      ],
+      "rssBytes": 3175428096
+    }
+  ],
+  "notes": "Raw proposals and class-aware overlap suppression are not garment counts or accuracy. Same development closet fixture; no human gold set. No application changes.",
+  "modelSha256": "267c8b00d269dc2dda0d8592812d3027abd5fb59f1cabf8e3d56f8fdf07f68ec",
+  "loadMs": 4738.346500000001,
+  "normalizedSize": [
+    1600,
+    1200
+  ],
+  "rawProposals": 2,
+  "survivingProposals": [
+    {
+      "label": "shorts",
+      "score": 0.31958380341529846,
+      "localCorners": [
+        387.50211000442505,
+        1005.6636214256287,
+        612.1606230735779,
+        1198.3478665351868
+      ],
+      "structurallyValid": true,
+      "normalizedSourceCorners": [
+        0.5234388187527657,
+        0.8380530178546906,
+        0.6638503894209862,
+        0.9986232221126556
+      ],
+      "tile": 1
+    },
+    {
+      "label": "shirt",
+      "score": 0.2763310670852661,
+      "localCorners": [
+        265.5665546655655,
+        334.9119186401367,
+        594.3585008382797,
+        1197.9487895965576
+      ],
+      "structurallyValid": true,
+      "normalizedSourceCorners": [
+        0.7284790966659784,
+        0.27909326553344727,
+        0.9339740630239248,
+        0.9982906579971313
+      ],
+      "tile": 2
+    }
+  ],
+  "totalMs": 114948.75099999999
+}

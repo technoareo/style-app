@@ -1,0 +1,10 @@
+{
+  "syntheticOnly": true,
+  "experiment": "stale-takeover-replaces-fresh-owner-009-correction",
+  "firstAgeAfterAcquireMs": 2.726318359375,
+  "secondAcquired": true,
+  "freshFirstOwnerLost": true,
+  "keeperRefreshMs": 100,
+  "leaseMs": 500,
+  "secondExitCode": 0
+}

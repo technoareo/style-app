@@ -1,1 +1,51 @@
-{"name":"style-studio","version":"1.0.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"next lint"},"dependencies":{"next":"14.2.15","react":"^18.3.1","react-dom":"^18.3.1","lucide-react":"^0.468.0"},"devDependencies":{"@types/node":"^22.10.2","@types/react":"^18.3.12","@types/react-dom":"^18.3.1","typescript":"^5.7.2"}}
+{
+  "name": "style-studio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && tsx scripts/sanitize-build-output.ts && tsx scripts/verify-packaging.ts",
+    "start": "tsx scripts/start-server.ts",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "verify:packaging": "tsx scripts/verify-packaging.ts",
+    "worker": "tsx scripts/analysis-worker.ts",
+    "mail-worker": "tsx scripts/mail-worker.ts",
+    "verify:standalone": "tsx scripts/verify-standalone.ts"
+  },
+  "dependencies": {
+    "@better-auth/core": "1.7.7",
+    "@better-auth/kysely-adapter": "1.7.7",
+    "better-auth": "^1.7.7",
+    "kysely": "0.29.6",
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.27",
+    "nodemailer": "^10.1.0",
+    "proper-lockfile": "^4.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.2",
+    "@types/proper-lockfile": "^4.1.4",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.5.27",
+    "prettier": "^3.9.10",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "postcss": "8.5.23"
+  },
+  "engines": {
+    "node": ">=24.20 <25"
+  }
+}

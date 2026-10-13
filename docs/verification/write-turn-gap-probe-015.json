@@ -1,0 +1,43 @@
+{
+  "kind": "synthetic-queued-task-write-lock-gap",
+  "calls": 1,
+  "rows": 1,
+  "sourceSha256": "7039eeb1c9d04c709e4363b357bc4bbe3bb0733411e98ffa7628464dd9def8c2",
+  "events": [
+    {
+      "event": "begin-return",
+      "atMs": 1987.5283,
+      "active": true,
+      "calls": 0
+    },
+    {
+      "event": "queued-task-start",
+      "atMs": 1987.5794,
+      "active": true,
+      "calls": 0
+    },
+    {
+      "event": "queued-task-end",
+      "atMs": 2062.6284,
+      "active": true,
+      "calls": 0
+    },
+    {
+      "event": "body",
+      "atMs": 2062.7905,
+      "active": true,
+      "calls": 1
+    },
+    {
+      "event": "commit-return",
+      "atMs": 2121.7533,
+      "active": false,
+      "calls": 1
+    }
+  ],
+  "limitations": [
+    "Synthetic scheduling injection, not proof of the full-suite failure cause.",
+    "One disposable database and one writer; no real account data.",
+    "No application or test source mutation."
+  ]
+}

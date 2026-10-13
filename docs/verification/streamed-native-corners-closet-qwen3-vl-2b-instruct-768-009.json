@@ -1,0 +1,18 @@
+{
+  "experiment": "streamed-native-corners-schema-009",
+  "model": "qwen3-vl:2b-instruct",
+  "maxSide": 768,
+  "developmentOnly": true,
+  "heldOut": false,
+  "qualityBenchmark": false,
+  "timeoutMs": 240000,
+  "firstContentMs": 3268,
+  "firstThinkingMs": null,
+  "completed": false,
+  "validated": false,
+  "itemCount": 0,
+  "failure": "timeout-or-aborted",
+  "durationMs": 240169,
+  "frames": 916,
+  "outputCharacters": 2385
+}

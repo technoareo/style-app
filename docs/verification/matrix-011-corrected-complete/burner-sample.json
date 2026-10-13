@@ -1,0 +1,9 @@
+{
+  "sampledAtUtc": "2026-10-12T11:42:11.8870616Z",
+  "matchedBurners": 0,
+  "remainedAlive": 0,
+  "elapsedSeconds": 2.0079656,
+  "aggregateCpuSeconds": 0.0,
+  "equivalentBusyCores": 0.0,
+  "scope": "One instantaneous sample of matrix-owned inline burners; not target-host capacity or whole-run utilization"
+}

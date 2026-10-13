@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-12T01:12:15.150Z",
+  "purpose": "isolated synthetic-data probe; no private user photos or records were read",
+  "observations": [
+    {
+      "secureDelete": 0,
+      "logicalPhotoCleared": true,
+      "markerStillPresentInDatabase": true
+    },
+    {
+      "secureDelete": 1,
+      "logicalPhotoCleared": true,
+      "markerStillPresentInDatabase": false
+    }
+  ]
+}

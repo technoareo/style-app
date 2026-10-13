@@ -1,0 +1,660 @@
+{
+  "compiledLoopback": true,
+  "operatorBudgetMs": 1000,
+  "fixtureVerificationBypass": true,
+  "before": {
+    "images": {
+      "active": 0,
+      "queued": 0,
+      "refused": 0
+    },
+    "accountsHoldingUpload": 0,
+    "bodies": {
+      "auth": {
+        "ok": 11,
+        "empty": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "too_large": 2,
+        "error": 0
+      },
+      "wardrobe": {
+        "ok": 30,
+        "empty": 0,
+        "timeout": 0,
+        "aborted": 1,
+        "too_large": 0,
+        "error": 0
+      },
+      "photos": {
+        "ok": 262,
+        "empty": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "too_large": 0,
+        "error": 0
+      },
+      "analyze": {
+        "ok": 6,
+        "empty": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "too_large": 0,
+        "error": 0
+      },
+      "other": {
+        "ok": 0,
+        "empty": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "too_large": 0,
+        "error": 0
+      }
+    },
+    "cancels": {
+      "auth": {
+        "settled": 2,
+        "rejected": 0,
+        "grace_expired": 0
+      },
+      "wardrobe": {
+        "settled": 1,
+        "rejected": 0,
+        "grace_expired": 0
+      },
+      "photos": {
+        "settled": 0,
+        "rejected": 0,
+        "grace_expired": 0
+      },
+      "analyze": {
+        "settled": 0,
+        "rejected": 0,
+        "grace_expired": 0
+      },
+      "other": {
+        "settled": 0,
+        "rejected": 0,
+        "grace_expired": 0
+      }
+    },
+    "accounts": {
+      "auth": {
+        "admitted": 0,
+        "refused": 0,
+        "released": 0
+      },
+      "wardrobe": {
+        "admitted": 0,
+        "refused": 0,
+        "released": 0
+      },
+      "photos": {
+        "admitted": 262,
+        "refused": 0,
+        "released": 262
+      },
+      "analyze": {
+        "admitted": 6,
+        "refused": 0,
+        "released": 6
+      },
+      "other": {
+        "admitted": 0,
+        "refused": 0,
+        "released": 0
+      }
+    }
+  },
+  "results": [
+    {
+      "case": "same-owner-and-other-user",
+      "duplicate": {
+        "status": 429,
+        "elapsedMs": 30.458899999999858
+      },
+      "otherStatus": 400,
+      "stalledResult": {
+        "status": 408,
+        "elapsedMs": 1291.8840999999998
+      },
+      "active": {
+        "images": {
+          "active": 1,
+          "queued": 0,
+          "refused": 0
+        },
+        "accountsHoldingUpload": 1,
+        "bodies": {
+          "auth": {
+            "ok": 11,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 2,
+            "error": 0
+          },
+          "wardrobe": {
+            "ok": 30,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "photos": {
+            "ok": 262,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "analyze": {
+            "ok": 6,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "other": {
+            "ok": 0,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          }
+        },
+        "cancels": {
+          "auth": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "wardrobe": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "photos": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "analyze": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "other": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          }
+        },
+        "accounts": {
+          "auth": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "wardrobe": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "photos": {
+            "admitted": 263,
+            "refused": 0,
+            "released": 262
+          },
+          "analyze": {
+            "admitted": 6,
+            "refused": 0,
+            "released": 6
+          },
+          "other": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          }
+        }
+      },
+      "after": {
+        "images": {
+          "active": 0,
+          "queued": 0,
+          "refused": 0
+        },
+        "accountsHoldingUpload": 0,
+        "bodies": {
+          "auth": {
+            "ok": 11,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 2,
+            "error": 0
+          },
+          "wardrobe": {
+            "ok": 30,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "photos": {
+            "ok": 263,
+            "empty": 0,
+            "timeout": 1,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "analyze": {
+            "ok": 6,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "other": {
+            "ok": 0,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          }
+        },
+        "cancels": {
+          "auth": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "wardrobe": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "photos": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 1
+          },
+          "analyze": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "other": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          }
+        },
+        "accounts": {
+          "auth": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "wardrobe": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "photos": {
+            "admitted": 264,
+            "refused": 1,
+            "released": 264
+          },
+          "analyze": {
+            "admitted": 6,
+            "refused": 0,
+            "released": 6
+          },
+          "other": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "chunked-without-content-length",
+      "response": {
+        "status": 408,
+        "elapsedMs": 1106.5946999999996
+      },
+      "after": {
+        "images": {
+          "active": 0,
+          "queued": 0,
+          "refused": 0
+        },
+        "accountsHoldingUpload": 0,
+        "bodies": {
+          "auth": {
+            "ok": 11,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 2,
+            "error": 0
+          },
+          "wardrobe": {
+            "ok": 30,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "photos": {
+            "ok": 263,
+            "empty": 0,
+            "timeout": 2,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "analyze": {
+            "ok": 6,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "other": {
+            "ok": 0,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          }
+        },
+        "cancels": {
+          "auth": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "wardrobe": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "photos": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 1
+          },
+          "analyze": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "other": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          }
+        },
+        "accounts": {
+          "auth": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "wardrobe": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "photos": {
+            "admitted": 265,
+            "refused": 1,
+            "released": 265
+          },
+          "analyze": {
+            "admitted": 6,
+            "refused": 0,
+            "released": 6
+          },
+          "other": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "client-disconnect",
+      "client": {
+        "error": "ECONNRESET",
+        "elapsedMs": 185.45079999999962
+      },
+      "early": {
+        "images": {
+          "active": 0,
+          "queued": 0,
+          "refused": 0
+        },
+        "accountsHoldingUpload": 0,
+        "bodies": {
+          "auth": {
+            "ok": 11,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 2,
+            "error": 0
+          },
+          "wardrobe": {
+            "ok": 30,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "photos": {
+            "ok": 263,
+            "empty": 0,
+            "timeout": 2,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "analyze": {
+            "ok": 6,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "other": {
+            "ok": 0,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          }
+        },
+        "cancels": {
+          "auth": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "wardrobe": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "photos": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 1
+          },
+          "analyze": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "other": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          }
+        },
+        "accounts": {
+          "auth": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "wardrobe": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "photos": {
+            "admitted": 266,
+            "refused": 1,
+            "released": 266
+          },
+          "analyze": {
+            "admitted": 6,
+            "refused": 0,
+            "released": 6
+          },
+          "other": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          }
+        }
+      },
+      "late": {
+        "images": {
+          "active": 0,
+          "queued": 0,
+          "refused": 0
+        },
+        "accountsHoldingUpload": 0,
+        "bodies": {
+          "auth": {
+            "ok": 11,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 2,
+            "error": 0
+          },
+          "wardrobe": {
+            "ok": 30,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "photos": {
+            "ok": 263,
+            "empty": 0,
+            "timeout": 2,
+            "aborted": 1,
+            "too_large": 0,
+            "error": 0
+          },
+          "analyze": {
+            "ok": 6,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          },
+          "other": {
+            "ok": 0,
+            "empty": 0,
+            "timeout": 0,
+            "aborted": 0,
+            "too_large": 0,
+            "error": 0
+          }
+        },
+        "cancels": {
+          "auth": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "wardrobe": {
+            "settled": 1,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "photos": {
+            "settled": 2,
+            "rejected": 0,
+            "grace_expired": 1
+          },
+          "analyze": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          },
+          "other": {
+            "settled": 0,
+            "rejected": 0,
+            "grace_expired": 0
+          }
+        },
+        "accounts": {
+          "auth": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "wardrobe": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          },
+          "photos": {
+            "admitted": 266,
+            "refused": 1,
+            "released": 266
+          },
+          "analyze": {
+            "admitted": 6,
+            "refused": 0,
+            "released": 6
+          },
+          "other": {
+            "admitted": 0,
+            "refused": 0,
+            "released": 0
+          }
+        }
+      },
+      "serverAbortDelta": 1,
+      "serverTimeoutDelta": 0
+    }
+  ],
+  "problems": []
+}

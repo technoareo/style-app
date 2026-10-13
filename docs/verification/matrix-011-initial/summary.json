@@ -1,0 +1,167 @@
+{
+  "planned": 2,
+  "completed": 2,
+  "complete": true,
+  "allChildrenStopped": true,
+  "problems": [],
+  "results": [
+    {
+      "scenario": "stress",
+      "rep": 1,
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "allChildrenStopped": true,
+      "stopProblems": [],
+      "durationSec": 35.9,
+      "counts": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "skipped": 0
+      },
+      "report": {
+        "phasesMs": {
+          "setup": 1468,
+          "wait": 8015,
+          "stress": 20739
+        },
+        "problems": 0,
+        "childFailures": [
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "worker",
+            "ok": 60,
+            "failures": 0,
+            "code": 0
+          }
+        ],
+        "writeAcquireMaxMs": 1885.3,
+        "writeAcquireP99MaxMs": 1171.8,
+        "writeGateMaxMs": 1129.1,
+        "writeSqliteMaxMs": 1881.7,
+        "writeAcquireFailed": 0,
+        "authAcquireMaxMs": 2739.2,
+        "authAcquireFailed": 0,
+        "authHoldMaxMs": 134.1,
+        "queueDepthMax": 2
+      },
+      "log": "docs\\verification\\matrix-011-initial\\stress-1.log"
+    },
+    {
+      "scenario": "stress",
+      "rep": 2,
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null,
+      "allChildrenStopped": true,
+      "stopProblems": [],
+      "durationSec": 35.9,
+      "counts": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "skipped": 0
+      },
+      "report": {
+        "phasesMs": {
+          "setup": 1552,
+          "wait": 8001,
+          "stress": 20920
+        },
+        "problems": 0,
+        "childFailures": [
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "register",
+            "ok": 4,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "write",
+            "ok": 150,
+            "failures": 0,
+            "code": 0
+          },
+          {
+            "role": "worker",
+            "ok": 60,
+            "failures": 0,
+            "code": 0
+          }
+        ],
+        "writeAcquireMaxMs": 2157,
+        "writeAcquireP99MaxMs": 2110,
+        "writeGateMaxMs": 531.3,
+        "writeSqliteMaxMs": 2153.9,
+        "writeAcquireFailed": 0,
+        "authAcquireMaxMs": 3448.2,
+        "authAcquireFailed": 0,
+        "authHoldMaxMs": 144.2,
+        "queueDepthMax": 2
+      },
+      "log": "docs\\verification\\matrix-011-initial\\stress-2.log"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "compiledBuild": "AyhSS6LYgUPv-LCv9p02d",
+  "defaultBudgetMs": 20000,
+  "caddyVersion": "2.11.7",
+  "proxyOnly": true,
+  "observationMs": 15000,
+  "windowsLoopbackHttp1Only": true,
+  "noClientDestroyUntilObservationOrWatchdog": true,
+  "results": [
+    {
+      "port": 3001,
+      "mode": "stall",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "status": 408,
+      "responseHeaders": {
+        "connection": "close",
+        "cacheControl": "private, no-store"
+      },
+      "responseFinishedAtMs": 20317.0841,
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "socketClosedAtMs": 20317.331100000003,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": true,
+      "socketOpenBeforeClientCleanup": false,
+      "clientCleanupAtMs": 20317.364400000002
+    },
+    {
+      "port": 3001,
+      "mode": "trickle",
+      "requestedConnection": "keep-alive",
+      "declaredBytes": 1000,
+      "status": 408,
+      "responseHeaders": {
+        "connection": "close",
+        "cacheControl": "private, no-store"
+      },
+      "responseFinishedAtMs": 20222.4552,
+      "reply": {
+        "error": "The request took too long. Please try again."
+      },
+      "socketClosedAtMs": 20223.2439,
+      "socketCloseHadError": false,
+      "closedBeforeClientCleanup": true,
+      "socketOpenBeforeClientCleanup": false,
+      "clientCleanupAtMs": 20223.3204
+    }
+  ],
+  "health": [
+    {
+      "port": 3000,
+      "status": 200
+    },
+    {
+      "port": 3001,
+      "status": 200
+    }
+  ],
+  "problems": []
+}

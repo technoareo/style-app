@@ -1,0 +1,29 @@
+# Build 012 verification (in progress)
+
+Claude implemented a shared bounded body reader for auth, wardrobe JSON and photo uploads, plus the Docker operator-script packaging rider. No production approval or compiled build-012 result is claimed yet. Initial candidate preserved in sibling `build-012-initial`, with 169 hashed source/config/test/reference files.
+
+Initial root results:
+
+- Targeted body/deadline/deployment-script checks: 18 passed, zero failed/skipped, 12.7115 seconds. Synthetic streams and disposable accounts; direct-handler checks, not network proof.
+- Typecheck failed in `src/server/access.ts:113`: grouped refusal statuses in a union member prevented exhaustive narrowing of `read.bytes`.
+- Independent `body-deadline-boundary-probe-012.mjs`: a ready synthetic JSON stream, 50 ms internal budget and queued 120 ms blocking microtask returned `ok` after 124.69 ms. The timer had not executed, so the helper accepted a body after its claimed absolute deadline. Evidence JSON is preserved. This is a delayed-continuation probe, not a deployed-network result.
+
+Root requested Claude correct the truthful discriminated union/ok guard and add monotonic elapsed-deadline checks before reads and before accepting data/EOF, preserving timeout/abort precedence, cleanup, size caps, production defaults and cancellation grace. Meaningful regression coverage requested; no loosened timing bounds, no scheduling changes. Claude is the source implementation owner; root performs verification. The original failed candidate remains intact.
+
+Corrected candidate results:
+
+- Typecheck passed.
+- Targeted body/deadline/deployment-script checks: 23 passed, zero failed/skipped, 11.9572 seconds. Includes delayed data, zero-byte progress, EOF and abort precedence regressions.
+- Independent boundary probe, preserving its original failed JSON separately: timeout after 127.93 ms despite the unfired 50 ms timer; no late body accepted; reader released. The deliberate 120 ms thread block prevents any response while it runs, so this proves rejection after resumption, not a guarantee that blocked JavaScript can respond on time.
+- Original default-budget auth probe, preserving build-011 evidence: response settled at 20038.95 ms, status 408; input cancelled; observed completed at 21 seconds. Direct-handler scope, not network proof.
+- Corrected source snapshot: sibling `build-012-corrected`, 169 hashed files. No file hashes changed during the full regression run.
+- Actual unchanged `npm test` script (`tsx --test tests/*.test.ts`), cleared application/private environment and local development settings: 163 total, 159 passed, four skipped, zero failed/cancelled, 152.6077 seconds. Log: `backend-012-corrected-npm.log`. This is the release command, rather than the matrix's equivalent Node-import invocation. Resource-intensive large-backup test and platform-dependent cases remain skipped as reported.
+- Production compilation started after the owned build-011 browser server was confirmed live and stopped. Build-012 results, compiled network checks, browser checks and independent review are pending.
+- Compilation completed successfully: compile, lint, types, static generation, sanitization and packaging passed. Build ID `gfVae_5IhelyzlAuq0Cm_`; 86192 trace entries removed from 16 manifests and one generated private-path/escaping-link entry removed. Actual runtime data remained untouched. Log: `build-012-corrected.log`.
+- Isolated standalone verification passed (session 78721 completed with exit zero), serving real routes without ancestor project dependencies.
+- Compiled loopback auth HTTP probe passed: stalled body received private/no-store 408 in 1320.47 ms; steady 100 ms trickle received 408 in 1009.87 ms; oversize received 413; deliberately disconnected client observed ECONNRESET; subsequent health 200. Server used the supported 1000 ms operator body budget and strict unhandled-rejection handling. Default 20000 ms behavior is covered by the separate direct-handler probe; these are not Caddy or internet deployment tests. Evidence: `body-http-probe-012-initial.json`. Wardrobe/photo slow-body network coverage remains pending.
+- All 169 source hashes remained unchanged after compilation. Compiled browser regression started as session 71050 with matching server/fixture `.data/release-012-browser`, private capture and 1000 ms operator budget. Completion is not yet claimed. Server session 8928 is live on loopback only; no AI/mail worker started for it.
+- Browser regression completed with exit zero: 33 passed, one duplicate mobile signup skipped, 1.9 minutes. Log: `browser-012-corrected.log`. Desktop Chrome and mobile-size viewport, controlled AI responses, not actual phones or recognition accuracy. Source snapshot remains the verification target; fresh independent build-012 review and wardrobe/photo slow-body network checks are next.
+- Additional compiled owned-account HTTP checks passed: wardrobe stall 408 in 1288.33 ms, wardrobe trickle 408 in 1105.61 ms, photo stall 408 in 1286.70 ms, deliberate photo-client disconnect observed at 201.46 ms. Afterwards the synthetic account's wardrobe revision remained zero and photo asset count zero; server health 200. Evidence: `owned-body-http-probe-012.json`. Supported 1000 ms operator budget, strict-rejection server, loopback only. A fresh synthetic fixture identity was marked verified internally; independent browser tests cover the normal email verification interaction. No real user photos or credentials were inspected.
+
+Required next: targeted retest and typecheck; original twenty-one-second auth probe adapted to preserve historical evidence; corrected candidate snapshot; compile/packaging and isolated startup; real compiled loopback slow/trickle/disconnect tests; appropriate full/backend/browser regressions; fresh independent Claude review. All other launch gates remain open, including real wardrobe recognition and deployment.

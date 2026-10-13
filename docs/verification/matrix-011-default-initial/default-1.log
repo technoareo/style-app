@@ -1,0 +1,179 @@
+2026-10-12T09:52:11.637Z WARN [Better Auth]: Invalid password
+✔ verified accounts isolate wardrobes and photos, handle conflicts, recover and delete themselves (10499.5138ms)
+✔ image-work semaphore bounds concurrency, queue and wait, and always releases (2132.4418ms)
+✔ upload inspection rejects by header metadata before any decode (132.8281ms)
+✔ limits are configurable and size is judged on decoded bytes (66.5996ms)
+✔ a burst of oversize and over-quota uploads is refused cheaply and boundedly (144.4407ms)
+✔ consistent backup excludes temporary photos and restore preserves account deletions (12759.8312ms)
+✔ only 'this file system cannot fsync' is tolerated; I/O failures are not (1.8981ms)
+✔ a real I/O error while flushing the backup file fails the backup: nothing published, no partial, no sensitive bytes (2107.0035ms)
+✔ a file system that cannot fsync is tolerated and reported as a platform limit, not as a failure (2646.5013ms)
+✔ a real I/O error flushing the directory after publication keeps the verified backup but reports it as not durable, and old backups are not pruned (4886.5308ms)
+✔ a platform that cannot flush a directory is reported as a limit and does not block retention (3178.5143ms)
+✔ the real flushes: a platform that can flush a directory does so; Windows reports the documented limit (3152.0232ms)
+✔ NATIVE hard-link publication: when the partial's name cannot be removed after the final name exists, the backup is reported as published with the leftover named, not as failed; the next backup sweeps it (3227.7254ms)
+﹣ REAL fallback: where this environment refuses hard links, publication uses rename, the partial name is gone, nothing is left over, and the unlink step never runs (0.5526ms) # hard links work here, so the native branch is what runs (see the native test)
+✔ REACTION (injected link refusal, any platform): a refused hard link falls back to rename and the backup is complete with no leftover (1832.1655ms)
+✔ REACTION (injected; a copy stands in for the link, so this is NOT hard-link or file-system proof): link succeeds, removing the partial name fails -> published with the leftover named, durable, next backup sweeps it; a taken name moves on to -1 (4095.697ms)
+✔ rate-limit rows (client addresses) never reach a completed backup; the table is kept, empty (2707.4384ms)
+﹣ POSIX: a pre-existing wide backups directory is narrowed to 0700 (that directory only) and the backup files are owner-only (0.1518ms) # POSIX mode bits do not exist on Windows
+✔ the overlap predicate counts only writes whose whole interval is strictly inside the copy (2.1452ms)
+﹣ a backup of a database of 300 MB or more completes within the bound while another process commits writes inside the copy, and passes an integrity check (10.407ms) # resource-intensive: set STYLE_LARGE_BACKUP_TEST=1 to run
+✔ a completed backup is sanitised, verified and published under a final name only (6049.0727ms)
+✔ a failure at any stage leaves no final file, no partial and no marker bytes, and keeps the earlier backup and the live data (5252.7595ms)
+✔ pruning happens only after a backup completed (2161.7541ms)
+✔ a cleanup that cannot remove the partial says so instead of claiming it is gone (1540.9809ms)
+✔ a killed owner leaves only a partial that restore refuses; its lock dies with it, the next backup takes over at once and removes the dead partial (6769.9505ms)
+✔ two contenders waiting on a live owner cannot take its lock; when it is killed they proceed one at a time and both succeed (11055.9231ms)
+Skipped coordinator link guard: this account may not create links.
+✔ the lock module: a second holder is refused while the first lives (same process too), granted after release, and the coordinator file is guarded (344.2382ms)
+✔ a LIVE owner whose main thread is blocked for a long time keeps its lock and its partial and completes (the first 009 failure) (9748.1167ms)
+✔ publication never replaces an existing backup, even when the name is taken at the last moment (661.3526ms)
+✔ two backups started in the same millisecond are serialised and never replace an earlier backup (8749.8642ms)
+✔ physical path guards: a linked backups directory is refused and a linked partial name is unlinked without touching its target (721.822ms)
+✔ deferred BEGIN fails read-to-write upgrade at once; BEGIN IMMEDIATE does not (816.5771ms)
+✔ auth dialect: eager IMMEDIATE transaction, async bounded lock acquisition, gate released on every exit (2445.4261ms)
+✔ a gated synchronous writer waits for an async auth transaction instead of blocking the event loop (1268.7033ms)
+✔ read-then-write atomicity: two delayed async consumers of one token cannot both succeed (1425.0257ms)
+✔ write gate waits are bounded: timed-out waiters are removed and the queue is capped (54.592ms)
+✔ deleting a user writes the tombstone atomically: rollback and a crash before commit leave neither (6483.3321ms)
+CONCURRENCY_TIMING {"phasesMs":{"setup":3603,"wait":8001,"stress":35747},"parent":{"calls":{"handlerSignUp":{"all":{"count":4,"p50":2772,"p95":3300.3,"p99":3300.3,"max":3300.3,"mean":2827.2},"ok":{"count":4,"p50":2772,"p95":3300.3,"p99":3300.3,"max":3300.3,"mean":2827.2},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"apiSignUp":{"all":{"count":4,"p50":716.9,"p95":1518.5,"p99":1518.5,"max":1518.5,"mean":930.5},"ok":{"count":4,"p50":716.9,"p95":1518.5,"p99":1518.5,"max":1518.5,"mean":930.5},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"wardrobeRequest":{"all":{"count":21,"p50":845.4,"p95":5216.6,"p99":5217.1,"max":5217.1,"mean":1527.8},"ok":{"count":21,"p50":845.4,"p95":5216.6,"p99":5217.1,"max":5217.1,"mean":1527.8},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}}},"locks":{"write":{"acquire":{"count":60,"ok":60,"failed":0,"outcomes":{"acquired":60},"queueDepthMax":3,"totalMs":{"count":60,"p50":78.1,"p95":3712.2,"p99":3904.9,"max":3904.9,"mean":408.4},"totalMsOk":{"count":60,"p50":78.1,"p95":3712.2,"p99":3904.9,"max":3904.9,"mean":408.4},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":60,"p50":0,"p95":471.5,"p99":3904.8,"max":3904.8,"mean":264.8},"sqliteMs":{"count":60,"p50":0,"p95":544.6,"p99":3755.5,"max":3755.5,"mean":143.5},"attempts":{"count":60,"p50":1,"p95":4,"p99":19,"max":19,"mean":1.7}},"hold":{"count":60,"commit":60,"rollback":0,"holdMs":{"count":60,"p50":70,"p95":106.8,"p99":136.8,"max":136.8,"mean":62.7}},"truncated":false},"auth":{"acquire":{"count":11,"ok":11,"failed":0,"outcomes":{"acquired":11},"queueDepthMax":0,"totalMs":{"count":11,"p50":0.1,"p95":329.4,"p99":329.4,"max":329.4,"mean":64.9},"totalMsOk":{"count":11,"p50":0.1,"p95":329.4,"p99":329.4,"max":329.4,"mean":64.9},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":11,"p50":0,"p95":329.4,"p99":329.4,"max":329.4,"mean":30},"sqliteMs":{"count":11,"p50":0.1,"p95":280.5,"p99":280.5,"max":280.5,"mean":34.9},"attempts":{"count":11,"p50":1,"p95":3,"p99":3,"max":3,"mean":1.3}},"hold":{"count":11,"commit":11,"rollback":0,"holdMs":{"count":11,"p50":141.9,"p95":215.2,"p99":215.2,"max":215.2,"mean":127.4}},"truncated":false}}},"children":[{"role":"register","ok":4,"failures":0,"code":0,"timing":{"phases":{"setupMs":4165,"waitMs":3517,"stressMs":4697},"calls":{"all":{"count":4,"p50":4118.2,"p95":4695.9,"p99":4695.9,"max":4695.9,"mean":4266.9},"ok":{"count":4,"p50":4118.2,"p95":4695.9,"p99":4695.9,"max":4695.9,"mean":4266.9},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":3,"ok":3,"failed":0,"outcomes":{"acquired":3},"queueDepthMax":0,"totalMs":{"count":3,"p50":159.1,"p95":223,"p99":223,"max":223,"mean":173.8},"totalMsOk":{"count":3,"p50":159.1,"p95":223,"p99":223,"max":223,"mean":173.8},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":3,"p50":159,"p95":222.8,"p99":222.8,"max":222.8,"mean":173.6},"sqliteMs":{"count":3,"p50":0.1,"p95":0.2,"p99":0.2,"max":0.2,"mean":0.1},"attempts":{"count":3,"p50":1,"p95":1,"p99":1,"max":1,"mean":1}},"hold":{"count":3,"commit":3,"rollback":0,"holdMs":{"count":3,"p50":91.2,"p95":105.1,"p99":105.1,"max":105.1,"mean":89.4}},"truncated":false},"auth":{"acquire":{"count":4,"ok":4,"failed":0,"outcomes":{"acquired":4},"queueDepthMax":0,"totalMs":{"count":4,"p50":0.1,"p95":3634.8,"p99":3634.8,"max":3634.8,"mean":908.8},"totalMsOk":{"count":4,"p50":0.1,"p95":3634.8,"p99":3634.8,"max":3634.8,"mean":908.8},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":4,"p50":0,"p95":0.1,"p99":0.1,"max":0.1,"mean":0.1},"sqliteMs":{"count":4,"p50":0,"p95":3634.7,"p99":3634.7,"max":3634.7,"mean":908.7},"attempts":{"count":4,"p50":1,"p95":29,"p99":29,"max":29,"mean":8}},"hold":{"count":4,"commit":4,"rollback":0,"holdMs":{"count":4,"p50":174.4,"p95":225.8,"p99":225.8,"max":225.8,"mean":191.6}},"truncated":false}}}},{"role":"register","ok":4,"failures":0,"code":0,"timing":{"phases":{"setupMs":5037,"waitMs":2483,"stressMs":7039},"calls":{"all":{"count":4,"p50":6477.5,"p95":7038.8,"p99":7038.8,"max":7038.8,"mean":6609.3},"ok":{"count":4,"p50":6477.5,"p95":7038.8,"p99":7038.8,"max":7038.8,"mean":6609.3},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":3,"ok":3,"failed":0,"outcomes":{"acquired":3},"queueDepthMax":0,"totalMs":{"count":3,"p50":171.3,"p95":192.3,"p99":192.3,"max":192.3,"mean":172},"totalMsOk":{"count":3,"p50":171.3,"p95":192.3,"p99":192.3,"max":192.3,"mean":172},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":3,"p50":171.3,"p95":192.3,"p99":192.3,"max":192.3,"mean":172},"sqliteMs":{"count":3,"p50":0.1,"p95":0.1,"p99":0.1,"max":0.1,"mean":0.1},"attempts":{"count":3,"p50":1,"p95":1,"p99":1,"max":1,"mean":1}},"hold":{"count":3,"commit":3,"rollback":0,"holdMs":{"count":3,"p50":106.7,"p95":122,"p99":122,"max":122,"mean":111.5}},"truncated":false},"auth":{"acquire":{"count":4,"ok":4,"failed":0,"outcomes":{"acquired":4},"queueDepthMax":0,"totalMs":{"count":4,"p50":0.1,"p95":5930,"p99":5930,"max":5930,"mean":1482.6},"totalMsOk":{"count":4,"p50":0.1,"p95":5930,"p99":5930,"max":5930,"mean":1482.6},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":4,"p50":0,"p95":0.1,"p99":0.1,"max":0.1,"mean":0},"sqliteMs":{"count":4,"p50":0,"p95":5929.9,"p99":5929.9,"max":5929.9,"mean":1482.5},"attempts":{"count":4,"p50":1,"p95":47,"p99":47,"max":47,"mean":12.5}},"hold":{"count":4,"commit":4,"rollback":0,"holdMs":{"count":4,"p50":173.9,"p95":217.9,"p99":217.9,"max":217.9,"mean":186.4}},"truncated":false}}}},{"role":"register","ok":4,"failures":0,"code":0,"timing":{"phases":{"setupMs":4638,"waitMs":3002,"stressMs":5858},"calls":{"all":{"count":4,"p50":5379.2,"p95":5857.1,"p99":5857.1,"max":5857.1,"mean":5490.3},"ok":{"count":4,"p50":5379.2,"p95":5857.1,"p99":5857.1,"max":5857.1,"mean":5490.3},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":3,"ok":3,"failed":0,"outcomes":{"acquired":3},"queueDepthMax":0,"totalMs":{"count":3,"p50":139.4,"p95":177.2,"p99":177.2,"max":177.2,"mean":144.9},"totalMsOk":{"count":3,"p50":139.4,"p95":177.2,"p99":177.2,"max":177.2,"mean":144.9},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":3,"p50":139.4,"p95":177.1,"p99":177.1,"max":177.1,"mean":144.8},"sqliteMs":{"count":3,"p50":0.1,"p95":0.1,"p99":0.1,"max":0.1,"mean":0.1},"attempts":{"count":3,"p50":1,"p95":1,"p99":1,"max":1,"mean":1}},"hold":{"count":3,"commit":3,"rollback":0,"holdMs":{"count":3,"p50":103,"p95":107.8,"p99":107.8,"max":107.8,"mean":98.8}},"truncated":false},"auth":{"acquire":{"count":4,"ok":4,"failed":0,"outcomes":{"acquired":4},"queueDepthMax":0,"totalMs":{"count":4,"p50":0.1,"p95":4914.4,"p99":4914.4,"max":4914.4,"mean":1228.6},"totalMsOk":{"count":4,"p50":0.1,"p95":4914.4,"p99":4914.4,"max":4914.4,"mean":1228.6},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":4,"p50":0,"p95":0.2,"p99":0.2,"max":0.2,"mean":0.1},"sqliteMs":{"count":4,"p50":0,"p95":4914.1,"p99":4914.1,"max":4914.1,"mean":1228.5},"attempts":{"count":4,"p50":1,"p95":39,"p99":39,"max":39,"mean":10.5}},"hold":{"count":4,"commit":4,"rollback":0,"holdMs":{"count":4,"p50":144.8,"p95":178.6,"p99":178.6,"max":178.6,"mean":154.1}},"truncated":false}}}},{"role":"write","ok":150,"failures":0,"code":0,"timing":{"phases":{"setupMs":1529,"waitMs":6036,"stressMs":35281},"calls":{"all":{"count":150,"p50":93.6,"p95":794.5,"p99":3204.3,"max":4772.1,"mean":235.2},"ok":{"count":150,"p50":93.6,"p95":794.5,"p99":3204.3,"max":4772.1,"mean":235.2},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":150,"ok":150,"failed":0,"outcomes":{"acquired":150},"queueDepthMax":0,"totalMs":{"count":150,"p50":47.7,"p95":732,"p99":3095.9,"max":4708.2,"mean":184.2},"totalMsOk":{"count":150,"p50":47.7,"p95":732,"p99":3095.9,"max":4708.2,"mean":184.2},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":150,"p50":0,"p95":0.1,"p99":0.1,"max":15.4,"mean":0.1},"sqliteMs":{"count":150,"p50":47.6,"p95":732,"p99":3095.8,"max":4692.8,"mean":184},"attempts":{"count":150,"p50":1,"p95":5,"p99":20,"max":30,"mean":1.9}},"hold":{"count":150,"commit":150,"rollback":0,"holdMs":{"count":150,"p50":19.3,"p95":98.1,"p99":108.3,"max":108.4,"mean":39.4}},"truncated":false},"auth":{"acquire":{"count":0,"ok":0,"failed":0,"outcomes":{},"queueDepthMax":0,"totalMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsOk":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"sqliteMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"attempts":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"hold":{"count":0,"commit":0,"rollback":0,"holdMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"truncated":false}}}},{"role":"write","ok":150,"failures":0,"code":0,"timing":{"phases":{"setupMs":1516,"waitMs":6075,"stressMs":35718},"calls":{"all":{"count":150,"p50":78.3,"p95":1031.2,"p99":2581,"max":3158.1,"mean":238.1},"ok":{"count":150,"p50":78.3,"p95":1031.2,"p99":2581,"max":3158.1,"mean":238.1},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":150,"ok":150,"failed":0,"outcomes":{"acquired":150},"queueDepthMax":0,"totalMs":{"count":150,"p50":46.3,"p95":999.9,"p99":2471.6,"max":3048.6,"mean":192.3},"totalMsOk":{"count":150,"p50":46.3,"p95":999.9,"p99":2471.6,"max":3048.6,"mean":192.3},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":150,"p50":0,"p95":0.1,"p99":0.1,"max":14.9,"mean":0.1},"sqliteMs":{"count":150,"p50":46.2,"p95":999.9,"p99":2471.5,"max":3048.6,"mean":192.2},"attempts":{"count":150,"p50":1,"p95":7,"p99":16,"max":20,"mean":2}},"hold":{"count":150,"commit":150,"rollback":0,"holdMs":{"count":150,"p50":18.8,"p95":102,"p99":105.3,"max":106,"mean":34.4}},"truncated":false},"auth":{"acquire":{"count":0,"ok":0,"failed":0,"outcomes":{},"queueDepthMax":0,"totalMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsOk":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"sqliteMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"attempts":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"hold":{"count":0,"commit":0,"rollback":0,"holdMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"truncated":false}}}},{"role":"write","ok":150,"failures":0,"code":0,"timing":{"phases":{"setupMs":1747,"waitMs":5881,"stressMs":34172},"calls":{"all":{"count":150,"p50":110.2,"p95":596.9,"p99":3126.6,"max":3543.2,"mean":227.8},"ok":{"count":150,"p50":110.2,"p95":596.9,"p99":3126.6,"max":3543.2,"mean":227.8},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":150,"ok":150,"failed":0,"outcomes":{"acquired":150},"queueDepthMax":0,"totalMs":{"count":150,"p50":62.3,"p95":532.5,"p99":3017,"max":3434.3,"mean":171.7},"totalMsOk":{"count":150,"p50":62.3,"p95":532.5,"p99":3017,"max":3434.3,"mean":171.7},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":150,"p50":0,"p95":0.1,"p99":0.1,"max":15.1,"mean":0.1},"sqliteMs":{"count":150,"p50":62.3,"p95":532.5,"p99":3017,"max":3434.3,"mean":171.6},"attempts":{"count":150,"p50":1,"p95":4,"p99":20,"max":22,"mean":1.8}},"hold":{"count":150,"commit":150,"rollback":0,"holdMs":{"count":150,"p50":36.5,"p95":97.7,"p99":115.4,"max":162,"mean":44.4}},"truncated":false},"auth":{"acquire":{"count":0,"ok":0,"failed":0,"outcomes":{},"queueDepthMax":0,"totalMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsOk":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"sqliteMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"attempts":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"hold":{"count":0,"commit":0,"rollback":0,"holdMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"truncated":false}}}},{"role":"worker","ok":60,"failures":0,"code":0,"timing":{"phases":{"setupMs":4437,"waitMs":3069,"stressMs":34393},"calls":{"all":{"count":60,"p50":280.5,"p95":992.4,"p99":10683.3,"max":10683.3,"mean":570.1},"ok":{"count":60,"p50":280.5,"p95":992.4,"p99":10683.3,"max":10683.3,"mean":570.1},"failed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"locks":{"write":{"acquire":{"count":122,"ok":122,"failed":0,"outcomes":{"acquired":122},"queueDepthMax":0,"totalMs":{"count":122,"p50":62.6,"p95":671.2,"p99":1511,"max":9079.8,"mean":248.1},"totalMsOk":{"count":122,"p50":62.6,"p95":671.2,"p99":1511,"max":9079.8,"mean":248.1},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":122,"p50":0,"p95":0,"p99":0.1,"max":0.2,"mean":0},"sqliteMs":{"count":122,"p50":62.6,"p95":671.2,"p99":1510.9,"max":9079.8,"mean":248.1},"attempts":{"count":122,"p50":1,"p95":5,"p99":10,"max":57,"mean":2.3}},"hold":{"count":122,"commit":122,"rollback":0,"holdMs":{"count":122,"p50":17.4,"p95":94,"p99":113,"max":117.5,"mean":20.3}},"truncated":false},"auth":{"acquire":{"count":0,"ok":0,"failed":0,"outcomes":{},"queueDepthMax":0,"totalMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsOk":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"totalMsFailed":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"gateMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"sqliteMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0},"attempts":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"hold":{"count":0,"commit":0,"rollback":0,"holdMs":{"count":0,"p50":0,"p95":0,"p99":0,"max":0,"mean":0}},"truncated":false}}}}],"problems":0}
+✔ simultaneous HTTP auth, wardrobe routes, multi-process registrations, worker and direct writes never hit 'database is locked' (47354.2703ms)
+✔ a write that cannot get the lock within its budget fails retryably before its body runs (6100.9495ms)
+✔ a contended heartbeat is degraded, not fatal; it only turns critical after half a lease (715.3439ms)
+Could not record an analysis result under database contention; the job will be requeued after its lease.
+✔ job completion survives write contention without repeating inference; beyond the bound the job is requeued, not lost (3478.1363ms)
+✔ a refused write lock becomes a truthful retryable 503 with no side effects and no token consumed (7028.6918ms)
+Skipped ledger link guard: this account may not create links.
+✔ a ledger round-trips in canonical form (sorted, checksummed, newline-terminated) (3.427ms)
+✔ validation is fail-closed: every kind of damage is rejected with a code, never partially accepted (48.0469ms)
+✔ reading: a missing file, a directory and a link are distinguished and refused (12.0978ms)
+✔ export: written first, left alone when nothing changed, rewritten on a new deletion, and the ledger only grows (1647.5151ms)
+✔ export: a damaged previous ledger is set aside, not overwritten blindly or trusted; an unreadable or newer-version one stops the export (1089.7953ms)
+✔ export refuses a database row the ledger cannot represent instead of skipping it (1177.184ms)
+✔ concurrent exports from several real processes while deletions arrive: every sample is a valid ledger, generations and entries never go backwards, and the final file has every deletion (6950.9827ms)
+✔ composes complete outfits rather than first four items (39.3288ms)
+✔ does not hallucinate missing owned items (0.3309ms)
+✔ excludes laundry, unreviewed and warm items in hot weather (0.4522ms)
+✔ formal event cannot silently use casual pieces (0.6128ms)
+✔ dress substitutes for top and bottom (0.4734ms)
+✔ cold weather adds an available layer (5.1711ms)
+✔ new combinations stay within owned items (1.3862ms)
+✔ validates bounded detection records and rejects malformed model output (13.5603ms)
+✔ backup preserves items and rejects duplicates, executable image formats and unknown version (9.2465ms)
+✔ the percentile helper is nearest-rank and keeps the exact maximum (1.7428ms)
+✖ the acquire measurement brackets the real SQLite wait, the gate wait and the queue depth (657.148ms)
+✔ the hold measurement runs from a successful BEGIN to COMMIT or ROLLBACK, on the auth path and on the write path (601.134ms)
+✔ concurrent observer contexts stay isolated; the process observer sees only what no context claims (669.7601ms)
+✔ a refused lock never runs the body, reports where the budget went, and leaves no transaction or gate behind (547.8121ms)
+✔ a gate that times out is reported, the body never runs, and the original error type is unchanged (123.8824ms)
+✔ an observer that throws cannot change a result, mask a failure, keep a transaction open or hold the gate (655.2124ms)
+✔ observers whose property lookup throws (getter, Proxy) cannot change an outcome, leave a transaction begun, or hold the gate (233.3374ms)
+✔ a mutating observer cannot alter the metrics attached to a refusal (250.4987ms)
+✔ REAL child, strict about unhandled rejections: throwing getters, a throwing Proxy, rejecting async observers and hostile thenables change no outcome, row or gate, and raise no unhandled rejection (6140.5505ms)
+✔ the diagnostics add no cost without an observer: no events are produced and the result is unchanged (111.9596ms)
+✔ development capture is eventual, private, and flows through the outbox (5404.3262ms)
+✔ a sign-up request only enqueues: SMTP is never contacted by the request, and the delivered link verifies the account (5666.4626ms)
+✔ the mail row commits or rolls back with the surrounding Better Auth transaction (590.7987ms)
+✔ a process that dies mid-transaction leaves no mail; one that dies after COMMIT leaves exactly one (2189.6338ms)
+✔ a worker that dies after claiming does not lose the message: it is delivered again after the lease, with the same Message-ID (2667.2559ms)
+✔ temporary failures back off and stop at the attempt bound; permanent refusals stop at once; nothing leaks into logs (2061.3802ms)
+Account mail attempt 1 failed (timeout) for message 568e598d-2744-4f20-9db6-80afb6e9a76e.
+✔ a relay that never answers cannot hold the worker past the send bound (2030.3746ms)
+Account mail attempt 1 failed (timeout) for message 73667e94-4676-470d-aaa2-6c310ca7efcb.
+✔ a send is cancelled at the deadline by closing its own connection: a late acceptance never reaches the worker and no connection survives into the next attempt (5936.8184ms)
+Account mail attempt 1 failed (timeout) for message 39cf643d-6b46-455a-a38f-11d04fc1bc78.
+✔ a relay that trickles its greeting forever cannot keep an attempt alive past the deadline, and leaves nothing open (2804.9792ms)
+Account mail attempt 1 failed (timeout) for message 770c5680-1008-4ecb-9001-c7e9c8b19377.
+✔ cancelling one send closes only that send's connection: a concurrent legitimate send completes (2592.6562ms)
+✔ messages expire with their link: bodies are cleared and nothing stale is sent (529.2258ms)
+Account mail not queued (recipient-limit).
+Account mail not queued (recipient-limit).
+Account mail not queued (queue-full).
+Account mail not queued (queue-full).
+Account mail not queued (queue-full).
+Account mail not queued (recipient-limit).
+✔ recipient, global and per-hour bounds drop excess mail silently; a newer link replaces an unsent older one (2860.5105ms)
+✔ deleting an account deletes its queued mail, and a message in flight records nothing (1056.6692ms)
+✔ each recipient's message carries only that recipient's link (1024.5468ms)
+✔ request paths and public health stay clear of SMTP and queue details (60.4639ms)
+✔ production defaults: the shutdown work is bounded below the exit bound, which is below the compose grace period (4574.645ms)
+✔ out-of-range health settings fall back; the freshness window is never under three beats (1.5129ms)
+✔ the heartbeat reports while the loop makes progress, stops when it is stuck, never overlaps, and survives a failed write (6.5656ms)
+Account mail attempt 1 interrupted by shutdown for message 5252f0b9-3b55-4df1-b0f5-e1d614c564f7.
+✔ shutdown during a send cancels it, gives the attempt back and queues the message again (955.6702ms)
+✔ a send that finished before the cancel took effect is recorded as sent, not released (661.0979ms)
+✔ shutdown requested before the send starts releases the unstarted claim without calling the sender (657.4865ms)
+Could not record the outcome of account mail 116ce561-d6f0-438b-bb87-f3a81f4ab975; it may be sent again.
+✔ shutdown while the outcome cannot be recorded stops quickly and leaves the row to lease recovery (2002.3144ms)
+✔ the real worker stays healthy through sustained slow deliveries, where the 008 loop went stale (25335.5958ms)
+✔ a truly frozen worker stops reporting and the health check fails; it recovers when the freeze ends (8741.7483ms)
+✔ shutdown with a send in flight: the relay connection closes, the message is queued again, the worker exits well inside the bound (2291.0472ms)
+✔ arguments: whole numbers only; fractions, zero, negatives, exponents, words and out-of-range values are refused (1.6798ms)
+✔ arguments: valid values are taken as given and the plan is never empty (1.8019ms)
+✔ environment: only allow-listed names survive, forced local settings win, and no sentinel value reaches the result (0.4649ms)
+✔ a REAL child started with the built environment sees none of the sentinels (83.3012ms)
+✔ the real runner's dry plan lists the matrix and environment NAMES, and prints no sentinel value (199.5036ms)
+✔ the real runner refuses a malformed or empty matrix before starting anything, without echoing values (858.1304ms)
+✔ build 006 databases migrate in place without losing users, wardrobes, photos, looks or queued jobs (10931.7689ms)
+✔ build 007 databases gain the mail outbox in place without losing users, tokens, wardrobes, photos or queued jobs (13849.1097ms)
+✔ separate cold-start processes safely share account migrations (6887.7241ms)
+✔ sanitize removes private copies and trace entries, leaves real state and outside folders alone, never follows links, and is idempotent (402.0991ms)
+✔ a .next that is a link, or sits behind one, is refused before anything is changed (173.7896ms)
+✔ a standalone folder that is a link is refused, and nothing behind it is deleted (200.2493ms)
+✔ a trace manifest that is a link is refused rather than written through (133.1978ms)
+﹣ a file symlink used as a manifest is refused (skipped where the OS needs privilege) (57.7231ms) # creating file symlinks needs a privilege this account lacks
+✔ the temporary manifest file is created exclusively: a decoy planted at its path is never written through, truncated or replaced (177.1836ms)
+ℹ file-symlink variant skipped: no privilege to create one
+✔ a default run leaves no temporary manifest files behind, and rejects an unsafe temporary name (154.9077ms)
+✔ malformed manifests fail closed and abort before any manifest is rewritten or any copy is deleted (181.2823ms)
+✔ a traced runtime package missing from the bundle fails verification; a bundled one that is never traced does not (460.6121ms)
+✔ a link in the path can never redirect a deletion (176.2813ms)
+✔ path helpers: strict containment without false alarms for names that start with dots (0.7881ms)
+✔ recorded shoe output is only suggested as a pair, and becomes one item when confirmed (11.4773ms)
+✔ two distinct bags are never suggested for merging (1.4073ms)
+✔ distant shoes, unusable full-frame bounds and mismatched sizes are not suggested (0.6307ms)
+✔ an unseen AI 'formal' guess is not confirmed formal; a deliberate choice is (1.3433ms)
+✔ an exclusive claim is refused while a real idle process has the database open, and granted the moment that process is killed (1962.9916ms)
+✔ while a restore holds the exclusive claim a starting process cannot take its hold: it fails within the bound instead of waiting for ever (1448.1946ms)
+✔ many holders coexist, and the claim needs every one of them gone (458.7902ms)
+✔ getDatabase() takes the hold and closeDatabases() releases it (in-process wiring) (2087.0401ms)
+✔ durable queue isolates users, enforces individual quotas, recovers leases and suppresses cancelled results (9121.9711ms)
+✔ admission returns position, conservative wait and the server deadline, and refuses work that cannot be reviewed before expiry (10012.1212ms)
+✔ admission assumes the worst case (full inference timeout), not the 120 s estimate (5316.0206ms)
+✔ the global cap stays and carries a retry hint; measured speed can raise but never lower the estimate (3052.1194ms)
+✔ quota refunds are one-time, fair, and bounded by a separate attempts counter (5492.3449ms)
+✔ owner-only discovery lists active and recent jobs, results are retained until discard, and other accounts see nothing (1403.8744ms)
+✔ cancelling, deleting the account or expiry aborts running model work promptly and the next job starts (3055.7741ms)
+✔ a worker that is shutting down returns its job to the queue instead of failing it (978.8237ms)
+2026-10-12T09:52:31.464Z WARN [Better Auth]: Invalid password
+✔ restoring an older backup invalidates every password; the email reset flow recovers each user; deleted users stay deleted; data is kept (17564.0369ms)
+✔ a fresh server restores the backup with the latest exported ledger: post-backup deletion honoured, every password invalidated, data intact, self-service reset works (15550.9116ms)
+✔ ledger policy on a fresh server: missing, absent file, damaged, tampered and stale ledgers are all refused, nothing is created, and the diagnostic carries no user data (8729.7952ms)
+✔ restore is refused while a real idle process has the live database open; the original database is unchanged; once that process is killed the restore proceeds (3747.6177ms)
+✔ a restore that fails after staging begins leaves the original database untouched and no staging file; earlier crash leftovers are swept (4212.3982ms)
+✔ staging leftovers that cannot be removed are reported with a fixed warning code, by name only, and change the exit code instead of passing silently (2998.8667ms)
+ℹ tests 136
+ℹ suites 0
+ℹ pass 131
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 60465.6636
+
+✖ failing tests:
+
+test at tests\lockDiagnostics.test.ts:2:3095
+✖ the acquire measurement brackets the real SQLite wait, the gate wait and the queue depth (657.148ms)
+  AssertionError [ERR_ASSERTION]: SQLite wait covers the held lock (166.9 ms)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\lockDiagnostics.test.ts:99:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

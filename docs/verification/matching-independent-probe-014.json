@@ -1,0 +1,13 @@
+{
+  "syntheticOnly": true,
+  "seed": 14014,
+  "cases": 1200,
+  "oracle": "independent exhaustive enumeration of all admissible assignments",
+  "thresholds": [
+    0.1,
+    0.25,
+    0.5,
+    0.75
+  ],
+  "failures": []
+}

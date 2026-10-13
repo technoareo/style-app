@@ -1,0 +1,76 @@
+{
+  "pid": 24412,
+  "truncated": false,
+  "events": [
+    {
+      "role": "auth",
+      "atMs": 5015.988,
+      "path": "auth",
+      "ok": true,
+      "outcome": "acquired",
+      "budgetMs": 10000,
+      "initializationMs": 0,
+      "gateMs": 0,
+      "sqliteMs": 0.1,
+      "totalMs": 0.1,
+      "attempts": 1,
+      "queueDepth": 0
+    },
+    {
+      "role": "other",
+      "atMs": 5206.6065,
+      "path": "write",
+      "ok": true,
+      "outcome": "acquired",
+      "budgetMs": 10000,
+      "initializationMs": 0,
+      "gateMs": 39.9,
+      "sqliteMs": 0.1,
+      "totalMs": 40,
+      "attempts": 1,
+      "queueDepth": 0
+    },
+    {
+      "role": "mail-process",
+      "atMs": 5227.4097,
+      "path": "write",
+      "ok": true,
+      "outcome": "acquired",
+      "budgetMs": 10000,
+      "initializationMs": 0,
+      "gateMs": 60,
+      "sqliteMs": 0,
+      "totalMs": 60.1,
+      "attempts": 1,
+      "queueDepth": 1
+    },
+    {
+      "role": "mail-process",
+      "atMs": 5279.0135,
+      "path": "write",
+      "ok": true,
+      "outcome": "acquired",
+      "budgetMs": 5000,
+      "initializationMs": 2.3,
+      "gateMs": 0,
+      "sqliteMs": 1.5,
+      "totalMs": 3.8,
+      "attempts": 1,
+      "queueDepth": 0
+    },
+    {
+      "role": "mail-process",
+      "atMs": 5345.2542,
+      "path": "write",
+      "ok": true,
+      "outcome": "acquired",
+      "budgetMs": 10000,
+      "initializationMs": 0,
+      "gateMs": 0,
+      "sqliteMs": 0,
+      "totalMs": 0.1,
+      "attempts": 1,
+      "queueDepth": 0
+    }
+  ]
+}

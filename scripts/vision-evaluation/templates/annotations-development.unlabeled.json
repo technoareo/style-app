@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "annotations",
+  "split": "development",
+  "annotations": [
+    {
+      "fixtureId": "natural-closet",
+      "sha256": "71E077AB678B3B692E579D8CD9423D03967816E5F62919F071C0554F8B0F05D0",
+      "split": "development",
+      "labelStatus": "unlabeled",
+      "annotators": [],
+      "completedAt": null,
+      "emptyTruth": null,
+      "garments": [],
+      "notes": null
+    },
+    {
+      "fixtureId": "handmade-shoes",
+      "sha256": "A77EDBE5C3DF0C4A0D220376AA9EE886F4EE7460556C52BEFB0CA20CFA482D0F",
+      "split": "development",
+      "labelStatus": "unlabeled",
+      "annotators": [],
+      "completedAt": null,
+      "emptyTruth": null,
+      "garments": [],
+      "notes": null
+    },
+    {
+      "fixtureId": "handbag",
+      "sha256": "96813508705454BC3454298C03D5C2FCFFDA1899EFFCF92E810CC27D06BD7AF7",
+      "split": "development",
+      "labelStatus": "unlabeled",
+      "annotators": [],
+      "completedAt": null,
+      "emptyTruth": null,
+      "garments": [],
+      "notes": null
+    }
+  ]
+}

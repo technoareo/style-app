@@ -1,0 +1,45 @@
+{
+  "fixture": "handbag",
+  "model": "qwen3-vl:4b-instruct",
+  "recordedAt": "2026-10-12T00:48:18.669Z",
+  "seconds": 85.257,
+  "analysis": {
+    "items": [
+      {
+        "name": "handbag",
+        "category": "Accessories",
+        "color": "white",
+        "pattern": "solid",
+        "formality": "casual",
+        "brand": "",
+        "size": "",
+        "confidence": 0.75,
+        "evidence": "white handbag with gold buckle and flower charm, lying on red surface",
+        "box": [
+          0,
+          0.387,
+          0.76,
+          0.453
+        ]
+      },
+      {
+        "name": "crossbody bag",
+        "category": "Accessories",
+        "color": "beige",
+        "pattern": "solid",
+        "formality": "casual",
+        "brand": "",
+        "size": "",
+        "confidence": 0.75,
+        "evidence": "beige crossbody bag with adjustable strap, lying on red surface",
+        "box": [
+          0.035,
+          0.005,
+          0.964,
+          0.603
+        ]
+      }
+    ],
+    "warning": "Only visible physical garments. No drawings or furniture."
+  }
+}

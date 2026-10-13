@@ -1,0 +1,163 @@
+
+Running 38 tests using 1 worker
+
+(node:12804) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-10-12T16:16:07.310Z ERROR [Better Auth]: Database schema mismatch
+
+  Missing tables
+    user, session, account, verification, rateLimit
+
+  help: Run `npx auth migrate` to add the missing tables and columns.
+  x   1 [desktop] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images (4.0s)
+(node:22252) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   2 [desktop] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota (1.4s)
+(node:10616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   3 [desktop] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser (30.0s)
+(node:19236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  4 [desktop] › tests\e2e\consumer.spec.ts:2:5 › consumer can create, style, save, edit and reload wardrobe (2.6s)
+  ok  5 [desktop] › tests\e2e\consumer.spec.ts:48:5 › backup merges into the signed-in account and invalid backup preserves data (1.2s)
+  ok  6 [desktop] › tests\e2e\consumer.spec.ts:83:5 › upload review validates detections, crop, cancel, and persistence (1.8s)
+  ok  7 [desktop] › tests\e2e\consumer.spec.ts:144:5 › sign-out is guarded while a save is delayed and then fails (1.5s)
+  ok  8 [desktop] › tests\e2e\consumer.spec.ts:188:5 › manual item entry stays focused and Escape closes dialog (858ms)
+  ok  9 [desktop] › tests\e2e\review007.spec.ts:53:5 › an AI formal guess is only a suggestion until the user chooses it (1.5s)
+  ok 10 [desktop] › tests\e2e\review007.spec.ts:86:5 › a shoe pair is merged only after confirmation, and distinct items stay separate (1.3s)
+  ok 11 [desktop] › tests\e2e\review007.spec.ts:181:5 › a failed wardrobe save keeps the photo result; after reload and retry there is one durable garment and the result is discarded only after the acknowledged save (2.2s)
+  ok 12 [desktop] › tests\e2e\review007.spec.ts:230:5 › a retry after a failed save in the same dialog adds the garment once (2.0s)
+  ok 13 [desktop] › tests\e2e\review007.spec.ts:267:5 › a lost success response does not duplicate the garment when the same result is saved again (2.0s)
+  ok 14 [desktop] › tests\e2e\review007.spec.ts:301:5 › a failed discard after a successful save is reported honestly and not offered again (1.5s)
+  ok 15 [desktop] › tests\e2e\review007.spec.ts:332:5 › a superseded or cancelled result that arrives late cannot overwrite the newer reviewed photo (1.3s)
+  ok 16 [desktop] › tests\e2e\review007.spec.ts:417:5 › a cancel that is still pending when a newer photo starts cannot abort or reset the newer flow, and a second press is ignored (1.3s)
+  ok 17 [desktop] › tests\e2e\review007.spec.ts:503:5 › a queued photo keeps processing in the background and resumes after a reload (1.8s)
+  ok 18 [desktop] › tests\e2e\uploadAdmission013.spec.ts:14:5 › several reviewed items from one photo save together, and a refused upload is repeated without losing the draft (3.3s)
+  ok 19 [desktop] › tests\e2e\uploadAdmission013.spec.ts:116:5 › a 408 on the wardrobe save keeps the reviewed draft and a second press saves it (1.6s)
+(node:8036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  20 [mobile] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images (1.3s)
+(node:8828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  21 [mobile] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota (1.2s)
+(node:22712) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -  22 [mobile] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser
+  ok 23 [mobile] › tests\e2e\consumer.spec.ts:2:5 › consumer can create, style, save, edit and reload wardrobe (2.2s)
+  ok 24 [mobile] › tests\e2e\consumer.spec.ts:48:5 › backup merges into the signed-in account and invalid backup preserves data (1.2s)
+  ok 25 [mobile] › tests\e2e\consumer.spec.ts:83:5 › upload review validates detections, crop, cancel, and persistence (2.1s)
+  ok 26 [mobile] › tests\e2e\consumer.spec.ts:144:5 › sign-out is guarded while a save is delayed and then fails (1.5s)
+  ok 27 [mobile] › tests\e2e\consumer.spec.ts:188:5 › manual item entry stays focused and Escape closes dialog (871ms)
+  ok 28 [mobile] › tests\e2e\review007.spec.ts:53:5 › an AI formal guess is only a suggestion until the user chooses it (1.6s)
+  ok 29 [mobile] › tests\e2e\review007.spec.ts:86:5 › a shoe pair is merged only after confirmation, and distinct items stay separate (1.5s)
+  ok 30 [mobile] › tests\e2e\review007.spec.ts:181:5 › a failed wardrobe save keeps the photo result; after reload and retry there is one durable garment and the result is discarded only after the acknowledged save (2.3s)
+  ok 31 [mobile] › tests\e2e\review007.spec.ts:230:5 › a retry after a failed save in the same dialog adds the garment once (1.9s)
+  ok 32 [mobile] › tests\e2e\review007.spec.ts:267:5 › a lost success response does not duplicate the garment when the same result is saved again (2.0s)
+  ok 33 [mobile] › tests\e2e\review007.spec.ts:301:5 › a failed discard after a successful save is reported honestly and not offered again (1.4s)
+  ok 34 [mobile] › tests\e2e\review007.spec.ts:332:5 › a superseded or cancelled result that arrives late cannot overwrite the newer reviewed photo (1.3s)
+  ok 35 [mobile] › tests\e2e\review007.spec.ts:417:5 › a cancel that is still pending when a newer photo starts cannot abort or reset the newer flow, and a second press is ignored (1.3s)
+  ok 36 [mobile] › tests\e2e\review007.spec.ts:503:5 › a queued photo keeps processing in the background and resumes after a reload (1.8s)
+  ok 37 [mobile] › tests\e2e\uploadAdmission013.spec.ts:14:5 › several reviewed items from one photo save together, and a refused upload is repeated without losing the draft (3.3s)
+  ok 38 [mobile] › tests\e2e\uploadAdmission013.spec.ts:116:5 › a 408 on the wardrobe save keeps the reviewed draft and a second press saves it (1.5s)
+
+
+  1) [desktop] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 403
+
+      21 |     data: { image: "data:image/png;base64,AAAA" },
+      22 |   });
+    > 23 |   expect(missing.status()).toBe(400);
+         |                            ^
+      24 |   const unreadable = await request.post("/api/analyze", {
+      25 |     headers: { origin: "http://127.0.0.1:3000", "X-Style-Account": account },
+      26 |     data: { consent: true, image: "data:image/png;base64,AAAA" },
+        at C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\e2e\api.spec.ts:23:28
+
+    Error Context: test-results-proxy-014\api-analysis-rejects-forei-085d0-nsent-and-unreadable-images-desktop\error-context.md
+
+  2) [desktop] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 413
+    Received: 403
+
+      49 |     },
+      50 |   });
+    > 51 |   expect(refused.status()).toBe(413);
+         |                            ^
+      52 |   expect((await refused.json()).error).toContain("dimensions");
+      53 |
+      54 |   // Use up the ordinary change quota (invalid uploads still count).
+        at C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\e2e\api.spec.ts:51:28
+
+    Error Context: test-results-proxy-014\api-giant-rasters-are-refu-d7250-s-an-exhausted-change-quota-desktop\error-context.md
+
+  3) [desktop] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test ended.
+    Call log:
+      - waiting for getByRole('button', { name: 'My wardrobe', exact: true })
+
+
+      55 |     await other
+      56 |       .getByRole("button", { name: "My wardrobe", exact: true })
+    > 57 |       .click();
+         |        ^
+      58 |     await expect(
+      59 |       other.getByText("Cross-device white tee", { exact: true }),
+      60 |     ).toBeVisible();
+        at C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\e2e\auth.spec.ts:57:8
+
+    Error Context: test-results-proxy-014\auth-consumer-signs-up-ver-5fb15-wardrobe-in-another-browser-desktop\error-context.md
+
+  4) [mobile] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 403
+
+      21 |     data: { image: "data:image/png;base64,AAAA" },
+      22 |   });
+    > 23 |   expect(missing.status()).toBe(400);
+         |                            ^
+      24 |   const unreadable = await request.post("/api/analyze", {
+      25 |     headers: { origin: "http://127.0.0.1:3000", "X-Style-Account": account },
+      26 |     data: { consent: true, image: "data:image/png;base64,AAAA" },
+        at C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\e2e\api.spec.ts:23:28
+
+    Error Context: test-results-proxy-014\api-analysis-rejects-forei-085d0-nsent-and-unreadable-images-mobile\error-context.md
+
+  5) [mobile] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 413
+    Received: 403
+
+      49 |     },
+      50 |   });
+    > 51 |   expect(refused.status()).toBe(413);
+         |                            ^
+      52 |   expect((await refused.json()).error).toContain("dimensions");
+      53 |
+      54 |   // Use up the ordinary change quota (invalid uploads still count).
+        at C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\e2e\api.spec.ts:51:28
+
+    Error Context: test-results-proxy-014\api-giant-rasters-are-refu-d7250-s-an-exhausted-change-quota-mobile\error-context.md
+
+  5 failed
+    [desktop] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images 
+    [desktop] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota 
+    [desktop] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser 
+    [mobile] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images 
+    [mobile] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota 
+  1 skipped
+  32 passed (1.8m)

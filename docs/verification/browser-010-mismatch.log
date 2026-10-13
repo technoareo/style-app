@@ -1,0 +1,27 @@
+
+> style-studio@1.0.0 test:e2e
+> playwright test
+
+
+Running 34 tests using 1 worker
+
+(node:23584) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   1 [desktop] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images (4.2s)
+(node:16080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   2 [desktop] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota (2.8s)
+(node:18244) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   3 [desktop] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser (18.0s)
+(node:9780) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   4 [desktop] › tests\e2e\consumer.spec.ts:2:5 › consumer can create, style, save, edit and reload wardrobe (7.8s)
+(node:17092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   5 [desktop] › tests\e2e\consumer.spec.ts:48:5 › backup merges into the signed-in account and invalid backup preserves data (30.1s)
+(node:17768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x   6 [desktop] › tests\e2e\consumer.spec.ts:83:5 › upload review validates detections, crop, cancel, and persistence (30.1s)
+(node:22648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

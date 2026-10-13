@@ -1,0 +1,78 @@
+{
+  "developmentOnly": true,
+  "applicationChange": false,
+  "network": false,
+  "inferencePerformed": false,
+  "inputs": [
+    {
+      "name": "pixel_values",
+      "isTensor": true,
+      "type": "float32",
+      "shape": [
+        1,
+        3,
+        800,
+        800
+      ]
+    },
+    {
+      "name": "input_ids",
+      "isTensor": true,
+      "type": "int64",
+      "shape": [
+        1,
+        "sequence_length"
+      ]
+    },
+    {
+      "name": "token_type_ids",
+      "isTensor": true,
+      "type": "int64",
+      "shape": [
+        1,
+        "sequence_length"
+      ]
+    },
+    {
+      "name": "attention_mask",
+      "isTensor": true,
+      "type": "int64",
+      "shape": [
+        1,
+        "sequence_length"
+      ]
+    },
+    {
+      "name": "pixel_mask",
+      "isTensor": true,
+      "type": "int64",
+      "shape": [
+        1,
+        800,
+        800
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "logits",
+      "isTensor": true,
+      "type": "float32",
+      "shape": [
+        1,
+        900,
+        256
+      ]
+    },
+    {
+      "name": "pred_boxes",
+      "isTensor": true,
+      "type": "float32",
+      "shape": [
+        1,
+        900,
+        4
+      ]
+    }
+  ]
+}

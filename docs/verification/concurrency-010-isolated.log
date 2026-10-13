@@ -1,0 +1,15 @@
+✔ deferred BEGIN fails read-to-write upgrade at once; BEGIN IMMEDIATE does not (218.6796ms)
+✔ auth dialect: eager IMMEDIATE transaction, async bounded lock acquisition, gate released on every exit (1654.8982ms)
+✔ a gated synchronous writer waits for an async auth transaction instead of blocking the event loop (388.9357ms)
+✔ read-then-write atomicity: two delayed async consumers of one token cannot both succeed (372.6052ms)
+✔ write gate waits are bounded: timed-out waiters are removed and the queue is capped (57.4012ms)
+✔ deleting a user writes the tombstone atomically: rollback and a crash before commit leave neither (4037.3165ms)
+✔ simultaneous HTTP auth, wardrobe routes, multi-process registrations, worker and direct writes never hit 'database is locked' (36131.8774ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43380.6207

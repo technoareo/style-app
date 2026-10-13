@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "purpose": "development samples; not a representative held-out launch benchmark",
+  "annotatedBeforeInference": true,
+  "fixtures": [
+    {
+      "file": "handmade-shoes.jpg",
+      "sha256": "A77EDBE5C3DF0C4A0D220376AA9EE886F4EE7460556C52BEFB0CA20CFA482D0F",
+      "source": "https://commons.wikimedia.org/wiki/File:Handgefertigte_Schuhe.jpg",
+      "author": "AK-Bino",
+      "license": "CC0 1.0",
+      "sourceRevision": "1234306633",
+      "visibleCategories": ["Shoes"],
+      "visibleObjects": "Two cream/tan shoes, one showing its sole, plus a shoemaking last that is not wearable clothing.",
+      "acceptableDetectionCount": [1, 2],
+      "countNote": "One pair record or two shoe records are accepted for initial model inspection; the product should represent a pair as one wardrobe item.",
+      "negativeObjects": ["shoemaking last", "patterned background"],
+      "dominantColorAlternatives": ["cream", "beige", "tan", "light brown"],
+      "difficulty": "hard lighting and non-clothing object resembling footwear"
+    },
+    {
+      "file": "handbag.jpg",
+      "sha256": "96813508705454BC3454298C03D5C2FCFFDA1899EFFCF92E810CC27D06BD7AF7",
+      "source": "https://commons.wikimedia.org/wiki/File:Handbage.jpg",
+      "author": "Saidatul Soleha",
+      "license": "CC0 1.0",
+      "visibleCategories": ["Accessories"],
+      "visibleObjects": "Two overlapping handbags: cream/white in front and gray/taupe behind, on a red background.",
+      "expectedMainItemCount": 2,
+      "countNote": "A flower decoration attached to the front bag should not become a standalone garment; handling removable charms needs an explicit product rule.",
+      "negativeObjects": ["red background"],
+      "dominantColorAlternatives": [["cream", "white", "off-white"], ["gray", "grey", "taupe", "beige"]],
+      "difficulty": "overlap, cropped edges, low lighting, EXIF orientation"
+    }
+  ]
+}

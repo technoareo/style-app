@@ -1,0 +1,31 @@
+{
+  "developmentOnly": true,
+  "heldOut": false,
+  "accuracyBenchmark": false,
+  "complete": true,
+  "network": false,
+  "backend": "wasm",
+  "dtype": "fp32",
+  "threads": 1,
+  "revision": "ff690b0a8050566c290287545bd059350f3e9096",
+  "source": "tests/fixtures/candidates/natural-closet.jpg",
+  "query": "shirt. dress. jacket. coat. trousers. skirt. shorts. shoes. handbag.",
+  "boxThreshold": 0.25,
+  "textThreshold": 0.25,
+  "preprocessing": "Preserve 1600x1200 proportions at 800x600, pad bottom to 800x800, mark padding with pixel_mask=0 and normalized pixel_values=0. Does not change the model static spatial shape.",
+  "notes": "Experimental preprocessing, not accuracy proof. Same development fixture; returned regions require visual review. No returned invalid box is repaired.",
+  "modelSha256": "267c8b00d269dc2dda0d8592812d3027abd5fb59f1cabf8e3d56f8fdf07f68ec",
+  "loadMs": 6676.769,
+  "tensorShape": [
+    1,
+    3,
+    800,
+    800
+  ],
+  "validMaskPixels": 480000,
+  "maskedPixels": 160000,
+  "inferenceMs": 50025.2414,
+  "proposals": [],
+  "rssBytes": 3238027264,
+  "totalMs": 57764.6472
+}

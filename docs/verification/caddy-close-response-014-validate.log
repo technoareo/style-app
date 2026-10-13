@@ -1,0 +1,7 @@
+{"level":"info","ts":1791821099.0582578,"msg":"using config from file","file":"C:\\Users\\arjun\\.codex\\.chatgpt-projects\\g-p-6acb68846a548191aa7e43f0646ff6c9\\style-app\\.runtime\\caddy-probe-014\\close-response-candidate.Caddyfile"}
+{"level":"info","ts":1791821099.059386,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1791821099.059386,"msg":"Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies","adapter":"caddyfile","file":"C:\\Users\\arjun\\.codex\\.chatgpt-projects\\g-p-6acb68846a548191aa7e43f0646ff6c9\\style-app\\.runtime\\caddy-probe-014\\close-response-candidate.Caddyfile","line":2}
+{"level":"info","ts":1791821099.059952,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x247e77335500"}
+{"level":"info","ts":1791821099.0604584,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1791821099.0604584,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x247e77335500"}
+Valid configuration

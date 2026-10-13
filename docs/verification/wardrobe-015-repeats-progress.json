@@ -1,0 +1,262 @@
+[
+  {
+    "run": 1,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-01.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 2,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-02.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 3,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-03.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 4,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-04.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 5,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-05.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 6,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-06.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 7,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-07.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 8,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-08.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 9,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-09.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 10,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-10.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 11,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-11.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 12,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-12.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 13,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-13.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 14,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-14.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 15,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-15.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 16,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-16.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 17,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-17.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 18,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-18.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 19,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-19.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  },
+  {
+    "run": 20,
+    "exitCode": 0,
+    "log": "docs\\verification\\wardrobe-015-repeat-20.log",
+    "tests": "22",
+    "pass": "22",
+    "fail": "0",
+    "diagnostics": [
+      "ℹ A direct row: queue=1, account outbox rows=0",
+      "ℹ B real sign-up, unsettled: queue=2, account outbox rows=1",
+      "ℹ C real sign-up, settled: queue=1, account outbox rows=1"
+    ]
+  }
+]

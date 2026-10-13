@@ -1,0 +1,23 @@
+{
+  "researchOnly": true,
+  "applicationChange": false,
+  "network": false,
+  "modelDirectory": "Pinned previously verified public Grounding DINO fp32 cache",
+  "complete": true,
+  "sessionsCreated": 1,
+  "loadMs": 5855.8366000000005,
+  "inferenceMs": 51771.0288,
+  "proposals": [
+    {
+      "label": "shirt",
+      "score": 0.7683762907981873,
+      "corners": [
+        196.0794448852539,
+        233.0422878265381,
+        1424.2891311645508,
+        1371.7358112335205
+      ]
+    }
+  ],
+  "totalMs": 58294.0378
+}

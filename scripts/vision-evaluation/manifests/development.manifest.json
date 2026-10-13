@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "fixture-manifest",
+  "split": "development",
+  "splitFrozenAt": null,
+  "purpose": "Development fixtures only. Every image listed here was already shown to at least one model, so none of it is held-out evidence. Hashes, sources and licenses are copied from tests/fixtures/candidates (manifest.json, SOURCES.md, NATURAL_CLOSET_SOURCE.md, natural-closet.metadata.json). No gold labels exist yet: scoring against this manifest is refused until a human writes them. originalDimensions are null until measured with the inspect command; strata the existing notes do not settle are null until a human decides.",
+  "fixtures": [
+    {
+      "id": "natural-closet",
+      "file": "natural-closet.jpg",
+      "sha256": "71E077AB678B3B692E579D8CD9423D03967816E5F62919F071C0554F8B0F05D0",
+      "originalDimensions": null,
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Clothes_hanged_inside_a_closet.jpg",
+        "author": "mycurrency.com (Wikimedia user Mycaccount)",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "retrievedAt": "2026-10-12"
+      },
+      "stratum": "crowded",
+      "priorInference": true,
+      "notes": "Crowded closet; low light, heavy overlap. Seen by Florence-2 and Qwen3-VL probes in builds 009-013. Attribution and share-alike apply to any redistributed copy."
+    },
+    {
+      "id": "handmade-shoes",
+      "file": "handmade-shoes.jpg",
+      "sha256": "A77EDBE5C3DF0C4A0D220376AA9EE886F4EE7460556C52BEFB0CA20CFA482D0F",
+      "originalDimensions": null,
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Handgefertigte_Schuhe.jpg",
+        "author": "AK-Bino",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "retrievedAt": "2026-10-12"
+      },
+      "stratum": null,
+      "priorInference": true,
+      "notes": "Stratum left open: the product rule for a pair (one item or two) is undecided, and a shoemaking last appears that is not clothing. A human decides before labelling."
+    },
+    {
+      "id": "handbag",
+      "file": "handbag.jpg",
+      "sha256": "96813508705454BC3454298C03D5C2FCFFDA1899EFFCF92E810CC27D06BD7AF7",
+      "originalDimensions": null,
+      "source": {
+        "url": "https://commons.wikimedia.org/wiki/File:Handbage.jpg",
+        "author": "Saidatul Soleha",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "retrievedAt": "2026-10-12"
+      },
+      "stratum": null,
+      "priorInference": true,
+      "notes": "Stratum left open: overlapping bags with an attached flower; the rule for removable charms is undecided. Has EXIF orientation, so record exifOrientation from the inspect command."
+    }
+  ]
+}

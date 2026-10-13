@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "seconds": 242.586,
+  "checks": [
+    "real browser file normalization",
+    "local vision detection",
+    "review confirmation",
+    "save",
+    "reload persistence"
+  ]
+}

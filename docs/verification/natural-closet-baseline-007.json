@@ -1,0 +1,9 @@
+{
+  "pipelineReturnedValidatedResult": false,
+  "seconds": 240.063,
+  "modelStats": null,
+  "failureKind": "unavailable",
+  "error": "Photo analysis is temporarily unavailable. Your wardrobe was not changed.",
+  "stage": "Development baseline; not a held-out accuracy or capacity claim",
+  "provenance": "tests/fixtures/candidates/NATURAL_CLOSET_SOURCE.md"
+}

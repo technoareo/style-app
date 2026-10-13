@@ -1,0 +1,32 @@
+[
+  {
+    "file": "natural-closet.jpg",
+    "bytes": 2346351,
+    "sha256": "71e077ab678b3b692e579d8cd9423d03967816e5f62919f071c0554f8b0f05d0",
+    "dimensions": {
+      "width": 4032,
+      "height": 3024,
+      "exifOrientation": 1
+    }
+  },
+  {
+    "file": "handmade-shoes.jpg",
+    "bytes": 4398235,
+    "sha256": "a77edbe5c3df0c4a0d220376aa9ee886f4ee7460556c52befb0ca20cfa482d0f",
+    "dimensions": {
+      "width": 4608,
+      "height": 3456,
+      "exifOrientation": 1
+    }
+  },
+  {
+    "file": "handbag.jpg",
+    "bytes": 1609219,
+    "sha256": "96813508705454bc3454298c03d5c2fcffda1899effcf92e810cc27d06bd7af7",
+    "dimensions": {
+      "width": 4032,
+      "height": 3024,
+      "exifOrientation": 6
+    }
+  }
+]

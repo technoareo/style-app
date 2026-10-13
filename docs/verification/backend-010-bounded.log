@@ -1,0 +1,146 @@
+2026-10-12T08:09:10.754Z WARN [Better Auth]: Invalid password
+✔ verified accounts isolate wardrobes and photos, handle conflicts, recover and delete themselves (7681.559ms)
+✔ image-work semaphore bounds concurrency, queue and wait, and always releases (2823.3145ms)
+✔ upload inspection rejects by header metadata before any decode (241.5505ms)
+✔ limits are configurable and size is judged on decoded bytes (91.0294ms)
+✔ a burst of oversize and over-quota uploads is refused cheaply and boundedly (198.4507ms)
+✔ consistent backup excludes temporary photos and restore preserves account deletions (11789.466ms)
+✔ only 'this file system cannot fsync' is tolerated; I/O failures are not (2.5977ms)
+✔ a real I/O error while flushing the backup file fails the backup: nothing published, no partial, no sensitive bytes (1100.3929ms)
+✔ a file system that cannot fsync is tolerated and reported as a platform limit, not as a failure (662.9276ms)
+✔ a real I/O error flushing the directory after publication keeps the verified backup but reports it as not durable, and old backups are not pruned (985.782ms)
+✔ a platform that cannot flush a directory is reported as a limit and does not block retention (682.0055ms)
+✔ the real flushes: a platform that can flush a directory does so; Windows reports the documented limit (789.2343ms)
+✔ NATIVE hard-link publication: when the partial's name cannot be removed after the final name exists, the backup is reported as published with the leftover named, not as failed; the next backup sweeps it (1421.8888ms)
+﹣ REAL fallback: where this environment refuses hard links, publication uses rename, the partial name is gone, nothing is left over, and the unlink step never runs (0.3679ms) # hard links work here, so the native branch is what runs (see the native test)
+✔ REACTION (injected link refusal, any platform): a refused hard link falls back to rename and the backup is complete with no leftover (699.0767ms)
+✔ REACTION (injected; a copy stands in for the link, so this is NOT hard-link or file-system proof): link succeeds, removing the partial name fails -> published with the leftover named, durable, next backup sweeps it; a taken name moves on to -1 (1299.2322ms)
+✔ rate-limit rows (client addresses) never reach a completed backup; the table is kept, empty (696.3163ms)
+﹣ POSIX: a pre-existing wide backups directory is narrowed to 0700 (that directory only) and the backup files are owner-only (0.3335ms) # POSIX mode bits do not exist on Windows
+✔ the overlap predicate counts only writes whose whole interval is strictly inside the copy (1.909ms)
+﹣ a backup of a database of 300 MB or more completes within the bound while another process commits writes inside the copy, and passes an integrity check (0.5159ms) # resource-intensive: set STYLE_LARGE_BACKUP_TEST=1 to run
+✔ a completed backup is sanitised, verified and published under a final name only (2623.1434ms)
+✔ a failure at any stage leaves no final file, no partial and no marker bytes, and keeps the earlier backup and the live data (1280.5019ms)
+✔ pruning happens only after a backup completed (529.1997ms)
+✔ a cleanup that cannot remove the partial says so instead of claiming it is gone (957.136ms)
+✔ a killed owner leaves only a partial that restore refuses; its lock dies with it, the next backup takes over at once and removes the dead partial (5093.196ms)
+✔ two contenders waiting on a live owner cannot take its lock; when it is killed they proceed one at a time and both succeed (10824.2408ms)
+Skipped coordinator link guard: this account may not create links.
+✔ the lock module: a second holder is refused while the first lives (same process too), granted after release, and the coordinator file is guarded (344.9823ms)
+✔ a LIVE owner whose main thread is blocked for a long time keeps its lock and its partial and completes (the first 009 failure) (10876.7717ms)
+✔ publication never replaces an existing backup, even when the name is taken at the last moment (868.9561ms)
+✔ two backups started in the same millisecond are serialised and never replace an earlier backup (10286.6374ms)
+✔ physical path guards: a linked backups directory is refused and a linked partial name is unlinked without touching its target (1079.3339ms)
+✔ deferred BEGIN fails read-to-write upgrade at once; BEGIN IMMEDIATE does not (275.4556ms)
+✔ auth dialect: eager IMMEDIATE transaction, async bounded lock acquisition, gate released on every exit (1867.6386ms)
+✔ a gated synchronous writer waits for an async auth transaction instead of blocking the event loop (373.9043ms)
+✔ read-then-write atomicity: two delayed async consumers of one token cannot both succeed (588.1095ms)
+✔ write gate waits are bounded: timed-out waiters are removed and the queue is capped (58.0553ms)
+✔ deleting a user writes the tombstone atomically: rollback and a crash before commit leave neither (6746.7608ms)
+✔ simultaneous HTTP auth, wardrobe routes, multi-process registrations, worker and direct writes never hit 'database is locked' (41660.87ms)
+✔ a write that cannot get the lock within its budget fails retryably before its body runs (6086.3491ms)
+✔ a contended heartbeat is degraded, not fatal; it only turns critical after half a lease (666.5896ms)
+Could not record an analysis result under database contention; the job will be requeued after its lease.
+✔ job completion survives write contention without repeating inference; beyond the bound the job is requeued, not lost (2845.0208ms)
+2026-10-12T08:10:19.846Z WARN [Better Auth]: Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket. Ensure your runtime forwards a trusted client IP header, then set `advanced.ipAddress.ipAddressHeaders` or `advanced.ipAddress.trustedProxies` so the address can be resolved.
+✔ a refused write lock becomes a truthful retryable 503 with no side effects and no token consumed (7819.5586ms)
+Skipped ledger link guard: this account may not create links.
+✔ a ledger round-trips in canonical form (sorted, checksummed, newline-terminated) (6.1441ms)
+✔ validation is fail-closed: every kind of damage is rejected with a code, never partially accepted (81.358ms)
+✔ reading: a missing file, a directory and a link are distinguished and refused (11.3534ms)
+✔ export: written first, left alone when nothing changed, rewritten on a new deletion, and the ledger only grows (1062.9014ms)
+✔ export: a damaged previous ledger is set aside, not overwritten blindly or trusted; an unreadable or newer-version one stops the export (495.1264ms)
+✔ export refuses a database row the ledger cannot represent instead of skipping it (308.8115ms)
+✔ concurrent exports from several real processes while deletions arrive: every sample is a valid ledger, generations and entries never go backwards, and the final file has every deletion (3219.7084ms)
+✔ composes complete outfits rather than first four items (55.007ms)
+✔ does not hallucinate missing owned items (0.5546ms)
+✔ excludes laundry, unreviewed and warm items in hot weather (0.8472ms)
+✔ formal event cannot silently use casual pieces (0.5984ms)
+✔ dress substitutes for top and bottom (0.6871ms)
+✔ cold weather adds an available layer (1.0909ms)
+✔ new combinations stay within owned items (4.2663ms)
+✔ validates bounded detection records and rejects malformed model output (12.2114ms)
+✔ backup preserves items and rejects duplicates, executable image formats and unknown version (8.8133ms)
+✔ development capture is eventual, private, and flows through the outbox (6514.1499ms)
+✔ a sign-up request only enqueues: SMTP is never contacted by the request, and the delivered link verifies the account (7547.0238ms)
+✔ the mail row commits or rolls back with the surrounding Better Auth transaction (351.6252ms)
+✔ a process that dies mid-transaction leaves no mail; one that dies after COMMIT leaves exactly one (5464.9068ms)
+✔ a worker that dies after claiming does not lose the message: it is delivered again after the lease, with the same Message-ID (4116.6913ms)
+✔ temporary failures back off and stop at the attempt bound; permanent refusals stop at once; nothing leaks into logs (1190.0432ms)
+Account mail attempt 1 failed (timeout) for message 6f1aabc6-3e89-4566-bdbc-06bd8e096f14.
+✔ a relay that never answers cannot hold the worker past the send bound (1891.1172ms)
+Account mail attempt 1 failed (timeout) for message c6a3651a-881b-4e3d-9256-2b816d60c9a0.
+✔ a send is cancelled at the deadline by closing its own connection: a late acceptance never reaches the worker and no connection survives into the next attempt (5520.5148ms)
+Account mail attempt 1 failed (timeout) for message 9ab1ef65-d922-4d3a-a8e5-7725e14692eb.
+✔ a relay that trickles its greeting forever cannot keep an attempt alive past the deadline, and leaves nothing open (2485.0525ms)
+Account mail attempt 1 failed (timeout) for message ec4dcf3e-6aeb-4436-b004-5b5e6ffa5f5a.
+✔ cancelling one send closes only that send's connection: a concurrent legitimate send completes (2253.7789ms)
+✔ messages expire with their link: bodies are cleared and nothing stale is sent (398.2992ms)
+Account mail not queued (recipient-limit).
+Account mail not queued (recipient-limit).
+Account mail not queued (queue-full).
+Account mail not queued (queue-full).
+Account mail not queued (queue-full).
+Account mail not queued (recipient-limit).
+✔ recipient, global and per-hour bounds drop excess mail silently; a newer link replaces an unsent older one (2392.3545ms)
+✔ deleting an account deletes its queued mail, and a message in flight records nothing (634.4875ms)
+✔ each recipient's message carries only that recipient's link (671.0518ms)
+✔ request paths and public health stay clear of SMTP and queue details (201.2208ms)
+✔ production defaults: the shutdown work is bounded below the exit bound, which is below the compose grace period (5524.0089ms)
+✔ out-of-range health settings fall back; the freshness window is never under three beats (4.4267ms)
+✔ the heartbeat reports while the loop makes progress, stops when it is stuck, never overlaps, and survives a failed write (9.2317ms)
+Account mail attempt 1 interrupted by shutdown for message 00a9fbf9-5a90-450a-878b-5bd639586e7e.
+✔ shutdown during a send cancels it, gives the attempt back and queues the message again (607.3422ms)
+✔ a send that finished before the cancel took effect is recorded as sent, not released (364.2964ms)
+✔ shutdown requested before the send starts releases the unstarted claim without calling the sender (519.9432ms)
+Could not record the outcome of account mail f2ff41af-6cf8-40b2-9278-ff7503a06655; it may be sent again.
+✔ shutdown while the outcome cannot be recorded stops quickly and leaves the row to lease recovery (1260.7478ms)
+✔ the real worker stays healthy through sustained slow deliveries, where the 008 loop went stale (27178.2005ms)
+✔ a truly frozen worker stops reporting and the health check fails; it recovers when the freeze ends (24484.4073ms)
+✔ shutdown with a send in flight: the relay connection closes, the message is queued again, the worker exits well inside the bound (10880.3888ms)
+✔ build 006 databases migrate in place without losing users, wardrobes, photos, looks or queued jobs (15502.6767ms)
+✔ build 007 databases gain the mail outbox in place without losing users, tokens, wardrobes, photos or queued jobs (20618.1127ms)
+✔ separate cold-start processes safely share account migrations (12126.8561ms)
+✔ sanitize removes private copies and trace entries, leaves real state and outside folders alone, never follows links, and is idempotent (668.587ms)
+✔ a .next that is a link, or sits behind one, is refused before anything is changed (222.7089ms)
+✔ a standalone folder that is a link is refused, and nothing behind it is deleted (230.5533ms)
+✔ a trace manifest that is a link is refused rather than written through (322.7469ms)
+﹣ a file symlink used as a manifest is refused (skipped where the OS needs privilege) (136.9705ms) # creating file symlinks needs a privilege this account lacks
+✔ the temporary manifest file is created exclusively: a decoy planted at its path is never written through, truncated or replaced (334.9612ms)
+ℹ file-symlink variant skipped: no privilege to create one
+✔ a default run leaves no temporary manifest files behind, and rejects an unsafe temporary name (238.2388ms)
+✔ malformed manifests fail closed and abort before any manifest is rewritten or any copy is deleted (549.8676ms)
+✔ a traced runtime package missing from the bundle fails verification; a bundled one that is never traced does not (389.836ms)
+✔ a link in the path can never redirect a deletion (149.4548ms)
+✔ path helpers: strict containment without false alarms for names that start with dots (2.7168ms)
+✔ recorded shoe output is only suggested as a pair, and becomes one item when confirmed (34.3409ms)
+✔ two distinct bags are never suggested for merging (2.9926ms)
+✔ distant shoes, unusable full-frame bounds and mismatched sizes are not suggested (2.3914ms)
+✔ an unseen AI 'formal' guess is not confirmed formal; a deliberate choice is (4.9535ms)
+✔ an exclusive claim is refused while a real idle process has the database open, and granted the moment that process is killed (4374.6723ms)
+✔ while a restore holds the exclusive claim a starting process cannot take its hold: it fails within the bound instead of waiting for ever (583.0366ms)
+✔ many holders coexist, and the claim needs every one of them gone (140.4647ms)
+✔ getDatabase() takes the hold and closeDatabases() releases it (in-process wiring) (3001.4313ms)
+✔ durable queue isolates users, enforces individual quotas, recovers leases and suppresses cancelled results (12380.4395ms)
+✔ admission returns position, conservative wait and the server deadline, and refuses work that cannot be reviewed before expiry (14557.2127ms)
+✔ admission assumes the worst case (full inference timeout), not the 120 s estimate (5817.0193ms)
+✔ the global cap stays and carries a retry hint; measured speed can raise but never lower the estimate (2422.8605ms)
+✔ quota refunds are one-time, fair, and bounded by a separate attempts counter (4492.3447ms)
+✔ owner-only discovery lists active and recent jobs, results are retained until discard, and other accounts see nothing (1054.3092ms)
+✔ cancelling, deleting the account or expiry aborts running model work promptly and the next job starts (2530.4991ms)
+✔ a worker that is shutting down returns its job to the queue instead of failing it (771.7611ms)
+2026-10-12T08:12:23.690Z WARN [Better Auth]: Invalid password
+✔ restoring an older backup invalidates every password; the email reset flow recovers each user; deleted users stay deleted; data is kept (34059.2615ms)
+✔ a fresh server restores the backup with the latest exported ledger: post-backup deletion honoured, every password invalidated, data intact, self-service reset works (27158.7226ms)
+✔ ledger policy on a fresh server: missing, absent file, damaged, tampered and stale ledgers are all refused, nothing is created, and the diagnostic carries no user data (30935.8599ms)
+✔ restore is refused while a real idle process has the live database open; the original database is unchanged; once that process is killed the restore proceeds (12092.6683ms)
+✔ a restore that fails after staging begins leaves the original database untouched and no staging file; earlier crash leftovers are swept (13076.6987ms)
+✔ staging leftovers that cannot be removed are reported with a fixed warning code, by name only, and change the exit code instead of passing silently (7914.1422ms)
+ℹ tests 119
+ℹ suites 0
+ℹ pass 115
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 305320.3244

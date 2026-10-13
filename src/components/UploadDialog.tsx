@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Garment } from "../domain/types";
-import { analysisSchema } from "../domain/analysis";
+import { analysisSchema, MAX_DETECTED_ITEMS } from "../domain/analysis";
 import { mergeShoePair, suggestShoePairs } from "../domain/pairs";
 import { imageFromFile, cropImage, photoHash } from "../services/images";
 import {
@@ -611,6 +611,12 @@ export function UploadDialog({
       <p>
         Photograph one item or several clearly separated pieces. We’ll identify
         visible details and create an item for each detected garment.
+      </p>
+      <p className="photo-tips">
+        For the best results, photograph one to three items at a time, laid
+        flat or hung apart on a plain background in good light, with nothing
+        overlapping. We list up to {MAX_DETECTED_ITEMS} items per photo, so a
+        full rack, shelf or closet will not work well.
       </p>
       <p className="privacy-note">
         Free AI runs on our private server. Your photo is held there for

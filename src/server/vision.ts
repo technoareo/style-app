@@ -2,6 +2,8 @@ import sharp from "sharp";
 import { limits } from "./limits";
 import {
   analysisSchema,
+  CROWDED_WARNING,
+  MAX_DETECTED_ITEMS,
   VISION_PROMPT,
   visionOutputSchema,
   type Analysis,
@@ -12,18 +14,102 @@ export class VisionError extends Error {
   /**
    * "unavailable": the model could not be reached, timed out or was aborted
    * (a server-side failure; the user's attempt is refundable).
+   * "timeout": the inference deadline passed before the model finished (the
+   * photo is too slow to analyze here; the attempt is refundable like
+   * "unavailable", but the user is told to send a simpler photo).
    * "unverified": the model answered but its output failed validation (the
    * inference ran and is charged).
    */
   constructor(
     message: string,
-    public kind: "unavailable" | "unverified" | "unreadable" = "unreadable",
+    public kind:
+      | "unavailable"
+      | "timeout"
+      | "unverified"
+      | "unreadable" = "unreadable",
   ) {
     super(message);
   }
 }
 
 const MODEL = "qwen3-vl:4b-instruct";
+
+const UNAVAILABLE_MESSAGE =
+  "Photo analysis is temporarily unavailable. Your wardrobe was not changed.";
+export const TOO_SLOW_MESSAGE =
+  "This photo took too long to analyze. Try a clearer photo of one to three items with space between them.";
+export const TOO_MANY_ITEMS_MESSAGE =
+  "This photo has too many items to read reliably. Upload a clearer photo of one to three items with space between them.";
+/**
+ * Output bound for one answer: six items at about 85 tokens each plus the
+ * warning, with room to spare. A grammar-limited answer never reaches it; if a
+ * model ignores the item limit, the answer is cut here instead of running for
+ * minutes (see the "length" handling below).
+ */
+const MAX_OUTPUT_TOKENS = 1100;
+/** A chat answer larger than this is refused instead of buffered. */
+const MAX_ANSWER_CHARS = 2_000_000;
+
+/**
+ * Reads Ollama's streamed chat answer (one JSON object per line) and returns
+ * the joined text. Streaming means response headers arrive with the first
+ * token, so the 5-minute header wait of the HTTP client no longer ends a slow
+ * CPU inference; the only deadline is the explicit inference timeout. A server
+ * that ignores `stream` and answers with one JSON body is read the same way.
+ */
+async function readChatAnswer(
+  response: Response,
+): Promise<{ content: string; doneReason?: string }> {
+  if (!response.body) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let raw = "";
+  let pending = "";
+  let content = "";
+  let doneReason: string | undefined;
+  let failedLine = false;
+  /** Returns false when the text is not a JSON object. */
+  const take = (line: string): boolean => {
+    let part: {
+      error?: unknown;
+      done_reason?: string;
+      message?: { content?: string };
+    };
+    try {
+      part = JSON.parse(line);
+    } catch {
+      failedLine = true;
+      return false;
+    }
+    if (part.error) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+    content += part.message?.content ?? "";
+    if (part.done_reason) doneReason = part.done_reason;
+    return true;
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    raw += text;
+    if (raw.length > MAX_ANSWER_CHARS) {
+      void reader.cancel().catch(() => {});
+      throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+    }
+    pending += text;
+    for (let i = pending.indexOf("\n"); i >= 0; i = pending.indexOf("\n")) {
+      const line = pending.slice(0, i).trim();
+      pending = pending.slice(i + 1);
+      if (line) take(line);
+    }
+  }
+  pending += decoder.decode();
+  if (pending.trim()) take(pending.trim());
+  if (failedLine && !content) {
+    // Not line-delimited (for example a pretty-printed single object).
+    if (!take(raw)) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+  }
+  return { content, doneReason };
+}
 
 /**
  * Base URL of the local Ollama server. Server-only, trusted configuration —
@@ -88,21 +174,27 @@ export async function analyzePhoto(
     .jpeg({ quality: 80 })
     .toBuffer();
 
-  let response: Response;
+  // One explicit deadline for the whole inference. Reaching it while the caller
+  // has not aborted means the photo is too slow to analyze here; any other
+  // failure (unreachable, reset, caller abort) stays "unavailable".
+  const deadline = AbortSignal.timeout(limits().inferenceTimeoutMs);
+  let text: string;
+  let doneReason: string | undefined;
   try {
-    response = await fetch(`${ollamaUrl()}/api/chat`, {
+    const response = await fetch(`${ollamaUrl()}/api/chat`, {
       method: "POST",
-      signal: AbortSignal.any([
-        AbortSignal.timeout(limits().inferenceTimeoutMs),
-        ...(signal ? [signal] : []),
-      ]),
+      signal: AbortSignal.any([deadline, ...(signal ? [signal] : [])]),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
-        stream: false,
+        stream: true,
         format: visionOutputSchema,
         think: false,
-        options: { temperature: 0, num_ctx: 4096, num_predict: 2048 },
+        options: {
+          temperature: 0,
+          num_ctx: 4096,
+          num_predict: MAX_OUTPUT_TOKENS,
+        },
         messages: [
           {
             role: "user",
@@ -114,34 +206,32 @@ export async function analyzePhoto(
         ],
       }),
     });
-  } catch {
-    throw new VisionError(
-      "Photo analysis is temporarily unavailable. Your wardrobe was not changed.",
-      "unavailable",
-    );
+    if (!response.ok)
+      throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+    ({ content: text, doneReason } = await readChatAnswer(response));
+  } catch (error) {
+    if (deadline.aborted && !signal?.aborted)
+      throw new VisionError(TOO_SLOW_MESSAGE, "timeout");
+    throw error instanceof VisionError
+      ? error
+      : new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
   }
-  if (!response.ok)
-    throw new VisionError(
-      "Photo analysis is temporarily unavailable. Your wardrobe was not changed.",
-      "unavailable",
-    );
-
-  let result: { message?: { content?: string } };
-  try {
-    result = await response.json();
-  } catch {
-    // Connection dropped or aborted while the answer was streaming back.
-    throw new VisionError(
-      "Photo analysis is temporarily unavailable. Your wardrobe was not changed.",
-      "unavailable",
-    );
-  }
-  const text = result.message?.content || "";
+  // The answer was cut at the output bound, so its JSON is incomplete: the
+  // model kept listing garments past the item limit. Say what to do instead of
+  // a generic verification failure (the inference ran and is charged).
+  if (doneReason === "length")
+    throw new VisionError(TOO_MANY_ITEMS_MESSAGE, "unverified");
   let parsed: Analysis;
   try {
     const raw = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    // A photo that fills the item limit is treated as crowded; anything past
+    // the limit (a model that ignored it) is dropped, never listed.
+    const found: unknown = raw.items ?? [];
+    if (!Array.isArray(found)) throw new Error("items is not a list");
+    const crowded = found.length >= MAX_DETECTED_ITEMS;
     let needsCrop = false;
-    raw.items = (raw.items ?? []).map((item: { box: number[] }) => {
+    raw.items = found.slice(0, MAX_DETECTED_ITEMS).map((entry) => {
+      const item = entry as { box: number[] };
       const b = item.box;
       const valid =
         Array.isArray(b) &&
@@ -167,6 +257,13 @@ export async function analyzePhoto(
     if (needsCrop)
       raw.warning =
         "Some item bounds could not be verified. The full photo is shown instead; adjust and check each affected crop before saving.";
+    if (crowded)
+      raw.warning = [
+        typeof raw.warning === "string" ? raw.warning : "",
+        CROWDED_WARNING,
+      ]
+        .filter(Boolean)
+        .join(" ");
     parsed = analysisSchema.parse(raw);
   } catch {
     throw new VisionError(

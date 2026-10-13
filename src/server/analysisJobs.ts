@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { getDatabase } from "./database";
 import { RequestError } from "./access";
-import { analyzePhoto, VisionError } from "./vision";
+import {
+  analyzePhoto,
+  TOO_MANY_ITEMS_MESSAGE,
+  TOO_SLOW_MESSAGE,
+  VisionError,
+} from "./vision";
 import { sleep } from "./sqliteRetry";
 import { limits, PHOTO_LIFETIME_MS } from "./limits";
 import {
@@ -959,7 +964,20 @@ export async function runWorkerTick(
       } else if (why === "expired") {
         outcomeArgs = ["failed", null, QUEUE_EXPIRED_MESSAGE, "expired"];
       } else if (e instanceof VisionError && e.kind === "unverified") {
-        outcomeArgs = ["failed", null, ANALYSIS_FAILED_MESSAGE, "model"];
+        // The message names the likely cause when it is known (for example a
+        // photo with too many items); otherwise the generic retry text.
+        outcomeArgs = [
+          "failed",
+          null,
+          e.message === TOO_MANY_ITEMS_MESSAGE
+            ? e.message
+            : ANALYSIS_FAILED_MESSAGE,
+          "model",
+        ];
+      } else if (e instanceof VisionError && e.kind === "timeout") {
+        // Past the inference deadline: still a server-side failure (the
+        // attempt is not counted), but the user is told what to change.
+        outcomeArgs = ["failed", null, TOO_SLOW_MESSAGE, "server"];
       } else {
         // Model unreachable, timed out, input missing: a server-side failure.
         outcomeArgs = [

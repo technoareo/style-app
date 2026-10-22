@@ -44,7 +44,7 @@ export function uploadCounterProblems(caddyfile: string): string[] {
   if (/reverse_proxy/.test(blocked)) problems.push("the matcher block proxies to the app");
 
   const open = blockBody(caddyfile, /handle\s*\{/);
-  if (open === null || !/^\s*reverse_proxy\s+app:3000\s*$/m.test(open))
+  if (open === null || !/^\s*reverse_proxy\s+app:3000(\s*\{)?\s*$/m.test(open))
     problems.push("no catch-all `handle { reverse_proxy app:3000 }`");
   if ((caddyfile.match(/reverse_proxy/g) ?? []).length !== 1)
     problems.push("reverse_proxy must appear exactly once, inside the catch-all handle");
@@ -63,6 +63,19 @@ test("earlier protections of the Caddyfile are intact", () => {
   assert.match(text, /Strict-Transport-Security/);
   assert.match(text, /X-Content-Type-Options "nosniff"/);
   assert.match(text, /\{\$STYLE_DOMAIN\}\s*\{/);
+});
+
+test("error interception closes the connection and copies the response once, without an explicit header copy", () => {
+  const text = read("deploy/Caddyfile");
+  // Static text only. An explicit copy_response_headers duplicated every
+  // upstream header (Cache-Control doubled) in a measured local TLS run.
+  assert.doesNotMatch(text.replace(/^\s*#.*$/gm, ""), /copy_response_headers/);
+  const block = blockBody(text, /handle_response\s+@[A-Za-z0-9_]+\s*\{/);
+  assert.ok(block !== null, "a handle_response block exists");
+  assert.match(block, /^\s*header\s+Connection\s+close\s*$/m);
+  assert.equal((block.match(/^\s*copy_response\s*$/gm) ?? []).length, 1);
+  assert.ok(block.indexOf("Connection") < block.indexOf("copy_response"), "the close header is set before the copy");
+  assert.match(text, /@[A-Za-z0-9_]+\s+status\s+4xx\s+5xx/);
 });
 
 test("the checker flags a Caddyfile without the block, with a wrong response, or with the order reversed", () => {
@@ -354,12 +367,12 @@ test("the proxy receives only STYLE_DOMAIN: no env_file, no app secrets, and the
     .map((l) => l.trim().replace(/^-\s*/, ""))
     .filter(Boolean)
     .map((l) => l.split(/[:=]/)[0].trim());
-  assert.deepEqual(keys, ["STYLE_DOMAIN"]);
+  assert.deepEqual(keys, ["STYLE_DOMAIN", "STYLE_PROXY_BODY_READ_TIMEOUT_S"]);
   assert.match(environment, /\$\{STYLE_DOMAIN(:-[^}]*)?\}/, "filled by Compose substitution, with a default");
   assert.doesNotMatch(environment, /AUTH_SECRET|SMTP|MAIL_FROM/);
   // Every environment variable the Caddyfile reads is one the proxy gets.
   const read_ = [...read("deploy/Caddyfile").matchAll(/\{\$([A-Z0-9_]+)/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(read_)], ["STYLE_DOMAIN"]);
+  assert.deepEqual([...new Set(read_)].sort(), ["STYLE_DOMAIN", "STYLE_PROXY_BODY_READ_TIMEOUT_S"]);
   // The services that need the secrets still get them.
   for (const name of ["app", "worker", "mailer"])
     assert.match(

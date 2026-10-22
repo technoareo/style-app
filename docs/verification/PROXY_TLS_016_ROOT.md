@@ -1,0 +1,18 @@
+# Build 016 proxy TLS check (2026-10-22)
+
+Independent local check of Claude's changed `deploy/Caddyfile` with official Caddy 2.11.7 and the compiled Revision5/6 application. `caddy validate --config deploy/Caddyfile --adapter caddyfile` returned `Valid configuration` when `APPDATA` pointed inside this workspace; the first attempt without that override could not create a local Caddy PKI directory because of the filesystem sandbox. Adapted JSON included `protocols: ["h1"]`, a 22,000,000,000 ns body read timeout and a 10,000,000,000 ns header read timeout. It did not validate Docker or Compose.
+
+For a real loopback TLS probe, the diagnostic Caddyfile preserved the shipped routes, response interception, header and body rules. It changed only the listener/domain to `localhost:8443` with explicit loopback binding, upstream to `127.0.0.1:3002`, and added `tls internal`, `admin off`, `persist_config off`, `auto_https disable_redirects`, and `skip_install_trust` for an untrusted, disposable local certificate without a Windows root-installation prompt. The compiled app ran on loopback with a fresh synthetic secret and data directory. Both processes were started and stopped within the same test shell to avoid isolated-process visibility between sandbox tool sessions. Test harness sources are in `.runtime/caddy-probe-016/`.
+
+The first Node probe sent `Host: 127.0.0.1:8443` while the test site was `localhost:8443`; its responses came from outside the intended site route and are invalid evidence. The corrected probe sent `Host: localhost:8443`, while connecting to 127.0.0.1 with SNI `localhost`. It completed with exit 0 and no reported problems:
+
+| Check | Observed |
+|---|---|
+| Health, twice | 200, ALPN `http/1.1`; second request reused the same client socket |
+| `/api/health/uploads` | 404 through proxy |
+| Incomplete stalled auth body | Original JSON 408 at 20.316 s; `Connection: close`; socket closed at 20.317 s before client cleanup |
+| One-byte-per-second trickling auth body | Original JSON 408 at 20.315 s; `Connection: close`; socket closed at 20.315 s before client cleanup |
+
+After that run, Claude added an explicit `copy_response_headers` call. A new direct/proxy comparison found that it duplicated a private 401 response's `Cache-Control` header (`private, no-store, private, no-store`). Claude removed the extra copy directive and revised the deployment notes. Root regenerated the loopback replica from the final Caddyfile and reran the official Caddy validation and full diagnostic script. The final test exited 0: direct and proxied unauthenticated `/api/wardrobe` both returned the same 401, exact JSON body, `Content-Type: application/json`, and exactly one `Cache-Control: private, no-store`; the proxy added `Connection: close`. Health twice stayed 200 with successful keep-alive/ALPN `http/1.1`; counters stayed 404; stalled/trickling auth uploads returned original JSON 408 at 20.317/20.317 s and sockets closed at 20.319/20.318 s before client cleanup. Focused proxy tests: 13 passed, 0 failed; typecheck exit 0.
+
+The diagnostic certificate is self-signed and client verification was disabled for this local test. This proves the selected HTTP/1.1 paths in this Windows loopback harness, including actual TLS and ALPN. It does not prove the Compose startup guard, Docker/Linux behavior, public certificate renewal, modified app/proxy timeout pairing, a real slow mobile link, all HTTP error paths under TLS, SMTP, real model accuracy, or readiness for launch. Claude's final independent review rejects launch readiness and calls out missing connection/concurrency limits, manual timeout pairing, long first-visit HSTS, deployment and real-device gates.

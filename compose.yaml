@@ -118,16 +118,25 @@ services:
     # makes a missing value fail clearly.
     environment:
       STYLE_DOMAIN: ${STYLE_DOMAIN:-}
+      # Whole-request-body cap in seconds (build 016; AUTHORED, NOT RUN). Must be
+      # at least STYLE_BODY_READ_TIMEOUT_MS / 1000 + 2 of the app, or the proxy
+      # cuts a slow upload before the app can answer. The proxy cannot read the
+      # app's value (it holds no secrets), so the pairing is the operator's;
+      # see docs/DEPLOYMENT.md. Default 22 pairs with the app default of 20 s.
+      STYLE_PROXY_BODY_READ_TIMEOUT_S: ${STYLE_PROXY_BODY_READ_TIMEOUT_S:-22}
     # Startup guard (build 015 revision 2; AUTHORED, NOT RUN): refuse to start
     # with a clear log line when the domain is empty, instead of handing Caddy a
     # Caddyfile with no site address. `$$` is Compose's escape: the container's
-    # shell expands $STYLE_DOMAIN at start, Compose does not. The exec line is
-    # the standard caddy:2 image command, unchanged. Assumes the image has
-    # /bin/sh (unverified).
+    # shell expands $STYLE_DOMAIN at start, Compose does not. Build 016 adds the
+    # same fail-fast for the body cap (one to three digits, value 3 to 122; longer
+    # strings are refused first because `[ ... -lt ... ]` errors, and so would
+    # pass the range check, on numbers too large for the shell). The
+    # exec line is the standard caddy:2 image command, unchanged. Assumes the
+    # image has /bin/sh (unverified).
     command:
       - sh
       - -c
-      - 'test -n "$$STYLE_DOMAIN" || { echo "STYLE_DOMAIN is not set. Copy .env.compose.example to .env and set it, see docs/DEPLOYMENT.md" >&2; exit 1; }; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
+      - 'test -n "$$STYLE_DOMAIN" || { echo "STYLE_DOMAIN is not set. Copy .env.compose.example to .env and set it, see docs/DEPLOYMENT.md" >&2; exit 1; }; case "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" in ""|*[!0-9]*|????*) echo "STYLE_PROXY_BODY_READ_TIMEOUT_S must be whole seconds from 3 to 122, see docs/DEPLOYMENT.md" >&2; exit 1;; esac; if [ "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" -lt 3 ] || [ "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" -gt 122 ]; then echo "STYLE_PROXY_BODY_READ_TIMEOUT_S must be whole seconds from 3 to 122, see docs/DEPLOYMENT.md" >&2; exit 1; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
     ports: ["80:80", "443:443"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

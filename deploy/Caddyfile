@@ -1,3 +1,29 @@
+# Build 016 transport hardening. Validated with official Caddy 2.11.7 and run
+# once in a local loopback TLS replica (untrusted internal certificate). NOT run
+# in Docker, on Linux, on a public domain or behind a real certificate. See
+# docs/DEPLOYMENT.md "Proxy transport behaviour" for exact scope and gates.
+{
+  servers {
+    # HTTP/1.1 only, for now. The 408-then-close behaviour below was measured on
+    # HTTP/1.1 only; with HTTP/2 the same stalled upload ended with a GOAWAY after
+    # the 408 and that was never resolved. This also drops HTTP/3 (compose.yaml
+    # publishes TCP 443 only, so HTTP/3 was not reachable anyway). Remove this
+    # line only after a stalled-upload probe passes over h2 on the target.
+    protocols h1
+    timeouts {
+      # Slow-header (slowloris) bound.
+      read_header 10s
+      # Hard limit on the WHOLE request body. It must stay above the app's own
+      # STYLE_BODY_READ_TIMEOUT_MS (default 20 s) so the app answers first with
+      # its JSON 408. Compose supplies STYLE_PROXY_BODY_READ_TIMEOUT_S (default
+      # 22, checked at proxy start); raise both together, see DEPLOYMENT.md.
+      read_body {$STYLE_PROXY_BODY_READ_TIMEOUT_S:22}s
+      # Not set on purpose: `write`/`write_idle` (the answer stream and photo
+      # downloads would be cut) and `idle` (Caddy default 5 m).
+    }
+  }
+}
+
 {$STYLE_DOMAIN} {
   encode zstd gzip
   request_body {
@@ -17,6 +43,23 @@
     respond 404
   }
   handle {
-    reverse_proxy app:3000
+    reverse_proxy app:3000 {
+      # When the app answers an error (the 408 for a stalled upload, 401, 413,
+      # 429, 5xx) before it has read the whole request body, close the client
+      # connection after the response. Without this the shipped rules left a
+      # stalled upload unanswered past 35 s on HTTP/1.1. The response itself
+      # (status, headers, JSON body) is copied unchanged by `copy_response`
+      # alone. Do NOT add `copy_response_headers`: copy_response already runs
+      # Caddy's normal response finalisation, which copies the upstream headers
+      # (and drops hop-by-hop ones), and an explicit header copy on top of it
+      # DUPLICATED them (measured: `Cache-Control: private, no-store,
+      # private, no-store`). `header Connection close` is set first so it
+      # survives. tests/proxyConfig.test.ts rejects copy_response_headers.
+      @upstream_error status 4xx 5xx
+      handle_response @upstream_error {
+        header Connection close
+        copy_response
+      }
+    }
   }
 }

@@ -228,6 +228,7 @@ test("job completion survives write contention without repeating inference; beyo
             warning: "",
           }),
         },
+        done: true, // the strict stream reader requires Ollama's terminal marker
       }),
     );
   });
@@ -237,8 +238,21 @@ test("job completion survives write contention without repeating inference; beyo
       server!.listen(0, "127.0.0.1", resolve),
     );
     process.env.OLLAMA_URL = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    // Harness bound only (build 016): if the mock model endpoint is never
+    // reached (for example a blocked loopback connection) the old unbounded
+    // poll hung the whole suite. No product budget or assertion changes.
+    const HELD_RESPONSE_WAIT_MS = 30_000;
     const heldResponse = async (): Promise<() => void> => {
-      while (!held.release) await sleep(10);
+      const giveUpAt = Date.now() + HELD_RESPONSE_WAIT_MS;
+      while (!held.release) {
+        if (Date.now() >= giveUpAt)
+          throw new Error(
+            `contention harness: the mock model endpoint received no held request within ${HELD_RESPONSE_WAIT_MS} ms ` +
+              `(requests seen: ${requests}, hold enabled: ${hold}, url: ${process.env.OLLAMA_URL}). ` +
+              "The worker tick never reached the mock model; check loopback access.",
+          );
+        await sleep(10);
+      }
       const release = held.release;
       held.release = undefined;
       return release;

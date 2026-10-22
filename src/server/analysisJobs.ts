@@ -4,7 +4,7 @@ import { getDatabase } from "./database";
 import { RequestError } from "./access";
 import {
   analyzePhoto,
-  TOO_MANY_ITEMS_MESSAGE,
+  ANSWER_CUT_MESSAGE,
   TOO_SLOW_MESSAGE,
   VisionError,
 } from "./vision";
@@ -964,12 +964,12 @@ export async function runWorkerTick(
       } else if (why === "expired") {
         outcomeArgs = ["failed", null, QUEUE_EXPIRED_MESSAGE, "expired"];
       } else if (e instanceof VisionError && e.kind === "unverified") {
-        // The message names the likely cause when it is known (for example a
-        // photo with too many items); otherwise the generic retry text.
+        // A cut-off answer keeps its own cause-neutral message; any other
+        // verification failure gets the generic retry text.
         outcomeArgs = [
           "failed",
           null,
-          e.message === TOO_MANY_ITEMS_MESSAGE
+          e.message === ANSWER_CUT_MESSAGE
             ? e.message
             : ANALYSIS_FAILED_MESSAGE,
           "model",

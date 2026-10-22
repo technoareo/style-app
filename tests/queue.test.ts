@@ -75,6 +75,7 @@ test("durable queue isolates users, enforces individual quotas, recovers leases 
             warning: "",
           }),
         },
+        done: true, // the strict stream reader requires Ollama's terminal marker
       }),
     );
   });

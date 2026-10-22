@@ -80,6 +80,11 @@ export async function newRepositoryUser(label: string): Promise<string> {
   db.prepare(
     `INSERT INTO "user"(${names.map((n) => `"${n}"`).join(",")}) VALUES(${names.map(() => "?").join(",")})`,
   ).run(...(values as (string | number)[]));
+  // The capture seam must be idle too: an empty queue alone cannot see a drain
+  // whose timer has not yet reached the gate (review F-L1). Nothing in this
+  // function queues mail, so this normally returns at once; a capture left
+  // over from an earlier test is waited out here, before the checks below.
+  await settleLocalCapture({ timeoutMs: 1000 });
   // Hold-gate precondition made an assertion, not an assumption.
   if (outboxRows(id) !== 0)
     throw new Error("newRepositoryUser: the account has mail queued.");

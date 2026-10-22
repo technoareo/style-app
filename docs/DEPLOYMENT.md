@@ -92,6 +92,26 @@ To restore, stop the app, proxy, worker and mailer, retain the latest live datab
 
 > **Build 010 supersedes two statements above.** Restoring onto a fresh server IS now supported, but only with a current deletion ledger (see "Deletion ledger and disaster recovery" below). Backups no longer fail silently on I/O errors: exit code 2 also covers a directory flush that hit a real I/O error (`BACKUP_W_DIR_SYNC_FAILED`) and a published backup whose partial name could not be removed.
 
+### Main database connection unusable (build 016)
+
+After a failed write whose rollback also fails, the app quarantines its main database connection and logs one line: `[database] main connection quarantined: outcome=<replaceable|unclosed|marked-only> count=<n>` (fixed text only; no SQL, path or user data).
+
+- **`outcome=replaceable`**: the quarantined handle was closed and is eligible for reopen. This is **not** proof that a fresh connection is already in use: the next database call opens one, and if that fails (disk full, I/O errors) writes keep failing and `/api/health` still answers 200. Investigate if the count repeats.
+- **`outcome=unclosed`**: the handle could not be closed. This process refuses every main-database access until it is restarted (wardrobe and photo writes fail), the stuck transaction may hold SQLite's write lock against the worker and mailer, and `/api/health` returns 503 `{"ready":false}`. The state is never cleared, even if the handle later closes; only a restart clears it.
+- **`outcome=marked-only`**: the quarantined handle was not the current shared connection. It was marked quarantined, but **this call only marks it and does not close it**. The line says nothing about whether that handle was closed earlier, whether the shared connection was replaced, or whether the current connection is healthy. Treat a repeating count like `replaceable`: investigate.
+
+**Plain Compose does not recover this.** `restart: unless-stopped` acts only when the process exits, so an unhealthy `app` is flagged but not restarted, and the current Caddy config has a plain `reverse_proxy` with no active health check, so it does not route around the 503. Alert on `app` unhealthy and on the log line above.
+
+Action for `unclosed` (or a repeating `replaceable`):
+1. Where practical drain first (let in-flight uploads and analyses finish); a restart cuts any request still running.
+2. Restart the `app` service (`docker compose restart app`).
+3. Inspect the `worker` and `mailer` logs for repeated busy or timeout errors; restart them if they are stuck. They have **no** equivalent unusable signal: the `worker` has no Compose health check at all, and the `mailer` health check (a heartbeat row) may stay green while its writes are blocked.
+4. Confirm `/api/health` returns 200 and a test sign-in and wardrobe write work.
+5. **Never** delete, move or copy the live `app.db`, `app.db-wal` or `app.db-shm` by hand.
+6. Afterwards take a verified backup, record the incident (time, count, log lines) and, if it recurs, check the data volume is a local disk or Docker volume, not NFS/SMB.
+
+Automatic recovery (an autoheal on the unhealthy status, or workers exiting after the current job) is not implemented and is an open owner decision.
+
 ## Account mail (build 008)
 
 Verification and password-reset messages go through a durable outbox table (`mail_outbox`) and are sent by the separate `mailer` service (`scripts/mail-worker.ts`), supervised by Compose (`restart: unless-stopped`, health check via a heartbeat row). Web requests only insert a row; SMTP is never contacted by the web process or by the AI worker. Delivery is **at-least-once** (a crash after SMTP accepts a message but before the outcome is recorded sends it again; both copies share one Message-ID), not exactly-once.

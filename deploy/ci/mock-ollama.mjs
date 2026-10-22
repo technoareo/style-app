@@ -23,6 +23,7 @@ const answer = JSON.stringify({
       warning: "",
     }),
   },
+  done: true, // the strict stream reader requires Ollama's terminal marker
 });
 
 createServer((req, res) => {

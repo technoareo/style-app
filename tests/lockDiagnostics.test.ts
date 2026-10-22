@@ -262,24 +262,442 @@ function blockAfterBegin(count: number, eachMs: number): void {
     });
 }
 
-test("the hold starts when BEGIN returned, not when the caller resumed (write path)", async () => {
+// Build 016 part 2 REPLACES the build-011 write-path test "the hold starts when
+// BEGIN returned, not when the caller resumed". That test queued microtasks
+// that ran between BEGIN and the body and asserted the hold included them. The
+// body and COMMIT now run in the same synchronous block as the successful
+// BEGIN, so no queued microtask can run inside the hold. The contract below is
+// causal and asserted against NATIVE timestamps, with no absolute duration
+// (a COMMIT's cost is the disk's, and a thread can be descheduled anywhere):
+//
+//   - a wrapper around the connection's exec() stamps the moment native
+//     BEGIN IMMEDIATE returned and, in that same call, queues a blocker
+//     microtask and a timer: the earliest possible points after the gap that
+//     used to exist between BEGIN and the body. Neither may run before COMMIT
+//     has returned, and the transaction must already be closed when they do;
+//   - the reported hold, body and COMMIT times are bracketed from both sides by
+//     those stamps (the service reads its clock only after exec returns and
+//     before it is called, so these inequalities hold under any scheduling,
+//     up to the 0.1 ms rounding of the reported numbers).
+//
+// The auth-path test further down is unchanged (the auth transaction is
+// Kysely-driven and stays asynchronous).
+const ROUNDING = 0.1;
+
+/** Stamps native BEGIN/COMMIT on the shared connection; restore() undoes it. */
+function instrumentNative(
+  db: DatabaseSync,
+  options: { onBeginReturned?: () => void; commitSpinMs?: number } = {},
+) {
+  const original = db.exec.bind(db);
+  const t = {
+    beginEntered: 0,
+    beginReturned: 0,
+    commitEntered: 0,
+    commitReturned: 0,
+    nativeCommitCalls: 0,
+  };
+  (db as unknown as { exec: (sql: string) => void }).exec = (sql: string) => {
+    if (sql === "BEGIN IMMEDIATE") {
+      t.beginEntered = performance.now();
+      original(sql);
+      t.beginReturned = performance.now();
+      options.onBeginReturned?.();
+      return;
+    }
+    if (sql === "COMMIT") {
+      t.nativeCommitCalls++;
+      t.commitEntered = performance.now();
+      if (options.commitSpinMs) {
+        // Deterministic extra COMMIT cost, independent of the disk.
+        const until = t.commitEntered + options.commitSpinMs;
+        while (performance.now() < until) {
+          // Stands in for a slow fsync.
+        }
+      }
+      original(sql);
+      t.commitReturned = performance.now();
+      return;
+    }
+    return original(sql);
+  };
+  return {
+    t,
+    restore: () => {
+      delete (db as unknown as { exec?: unknown }).exec;
+    },
+  };
+}
+
+/** Busy-waits `ms` of real time (a stand-in for delayed same-process work). */
+function spin(ms: number): void {
+  const until = performance.now() + ms;
+  while (performance.now() < until) {
+    // Busy wait.
+  }
+}
+
+test("write path: BEGIN, body and COMMIT are one synchronous block; nothing queued at the native BEGIN return runs inside it; the reported times are bracketed by native timestamps", async () => {
   await runWriteTransaction(() => undefined); // warm
+  const db = getDatabase();
+  const events: string[] = [];
   const recorder = createLockRecorder();
-  const call = runWithLockObserver(recorder.observer, () =>
-    runWriteTransaction(insert("begin-instant")),
+  const observer: LockObserver = {
+    acquire: (e) => {
+      events.push("acquire");
+      recorder.observer.acquire?.(e);
+    },
+    hold: (e) => {
+      events.push("hold");
+      recorder.observer.hold?.(e);
+    },
+  };
+  let bodyStart = 0;
+  let bodyEnd = 0;
+  let blockerStarted = 0;
+  let timerStarted = 0;
+  const inTransactionAt: Record<string, boolean | null> = { blocker: null, timer: null };
+  const native = instrumentNative(db, {
+    // The earliest moment after a successful native BEGIN: the old gap.
+    onBeginReturned: () => {
+      events.push("begin-returned");
+      queueMicrotask(() => {
+        blockerStarted = performance.now();
+        events.push("blocker");
+        inTransactionAt.blocker = db.isTransaction;
+        spin(50);
+      });
+      setTimeout(() => {
+        timerStarted = performance.now();
+        events.push("timer");
+        inTransactionAt.timer = db.isTransaction;
+      }, 0);
+    },
+  });
+  try {
+    await runWithLockObserver(observer, () =>
+      runWriteTransaction((d) => {
+        bodyStart = performance.now();
+        events.push("body");
+        spin(10); // so the body is a measurable interval of its own
+        insert("same-turn")(d);
+        bodyEnd = performance.now();
+      }),
+    );
+    // The timer fires on a later loop turn; let it.
+    await sleep(20);
+  } finally {
+    native.restore();
+  }
+  const t = native.t;
+  assert.equal(t.nativeCommitCalls, 1);
+
+  // Causal ordering: the whole block precedes the blocker and the timer.
+  const order = (name: string) => events.indexOf(name);
+  assert.deepEqual(
+    events.filter((e) => ["begin-returned", "body", "blocker", "timer"].includes(e)),
+    ["begin-returned", "body", "blocker", "timer"],
+    events.join(","),
   );
-  blockAfterBegin(20, 5); // ~100 ms between BEGIN returning and the resumption
-  await call;
+  assert.ok(t.beginReturned <= bodyStart && bodyEnd <= t.commitEntered);
+  assert.ok(t.commitReturned <= blockerStarted, "COMMIT returned before the blocker microtask began");
+  assert.ok(blockerStarted <= timerStarted);
+  assert.equal(inTransactionAt.blocker, false, "the transaction was already closed at the microtask");
+  assert.equal(inTransactionAt.timer, false, "and at the timer");
+  assert.ok(order("acquire") < order("hold"), "acquisition is reported before the hold");
+
   assert.equal(recorder.acquires.length, 1);
   assert.equal(recorder.holds.length, 1);
   const [a] = recorder.acquires;
   const [h] = recorder.holds;
-  assert.ok(a.sqliteMs < 50, `acquisition itself was quick (${a.sqliteMs} ms)`);
-  assert.ok(
-    h.holdMs >= 90,
-    `the hold includes the delay after BEGIN returned (${h.holdMs} ms)`,
-  );
   assert.equal(h.outcome, "commit");
+  assert.equal(typeof h.bodyMs, "number");
+  assert.equal(typeof h.commitMs, "number");
+
+  // The body really took time (our own stamps, no presumed clock speed).
+  assert.ok(bodyEnd - bodyStart >= 10);
+
+  // Hold: contains [first body statement, COMMIT returned] and is contained in
+  // [native BEGIN returned, blocker started].
+  assert.ok(
+    h.holdMs >= t.commitReturned - bodyStart - ROUNDING,
+    `hold ${h.holdMs} covers the body and COMMIT (${t.commitReturned - bodyStart})`,
+  );
+  assert.ok(
+    h.holdMs <= blockerStarted - t.beginReturned + ROUNDING,
+    `hold ${h.holdMs} ends before the blocker (${blockerStarted - t.beginReturned})`,
+  );
+  // Body: contains the body's own stamps, ends before native COMMIT began.
+  assert.ok(h.bodyMs! >= bodyEnd - bodyStart - ROUNDING);
+  assert.ok(h.bodyMs! <= t.commitEntered - t.beginReturned + ROUNDING);
+  // COMMIT: contains the native COMMIT call, ends before the blocker.
+  assert.ok(h.commitMs! >= t.commitReturned - t.commitEntered - ROUNDING);
+  assert.ok(h.commitMs! <= blockerStarted - bodyEnd + ROUNDING);
+  // Decomposition (three separately rounded numbers).
+  assert.ok(
+    Math.abs(h.holdMs - (h.bodyMs! + h.commitMs!)) <= 0.3,
+    `hold ${h.holdMs} = body ${h.bodyMs} + commit ${h.commitMs}`,
+  );
+
+  // Acquisition: BEGIN returned once, no back-off, begin time inside the wait.
+  assert.equal(typeof a.beginMs, "number");
+  assert.equal(typeof a.backoffMs, "number");
+  assert.equal(a.attempts, 1);
+  assert.equal(a.backoffMs, 0, "one attempt: no back-off");
+  assert.ok(a.beginMs! >= t.beginReturned - t.beginEntered - ROUNDING);
+  assert.ok(a.beginMs! <= a.sqliteMs + 0.3);
+});
+
+test("an injected slow COMMIT is attributed to commitMs, not to the body, and the transaction still closes before queued work runs", async () => {
+  await runWriteTransaction(() => undefined); // warm
+  const db = getDatabase();
+  const recorder = createLockRecorder();
+  const SLOW_COMMIT_MS = 120;
+  let bodyStart = 0;
+  let bodyEnd = 0;
+  let microtaskStarted = 0;
+  let inTransactionAtMicrotask: boolean | null = null;
+  const native = instrumentNative(db, { commitSpinMs: SLOW_COMMIT_MS });
+  try {
+    await runWithLockObserver(recorder.observer, () =>
+      runWriteTransaction((d) => {
+        bodyStart = performance.now();
+        insert("slow-commit")(d);
+        // Queued from inside the body: it can only run after COMMIT returned.
+        queueMicrotask(() => {
+          microtaskStarted = performance.now();
+          inTransactionAtMicrotask = db.isTransaction;
+        });
+        bodyEnd = performance.now();
+      }),
+    );
+  } finally {
+    native.restore();
+  }
+  const t = native.t;
+  const nativeCommit = t.commitReturned - t.commitEntered;
+  assert.ok(nativeCommit >= SLOW_COMMIT_MS, `the injected cost is really in native COMMIT (${nativeCommit} ms)`);
+  assert.ok(t.commitReturned <= microtaskStarted, "the queued microtask ran after COMMIT returned");
+  assert.equal(inTransactionAtMicrotask, false);
+
+  const [h] = recorder.holds;
+  assert.equal(h.outcome, "commit");
+  // Attribution from observed stamps: the COMMIT interval is in commitMs ...
+  assert.ok(h.commitMs! >= nativeCommit - ROUNDING, `commitMs ${h.commitMs} >= native ${nativeCommit}`);
+  // ... and the body number ends before native COMMIT was even called.
+  assert.ok(h.bodyMs! <= t.commitEntered - t.beginReturned + ROUNDING);
+  assert.ok(h.bodyMs! >= bodyEnd - bodyStart - ROUNDING, "the body number contains the body's own interval");
+  // The hold covers the whole injected cost and the pieces add up.
+  assert.ok(h.holdMs >= nativeCommit - ROUNDING);
+  assert.ok(Math.abs(h.holdMs - (h.bodyMs! + h.commitMs!)) <= 0.3);
+  assert.ok(h.holdMs <= microtaskStarted - t.beginReturned + ROUNDING);
+});
+
+test("beginMs and backoffMs are real, additive observations of a contended acquisition", async () => {
+  await runWriteTransaction(() => undefined); // warm
+  const recorder = createLockRecorder();
+  holder.exec("BEGIN IMMEDIATE");
+  const timer = setTimeout(() => {
+    try {
+      holder.exec("COMMIT");
+    } catch {
+      // Already finished by the cleanup below.
+    }
+  }, 300);
+  try {
+    await runWithLockObserver(recorder.observer, () =>
+      runWriteTransaction(insert("begin-backoff")),
+    );
+  } finally {
+    clearTimeout(timer);
+    if (holder.isTransaction) holder.exec("ROLLBACK");
+  }
+  const [e] = recorder.acquires;
+  assert.ok(e.attempts >= 2, `BEGIN was retried (${e.attempts})`);
+  assert.ok(e.backoffMs! >= 10, `real back-off time was observed (${e.backoffMs} ms)`);
+  assert.ok(e.beginMs! > 0, `native BEGIN time was observed (${e.beginMs} ms)`);
+  assert.ok(
+    e.beginMs! + e.backoffMs! <= e.sqliteMs + 1,
+    `begin ${e.beginMs} + back-off ${e.backoffMs} fit inside SQLite wait ${e.sqliteMs}`,
+  );
+  // The old keys are still there and unchanged in meaning.
+  assert.ok(e.sqliteMs >= 250 && e.totalMs >= e.sqliteMs);
+});
+
+/** A SQLite-shaped error, as node:sqlite raises it. */
+function sqliteError(errcode: number, message: string): Error {
+  return Object.assign(new Error(message), { errcode });
+}
+
+test("a busy-shaped BODY error is never replayed: one run, same error object, rolled back, gate free", async () => {
+  for (const errcode of [5, 6, 261, 517]) {
+    const recorder = createLockRecorder();
+    const before = rows();
+    let runs = 0;
+    const thrown = sqliteError(errcode, `body busy ${errcode}`);
+    let caught: unknown;
+    try {
+      await runWithLockObserver(recorder.observer, () =>
+        runWriteTransaction((db) => {
+          runs++;
+          insert("busy-body")(db);
+          throw thrown;
+        }),
+      );
+      assert.fail("the body error must surface");
+    } catch (error) {
+      caught = error;
+    }
+    assert.equal(runs, 1, `errcode ${errcode}: the body ran exactly once`);
+    assert.strictEqual(caught, thrown, `errcode ${errcode}: identity preserved`);
+    assert.ok(!(caught instanceof WriteContentionError));
+    assert.equal(rows(), before, "rolled back");
+    assert.equal(getDatabase().isTransaction, false);
+    assert.equal(recorder.acquires.length, 1);
+    assert.equal(recorder.acquires[0].attempts, 1, "BEGIN was not repeated");
+    assert.equal(recorder.holds.length, 1);
+    assert.equal(recorder.holds[0].outcome, "rollback");
+    assert.equal(await gateIsFree(), true);
+  }
+});
+
+test("a body that throws a primitive (not an Error) is rolled back once and surfaces unchanged", async () => {
+  for (const thrown of ["plain string", 0, null, undefined, false]) {
+    const recorder = createLockRecorder();
+    const before = rows();
+    let runs = 0;
+    let caught: unknown = Symbol("nothing thrown");
+    try {
+      await runWithLockObserver(recorder.observer, () =>
+        runWriteTransaction((db) => {
+          runs++;
+          insert("primitive")(db);
+          throw thrown;
+        }),
+      );
+    } catch (error) {
+      caught = error;
+    }
+    assert.strictEqual(caught, thrown, `${String(thrown)}: same value`);
+    assert.equal(runs, 1, "the body ran exactly once");
+    assert.equal(rows(), before, "rolled back");
+    assert.equal(getDatabase().isTransaction, false);
+    assert.equal(recorder.acquires[0].attempts, 1);
+    assert.equal(recorder.holds.length, 1);
+    assert.equal(recorder.holds[0].outcome, "rollback");
+    assert.equal(await gateIsFree(), true);
+  }
+});
+
+test("a busy-shaped COMMIT failure is never replayed: one body run, same error object, rolled back, gate free", async () => {
+  for (const errcode of [5, 6, 261, 517]) {
+    const db = getDatabase();
+    const original = db.exec.bind(db);
+    let commits = 0;
+    let begins = 0;
+    const thrown = sqliteError(errcode, `commit busy ${errcode}`);
+    (db as unknown as { exec: (sql: string) => void }).exec = (sql: string) => {
+      if (sql === "COMMIT") {
+        commits++;
+        throw thrown;
+      }
+      if (sql === "BEGIN IMMEDIATE") begins++;
+      return original(sql);
+    };
+    const recorder = createLockRecorder();
+    const before = rows();
+    let runs = 0;
+    let caught: unknown;
+    try {
+      await runWithLockObserver(recorder.observer, () =>
+        runWriteTransaction((d) => {
+          runs++;
+          insert("busy-commit")(d);
+        }),
+      );
+      assert.fail("the COMMIT error must surface");
+    } catch (error) {
+      caught = error;
+    } finally {
+      delete (db as unknown as { exec?: unknown }).exec;
+    }
+    assert.equal(runs, 1, `errcode ${errcode}: the body ran exactly once`);
+    assert.equal(commits, 1, "COMMIT was attempted once");
+    assert.equal(begins, 1, "BEGIN was not repeated");
+    assert.strictEqual(caught, thrown, `errcode ${errcode}: identity preserved`);
+    assert.ok(!(caught instanceof WriteContentionError));
+    assert.equal(rows(), before, "the failed COMMIT was rolled back");
+    assert.equal(db.isTransaction, false);
+    assert.equal(recorder.holds.length, 1);
+    assert.equal(recorder.holds[0].outcome, "rollback");
+    assert.equal(await gateIsFree(), true);
+  }
+});
+
+test("a body that returns a Promise is still rolled back and rejected with the existing message", async () => {
+  const recorder = createLockRecorder();
+  const before = rows();
+  let runs = 0;
+  await assert.rejects(
+    runWithLockObserver(recorder.observer, () =>
+      runWriteTransaction((db) => {
+        runs++;
+        insert("promise-body")(db);
+        return Promise.resolve("late");
+      }),
+    ),
+    /Write transaction bodies must be synchronous\./,
+  );
+  assert.equal(runs, 1);
+  assert.equal(rows(), before, "rolled back");
+  assert.equal(getDatabase().isTransaction, false);
+  assert.equal(recorder.holds.length, 1);
+  assert.equal(recorder.holds[0].outcome, "rollback");
+  assert.equal(await gateIsFree(), true);
+});
+
+test("observers run after the native transaction ended and the process gate was handed on", async () => {
+  await runWriteTransaction(() => undefined); // warm
+  const seen: {
+    kind: string;
+    inTransaction: boolean;
+    foreignLockFree: boolean;
+    queued: number;
+  }[] = [];
+  const probe = (kind: string) => {
+    let foreignLockFree = false;
+    try {
+      // Another connection can take the SQLite write lock only if this
+      // process no longer holds it.
+      holder.exec("BEGIN IMMEDIATE");
+      foreignLockFree = true;
+      holder.exec("ROLLBACK");
+    } catch {
+      if (holder.isTransaction) holder.exec("ROLLBACK");
+    }
+    seen.push({
+      kind,
+      inTransaction: getDatabase().isTransaction,
+      foreignLockFree,
+      queued: writeGateQueueLength(),
+    });
+  };
+  const observer: LockObserver = {
+    acquire: () => probe("acquire"),
+    hold: () => probe("hold"),
+  };
+  // The second call queues on the gate behind the first, in the same turn.
+  const first = runWithLockObserver(observer, () => runWriteTransaction(insert("obs-1")));
+  const second = runWriteTransaction(insert("obs-2"));
+  await Promise.all([first, second]);
+  const [a, h] = seen;
+  assert.equal(a.kind, "acquire");
+  assert.equal(h.kind, "hold");
+  for (const s of seen) {
+    assert.equal(s.inTransaction, false, `${s.kind}: this connection was not inside BEGIN`);
+    assert.equal(s.foreignLockFree, true, `${s.kind}: the SQLite write lock was free`);
+    assert.equal(s.queued, 0, `${s.kind}: the gate had already been handed to the queued writer`);
+  }
 });
 
 test("the hold starts when BEGIN returned, not when the caller resumed (auth path)", async () => {

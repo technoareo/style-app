@@ -36,8 +36,55 @@ function ensurePresence(): void {
   presence = holdPresence(getDataDir());
 }
 
+/**
+ * Every handle taken out of service whose closure is not proven (a close that
+ * threw and left it open, or that cannot be asked). Presence is never released
+ * while one survives: the restore command must keep being told the database is
+ * in use.
+ */
+const unclosed = new Set<DatabaseSync>();
+
+/**
+ * Closes `db` and records whether that is proven. Never throws; a close error is
+ * returned so the caller can still propagate it after its bookkeeping. A handle
+ * whose `close()` threw but that now reports closed counts as closed.
+ */
+function closeTracked(db: DatabaseSync): { failed: boolean; error?: unknown } {
+  let failed = false;
+  let error: unknown;
+  try {
+    if (db.isOpen) db.close();
+  } catch (e) {
+    failed = true;
+    error = e;
+  }
+  let open = true; // Cannot be asked => assume open.
+  try {
+    open = db.isOpen;
+  } catch {
+    // Judged as open.
+  }
+  if (open) unclosed.add(db);
+  else unclosed.delete(db);
+  return { failed, error };
+}
+
+function anyHandleOpen(): boolean {
+  for (const handle of unclosed) {
+    let open = true;
+    try {
+      open = handle.isOpen;
+    } catch {
+      // Judged as open.
+    }
+    if (open) return true;
+    unclosed.delete(handle);
+  }
+  return Boolean(database) || Boolean(authDatabase);
+}
+
 function releasePresenceIfIdle(): void {
-  if (database || authDatabase || !presence) return;
+  if (anyHandleOpen() || !presence) return;
   const hold = presence;
   presence = null;
   hold.release();
@@ -67,6 +114,7 @@ function openConnection(timeoutMs: number): DatabaseSync {
  * on this handle.
  */
 export function getDatabase(): DatabaseSync {
+  if (unusableMain) throw unusableMain;
   if (database) return database;
   // Very short native wait on purpose. Production writes go through
   // runWriteTransaction (writeTransaction.ts), which acquires the write lock
@@ -75,6 +123,108 @@ export function getDatabase(): DatabaseSync {
   // WAL.
   database = openConnection(50);
   return database;
+}
+
+/**
+ * Raised for a main connection that was quarantined after it could not leave a
+ * transaction (a failed ROLLBACK), and for any attempt to use it again.
+ */
+export class DatabaseQuarantineError extends Error {
+  constructor(
+    message = "The database connection was quarantined after a failed rollback.",
+  ) {
+    super(message);
+    this.name = "DatabaseQuarantineError";
+  }
+}
+
+/** Handles that must never be joined or used again (see below). */
+const quarantined = new WeakSet<DatabaseSync>();
+/** Set only if a quarantined main connection could not even be closed. */
+let unusableMain: DatabaseQuarantineError | null = null;
+let quarantineCount = 0;
+
+/** Whether `db` was quarantined (or has been closed). */
+export function isQuarantined(db: DatabaseSync): boolean {
+  return quarantined.has(db) || !db.isOpen;
+}
+
+/** How many main connections this process has quarantined (diagnostics). */
+export function quarantinedConnectionCount(): number {
+  return quarantineCount;
+}
+
+/**
+ * True once a quarantined main connection could not be closed, so this process
+ * refuses every {@link getDatabase} until it is restarted. A pure read of one
+ * flag: it opens, queries and allocates nothing and cannot throw, so a health
+ * probe may call it at any time.
+ */
+export function mainConnectionUnusable(): boolean {
+  return unusableMain !== null;
+}
+
+type QuarantineOutcome = "replaceable" | "unclosed" | "marked-only";
+
+/**
+ * One operator-visible line per quarantine: fixed text, the outcome (one of the
+ * literals above) and the running count only. No SQL, path, error text or user
+ * data is ever included, and a failing logger can neither throw nor change the
+ * quarantine, so the caller's original failure is always the one reported.
+ */
+function logQuarantine(outcome: QuarantineOutcome): void {
+  try {
+    console.error(
+      `[database] main connection quarantined: outcome=${outcome} count=${quarantineCount}`,
+    );
+  } catch {
+    // Diagnostics never alter the state or the error being reported.
+  }
+}
+
+/**
+ * Called, with the process write gate still held, when a failed ROLLBACK left
+ * `db` inside a transaction. Releasing the gate in that state would let the
+ * next caller join the stale transaction (`inTransaction`) or fail every later
+ * BEGIN, and the open transaction would keep SQLite's write lock from every
+ * other process.
+ *
+ * The handle is marked first, so no code can use or join it again. If it is
+ * the shared main connection it is then taken out of service and closed (closing
+ * rolls back anything uncommitted; committed data is untouched) and the next
+ * {@link getDatabase} opens a fresh connection to the same file, with the same
+ * options, under the presence hold this process already has (the hold is
+ * deliberately kept, not released and retaken). If even the close fails, the
+ * process refuses every later {@link getDatabase} with
+ * {@link DatabaseQuarantineError} until it is restarted: there is no reset
+ * function. Nothing is deleted, migrated or recreated, and the auth connection
+ * and any other handle are not touched. Never throws, so the caller's original
+ * error is the one reported.
+ */
+export function quarantineMainConnection(db: DatabaseSync): void {
+  try {
+    quarantined.add(db);
+    quarantineCount++;
+    if (database !== db) {
+      // Not the shared connection: marking is enough.
+      logQuarantine("marked-only");
+      return;
+    }
+    database = null;
+    // Presence is deliberately not touched here: kept across a successful close
+    // and reopen, and kept (via `unclosed`) while the handle survives.
+    closeTracked(db);
+    if (unclosed.has(db)) {
+      unusableMain = new DatabaseQuarantineError(
+        "The database connection could not be closed after a failed rollback. Restart the process.",
+      );
+      logQuarantine("unclosed");
+    } else {
+      logQuarantine("replaceable");
+    }
+  } catch {
+    // Nothing here may replace the failure being reported.
+  }
 }
 
 /**
@@ -97,15 +247,35 @@ export function getAuthDatabase(): DatabaseSync {
 
 /** Closes every connection this process opened (auth first, then main). */
 export function closeDatabases(): void {
-  closeAuthDatabase();
-  if (!database) return;
-  const db = database;
-  database = null;
+  // Handles from earlier failed closes, retried below. Their errors were
+  // already reported when they happened; the refusal in getDatabase for a
+  // quarantined main stays (only a restart clears it).
+  const earlier = [...unclosed];
+  let failed = false;
+  let firstError: unknown;
+  const note = (error: unknown) => {
+    if (failed) return;
+    failed = true;
+    firstError = error;
+  };
   try {
-    if (db.isOpen) db.close();
+    try {
+      closeAuthDatabase();
+    } catch (error) {
+      note(error);
+    }
+    if (database) {
+      const db = database;
+      database = null;
+      const outcome = closeTracked(db);
+      if (outcome.failed) note(outcome.error);
+    }
+    for (const handle of earlier) closeTracked(handle);
   } finally {
+    // Released only now, and only if no handle survives.
     releasePresenceIfIdle();
   }
+  if (failed) throw firstError;
 }
 
 /** Closes the auth connection if open. The caller closes {@link getDatabase} itself. */
@@ -113,8 +283,9 @@ export function closeAuthDatabase(): void {
   if (!authDatabase) return;
   const db = authDatabase;
   authDatabase = null;
+  const outcome = closeTracked(db);
   try {
-    if (db.isOpen) db.close();
+    if (outcome.failed) throw outcome.error;
   } finally {
     releasePresenceIfIdle();
   }

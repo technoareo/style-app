@@ -10,6 +10,16 @@ services:
       # Starting values, NOT measured capacity and not yet run in Docker.
       # Override in .env.production (STYLE_* names are in docs/DEPLOYMENT.md).
       NODE_OPTIONS: --max-old-space-size=768
+      # Build 017 (AUTHORED, NOT RUN): the ONE place the upload-body deadline is
+      # set. Compose fills it from the project variable STYLE_BODY_READ_TIMEOUT_MS
+      # in the project `.env` next to this file (shell and --env-file also work)
+      # and the proxy gets the same expression and derives its own cap from it,
+      # so the two cannot drift apart. It is handed to the container under a
+      # DIFFERENT name on purpose: the application's own STYLE_BODY_READ_TIMEOUT_MS
+      # is then set by the start command below, which first refuses to start if
+      # .env.production still carries that name (fail closed; nothing else starts,
+      # because everything waits for this service to be healthy).
+      STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ${STYLE_BODY_READ_TIMEOUT_MS:-20000}
     # Starting memory ceiling for the web process; size from the target-server
     # load test. Untested here because Docker is unavailable.
     mem_limit: 1536m
@@ -19,12 +29,22 @@ services:
       - "3000"
     depends_on:
       - ollama
+    # Build 017 guard (AUTHORED, NOT RUN). Two refusals, both before anything
+    # starts, so the app never becomes healthy and the worker, mailer and proxy
+    # (all wait for it) never start either:
+    #  1. STYLE_BODY_READ_TIMEOUT_MS already present: it can only come from
+    #     .env.production (the compose entry above uses another name). An old
+    #     value there is no longer read, which would silently reset it to 20 s.
+    #  2. The compose value must be strict: 4 to 6 digits, no leading zero, at
+    #     most 120000. The application itself silently falls back to 20000 for
+    #     an invalid value (src/server/limits.ts), which would differ from the
+    #     proxy. The check text is identical to the proxy command's;
+    #     tests/proxyConfig.test.ts keeps them identical.
+    # Then the validated value is exported under the name the application reads.
     command:
-      [
-        "sh",
-        "-c",
-        "./node_modules/.bin/tsx scripts/init-auth.ts && node server.js",
-      ]
+      - sh
+      - -c
+      - 'if [ -n "$$STYLE_BODY_READ_TIMEOUT_MS" ]; then echo "STYLE_BODY_READ_TIMEOUT_MS is set in .env.production, where it is no longer read. Remove it there and set it in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; case "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" in ""|0*|*[!0-9]*|?|??|???|???????*) bad=1;; *) bad=0;; esac; if [ "$$bad" = 1 ] || [ "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" -gt 120000 ]; then echo "STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000 with no leading zero. Set it only in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; STYLE_BODY_READ_TIMEOUT_MS="$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS"; export STYLE_BODY_READ_TIMEOUT_MS; ./node_modules/.bin/tsx scripts/init-auth.ts && node server.js'
     healthcheck:
       test:
         [
@@ -118,25 +138,26 @@ services:
     # makes a missing value fail clearly.
     environment:
       STYLE_DOMAIN: ${STYLE_DOMAIN:-}
-      # Whole-request-body cap in seconds (build 016; AUTHORED, NOT RUN). Must be
-      # at least STYLE_BODY_READ_TIMEOUT_MS / 1000 + 2 of the app, or the proxy
-      # cuts a slow upload before the app can answer. The proxy cannot read the
-      # app's value (it holds no secrets), so the pairing is the operator's;
-      # see docs/DEPLOYMENT.md. Default 22 pairs with the app default of 20 s.
-      STYLE_PROXY_BODY_READ_TIMEOUT_S: ${STYLE_PROXY_BODY_READ_TIMEOUT_S:-22}
+      # Build 017 (AUTHORED, NOT RUN): the same non-secret project variable the
+      # app receives. The start command below validates it exactly as the app's
+      # does and derives the Caddy body cap from it: ceil(ms / 1000) + 2 seconds
+      # (20000 gives 22, 60000 gives 62, 120000 gives 122). There is no separate
+      # proxy setting any more, so the two cannot be set apart.
+      STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ${STYLE_BODY_READ_TIMEOUT_MS:-20000}
     # Startup guard (build 015 revision 2; AUTHORED, NOT RUN): refuse to start
     # with a clear log line when the domain is empty, instead of handing Caddy a
     # Caddyfile with no site address. `$$` is Compose's escape: the container's
-    # shell expands $STYLE_DOMAIN at start, Compose does not. Build 016 adds the
-    # same fail-fast for the body cap (one to three digits, value 3 to 122; longer
-    # strings are refused first because `[ ... -lt ... ]` errors, and so would
-    # pass the range check, on numbers too large for the shell). The
-    # exec line is the standard caddy:2 image command, unchanged. Assumes the
-    # image has /bin/sh (unverified).
+    # shell expands $STYLE_DOMAIN at start, Compose does not. Build 017 adds the
+    # strict check of STYLE_COMPOSE_BODY_READ_TIMEOUT_MS (4 to 6 digits, no leading zero,
+    # at most 120000, so no value can overflow the shell arithmetic or be read
+    # as octal) and exports STYLE_PROXY_BODY_READ_TIMEOUT_S, which
+    # deploy/Caddyfile reads. A space is kept inside the arithmetic parentheses
+    # so no shell reads `$(((` as a command substitution. The exec line is the
+    # standard caddy:2 image command, unchanged. Assumes /bin/sh (unverified).
     command:
       - sh
       - -c
-      - 'test -n "$$STYLE_DOMAIN" || { echo "STYLE_DOMAIN is not set. Copy .env.compose.example to .env and set it, see docs/DEPLOYMENT.md" >&2; exit 1; }; case "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" in ""|*[!0-9]*|????*) echo "STYLE_PROXY_BODY_READ_TIMEOUT_S must be whole seconds from 3 to 122, see docs/DEPLOYMENT.md" >&2; exit 1;; esac; if [ "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" -lt 3 ] || [ "$$STYLE_PROXY_BODY_READ_TIMEOUT_S" -gt 122 ]; then echo "STYLE_PROXY_BODY_READ_TIMEOUT_S must be whole seconds from 3 to 122, see docs/DEPLOYMENT.md" >&2; exit 1; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
+      - 'test -n "$$STYLE_DOMAIN" || { echo "STYLE_DOMAIN is not set. Copy .env.compose.example to .env and set it, see docs/DEPLOYMENT.md" >&2; exit 1; }; case "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" in ""|0*|*[!0-9]*|?|??|???|???????*) bad=1;; *) bad=0;; esac; if [ "$$bad" = 1 ] || [ "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" -gt 120000 ]; then echo "STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000 with no leading zero. Set it only in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; STYLE_PROXY_BODY_READ_TIMEOUT_S=$$(( ($$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS + 999) / 1000 + 2 )); export STYLE_PROXY_BODY_READ_TIMEOUT_S; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
     ports: ["80:80", "443:443"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

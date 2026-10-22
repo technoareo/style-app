@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -356,7 +357,7 @@ test("the app port is not published, so the counters stay internal; the route it
   assert.ok(existsSync(path.join(root, "src/app/api/health/uploads/route.ts")));
 });
 
-test("the proxy receives only STYLE_DOMAIN: no env_file, no app secrets, and the Caddyfile reads nothing else", () => {
+test("the proxy receives only two non-secret values (STYLE_DOMAIN and the body deadline): no env_file, no app secrets, and the Caddyfile reads nothing else", () => {
   const compose = read("compose.yaml");
   const proxy = composeService(compose, "proxy");
   assert.equal(serviceKeyText(proxy, "env_file"), null, "the proxy must not load .env.production");
@@ -367,12 +368,22 @@ test("the proxy receives only STYLE_DOMAIN: no env_file, no app secrets, and the
     .map((l) => l.trim().replace(/^-\s*/, ""))
     .filter(Boolean)
     .map((l) => l.split(/[:=]/)[0].trim());
-  assert.deepEqual(keys, ["STYLE_DOMAIN", "STYLE_PROXY_BODY_READ_TIMEOUT_S"]);
+  assert.deepEqual(keys, ["STYLE_DOMAIN", "STYLE_COMPOSE_BODY_READ_TIMEOUT_MS"]);
   assert.match(environment, /\$\{STYLE_DOMAIN(:-[^}]*)?\}/, "filled by Compose substitution, with a default");
   assert.doesNotMatch(environment, /AUTH_SECRET|SMTP|MAIL_FROM/);
   // Every environment variable the Caddyfile reads is one the proxy gets.
   const read_ = [...read("deploy/Caddyfile").matchAll(/\{\$([A-Z0-9_]+)/g)].map((m) => m[1]);
+  // The cap is not a Compose input: the start command derives it from the one
+  // project variable, so it must be assigned there and read with no default.
   assert.deepEqual([...new Set(read_)].sort(), ["STYLE_DOMAIN", "STYLE_PROXY_BODY_READ_TIMEOUT_S"]);
+  const command = serviceKeyText(proxy, "command") ?? "";
+  assert.match(command, /STYLE_PROXY_BODY_READ_TIMEOUT_S=\$\$\(\( \(\$\$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS \+ 999\) \/ 1000 \+ 2 \)\); export STYLE_PROXY_BODY_READ_TIMEOUT_S;/);
+  assert.doesNotMatch(read("deploy/Caddyfile"), /STYLE_PROXY_BODY_READ_TIMEOUT_S:/, "no silent default for the cap");
+  // Caddy's default read_body_idle is 1 m, which fires before an app deadline
+  // of 60 s or more. It must be set, from the same variable as the total cap.
+  const caddy = read("deploy/Caddyfile").replace(/^\s*#.*$/gm, "");
+  assert.match(caddy, /^\s*read_body\s+\{\$STYLE_PROXY_BODY_READ_TIMEOUT_S\}s\s*$/m);
+  assert.match(caddy, /^\s*read_body_idle\s+\{\$STYLE_PROXY_BODY_READ_TIMEOUT_S\}s\s*$/m);
   // The services that need the secrets still get them.
   for (const name of ["app", "worker", "mailer"])
     assert.match(
@@ -446,7 +457,7 @@ test("the deployment guide has the domain file steps before the compose commands
   assert.ok(build > copy, "the domain file step comes BEFORE the first compose command block");
   assert.match(guide, /Never overwrites an existing \.env/);
   assert.match(guide, /--env-file \.env\.production/);
-  assert.match(guide, /only `STYLE_DOMAIN`/);
+  assert.match(guide, /only two non-secret values/);
   assert.match(guide, /STYLE_DOMAIN is not set/);
   assert.match(guide, /never run/i);
   // COMPOSE_ENV_FILES may be mentioned, but its minimum version is not established here.
@@ -460,4 +471,159 @@ test("the deployment guide documents the default block and the operator way in",
   const guide = read("docs/DEPLOYMENT.md");
   assert.match(guide, /deploy\/Caddyfile` answers `404` for `\/api\/health\/uploads`/);
   assert.match(guide, /docker compose exec app node -e "fetch\('http:\/\/127\.0\.0\.1:3000\/api\/health\/uploads'\)/);
+});
+
+/** The `sh -c` script of a compose service, with Compose's `$$` turned back into `$`. */
+function commandScript(service: string): string {
+  const items = (serviceKeyText(composeService(read("compose.yaml"), service), "command") ?? "")
+    .split("\n")
+    .map((l) => l.trim().replace(/^-\s*/, ""))
+    .filter(Boolean);
+  assert.deepEqual(items.slice(0, 2), ["sh", "-c"], `${service} runs sh -c`);
+  assert.equal(items.length, 3, `${service}: one script`);
+  return items[2].replace(/^'/, "").replace(/'$/, "").replace(/\$\$/g, "$");
+}
+
+const BODY_CHECK = /case "\$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" in .*? exit 1; fi;/;
+
+test("one project variable sets the app deadline and the proxy cap: same expression, same default, same strict check", () => {
+  const compose = read("compose.yaml");
+  const expr = (service: string) =>
+    /STYLE_COMPOSE_BODY_READ_TIMEOUT_MS:\s*(\$\{STYLE_BODY_READ_TIMEOUT_MS:-20000\})/.exec(
+      serviceKeyText(composeService(compose, service), "environment") ?? "",
+    )?.[1];
+  assert.equal(expr("app"), "${STYLE_BODY_READ_TIMEOUT_MS:-20000}", "app gets the project variable with the app default");
+  assert.equal(expr("proxy"), expr("app"), "the proxy gets the identical expression");
+  // The app default in code is the same number the compose default uses.
+  assert.match(read("src/server/limits.ts"), /"STYLE_BODY_READ_TIMEOUT_MS",\s*20_000,\s*1000,\s*120_000/);
+  // The cap is not a Compose input any more.
+  assert.doesNotMatch(compose.replace(/^\s*#.*$/gm, ""), /STYLE_PROXY_BODY_READ_TIMEOUT_S:\s*\$\{/);
+  const appCheck = BODY_CHECK.exec(commandScript("app"))?.[0];
+  const proxyCheck = BODY_CHECK.exec(commandScript("proxy"))?.[0];
+  assert.ok(appCheck, "the app command checks the value before it starts");
+  assert.equal(proxyCheck, appCheck, "app and proxy apply the identical check");
+  const app = commandScript("app");
+  assert.ok(app.lastIndexOf("exit 1") < app.indexOf("init-auth.ts"), "every refusal comes before anything starts");
+});
+
+test("the app fails closed on a leftover .env.production value, and the services that need it wait for the app", () => {
+  const compose = read("compose.yaml");
+  const app = composeService(compose, "app");
+  // The leftover can only be seen if nothing in the app's own environment uses
+  // the application's variable name.
+  assert.doesNotMatch(
+    serviceKeyText(app, "environment") ?? "",
+    /(^|\s)STYLE_BODY_READ_TIMEOUT_MS\s*:/,
+    "the compose entry must use another name, or a leftover in .env.production would be overridden unseen",
+  );
+  assert.match(serviceKeyText(app, "env_file") ?? "", /\.env\.production/);
+  const script = commandScript("app");
+  assert.match(script, /^if \[ -n "\$STYLE_BODY_READ_TIMEOUT_MS" \]; then echo "STYLE_BODY_READ_TIMEOUT_MS is set in \.env\.production[^"]*" >&2; exit 1; fi; case /);
+  assert.match(
+    script,
+    /export STYLE_BODY_READ_TIMEOUT_MS; \.\/node_modules\/\.bin\/tsx scripts\/init-auth\.ts && node server\.js$/,
+  );
+  // Fail closed: worker, mailer and proxy start only after the app is healthy,
+  // and the app never gets that far when its command exits.
+  for (const name of ["worker", "mailer", "proxy"])
+    assert.match(
+      serviceKeyText(composeService(compose, name), "depends_on") ?? "",
+      /app:\s*\n?\s*condition:\s*service_healthy/,
+      `${name} waits for a healthy app`,
+    );
+  // The worker no longer carries a guard of its own.
+  assert.doesNotMatch(serviceKeyText(composeService(compose, "worker"), "command") ?? "", /["']sh["']|-c/);
+});
+
+// Runs the real compose scripts in a POSIX sh with the final exec replaced by an
+// echo. Skipped where there is no `sh`. This executes only the validation and
+// arithmetic text, not Docker, Caddy or the app.
+const hasSh = (() => {
+  try {
+    return spawnSync("sh", ["-c", "exit 0"]).status === 0;
+  } catch {
+    return false;
+  }
+})();
+
+function runScript(script: string, env: Record<string, string | undefined>) {
+  // Start from the host environment (sh needs PATH) minus every variable these
+  // scripts read, so a value exported on the host can never leak into a case.
+  // NodeJS.ProcessEnv (not Record<string, string>) is the type spawnSync wants.
+  const clean: NodeJS.ProcessEnv = { ...process.env };
+  for (const k of ["STYLE_DOMAIN", "STYLE_BODY_READ_TIMEOUT_MS", "STYLE_COMPOSE_BODY_READ_TIMEOUT_MS", "STYLE_PROXY_BODY_READ_TIMEOUT_S"])
+    delete clean[k];
+  for (const [k, v] of Object.entries(env)) if (v !== undefined) clean[k] = v;
+  const r = spawnSync("sh", ["-c", script], { env: clean, encoding: "utf8", timeout: 10_000 });
+  return { status: r.status, out: r.stdout ?? "", err: r.stderr ?? "" };
+}
+
+test("the proxy command derives ceil(ms/1000)+2 and refuses every malformed value (needs sh)", (t) => {
+  if (!hasSh) return t.skip("no sh on this host");
+  const script = commandScript("proxy").replace(
+    "exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile",
+    'echo "CAP=$STYLE_PROXY_BODY_READ_TIMEOUT_S"',
+  );
+  assert.ok(script.includes("CAP="), "the exec line was replaced");
+  const good: Array<[string, number]> = [
+    ["1000", 3], ["1001", 4], ["1999", 4], ["2000", 4], ["20000", 22], ["20001", 23],
+    ["60000", 62], ["119999", 122], ["120000", 122],
+  ];
+  for (const [ms, cap] of good) {
+    const r = runScript(script, { STYLE_DOMAIN: "x.example", STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ms });
+    assert.equal(r.status, 0, `${ms}: ${r.err}`);
+    assert.equal(r.out.trim(), `CAP=${cap}`, ms);
+  }
+  const bad = [
+    "", "0", "999", "01000", "020000", "007000", "abc", "20000s", " 20000", "20000 ", "2 0000",
+    "-5", "+5000", "20.5", "1e4", "0x4e20", "120001", "999999", "1000000",
+    "99999999999999999999", "20000\n", "$(echo 5000)",
+  ];
+  for (const ms of bad) {
+    const r = runScript(script, { STYLE_DOMAIN: "x.example", STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ms });
+    assert.equal(r.status, 1, `${JSON.stringify(ms)} must be refused (status ${r.status}, out ${r.out})`);
+    assert.match(r.err, /STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000/);
+    assert.equal(r.out, "", `${JSON.stringify(ms)} must not reach caddy`);
+  }
+  const unset = runScript(script, { STYLE_DOMAIN: "x.example" });
+  assert.equal(unset.status, 1, "unset is refused too (Compose supplies the default, so this is a non-Compose misuse)");
+  const noDomain = runScript(script, { STYLE_DOMAIN: "", STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: "20000" });
+  assert.equal(noDomain.status, 1);
+  assert.match(noDomain.err, /STYLE_DOMAIN is not set/);
+});
+
+test("the app command applies the same check before it starts anything (needs sh)", (t) => {
+  if (!hasSh) return t.skip("no sh on this host");
+  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && node server.js", "echo STARTED");
+  assert.ok(script.endsWith("echo STARTED"));
+  // Reports the value the application would read, so a wrong hand-off is seen.
+  const probe = script.replace(/echo STARTED$/, 'echo "STARTED=$STYLE_BODY_READ_TIMEOUT_MS"');
+  for (const ms of ["1000", "20000", "120000"]) {
+    const r = runScript(probe, { STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ms });
+    assert.equal(r.status, 0, ms);
+    assert.equal(r.out.trim(), `STARTED=${ms}`, "the application receives exactly the validated value");
+  }
+  for (const ms of ["", "999", "020000", "20000s", "120001", "99999999999999999999", "1e4", "0x4e20", "-5", " 20000"]) {
+    const r = runScript(script, { STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ms });
+    assert.equal(r.status, 1, JSON.stringify(ms));
+    assert.match(r.err, /STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000/);
+    assert.equal(r.out, "");
+  }
+  const unset = runScript(script, {});
+  assert.equal(unset.status, 1, "no compose value at all is refused");
+});
+
+test("a leftover STYLE_BODY_READ_TIMEOUT_MS from .env.production stops the app before it starts (needs sh)", (t) => {
+  if (!hasSh) return t.skip("no sh on this host");
+  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && node server.js", "echo STARTED");
+  for (const leftover of ["60000", "20000", "abc", "0", " "]) {
+    const r = runScript(script, { STYLE_BODY_READ_TIMEOUT_MS: leftover, STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: "20000" });
+    assert.equal(r.status, 1, JSON.stringify(leftover));
+    assert.match(r.err, /set in \.env\.production, where it is no longer read/);
+    assert.equal(r.out, "", "nothing starts");
+  }
+  // An empty line in .env.production is harmless and does not stop the app.
+  const empty = runScript(script, { STYLE_BODY_READ_TIMEOUT_MS: "", STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: "20000" });
+  assert.equal(empty.status, 0);
+  assert.equal(empty.out.trim(), "STARTED");
 });

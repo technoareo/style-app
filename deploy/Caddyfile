@@ -1,7 +1,8 @@
-# Build 016 transport hardening. Validated with official Caddy 2.11.7 and run
-# once in a local loopback TLS replica (untrusted internal certificate). NOT run
-# in Docker, on Linux, on a public domain or behind a real certificate. See
-# docs/DEPLOYMENT.md "Proxy transport behaviour" for exact scope and gates.
+# Build 016/017 transport hardening. Validated with official Caddy 2.11.7 and
+# run in local loopback TLS replicas (untrusted internal certificate; app 20 s
+# and 60 s settings). NOT run in Docker, on Linux, on a public domain, behind a
+# real certificate, or at an app setting of 120 s. See docs/DEPLOYMENT.md
+# "Proxy transport behaviour" for exact scope and gates.
 {
   servers {
     # HTTP/1.1 only, for now. The 408-then-close behaviour below was measured on
@@ -14,10 +15,23 @@
       # Slow-header (slowloris) bound.
       read_header 10s
       # Hard limit on the WHOLE request body. It must stay above the app's own
-      # STYLE_BODY_READ_TIMEOUT_MS (default 20 s) so the app answers first with
-      # its JSON 408. Compose supplies STYLE_PROXY_BODY_READ_TIMEOUT_S (default
-      # 22, checked at proxy start); raise both together, see DEPLOYMENT.md.
-      read_body {$STYLE_PROXY_BODY_READ_TIMEOUT_S:22}s
+      # STYLE_BODY_READ_TIMEOUT_MS so the app answers first with its JSON 408.
+      # Under Compose the proxy start command derives
+      # STYLE_PROXY_BODY_READ_TIMEOUT_S = ceil(app ms / 1000) + 2 from the same
+      # project variable the app uses (see compose.yaml), so there is nothing to
+      # pair by hand. There is deliberately NO default here: outside Compose the
+      # variable must be set (22 pairs with the app default of 20 s), and an
+      # unset one makes Caddy refuse to start instead of guessing a cap.
+      read_body {$STYLE_PROXY_BODY_READ_TIMEOUT_S}s
+      # Caddy's own default for the body STALL timer, read_body_idle, is 1 m.
+      # With an app deadline of 60 s or more that timer fires at about the same
+      # moment as the app's (or before it, at 120 s), and a measured 60 s run
+      # left a fully stalled upload without any reply for 70 s. Set it to the
+      # same value as the total cap so it can never fire before the total cap,
+      # and the app's own 408 (cap minus 2 s) is always first. With this line a
+      # 60 s / 62 s local TLS run returned the app's 408 for a stalled and a
+      # trickled upload; 120 s has not been run.
+      read_body_idle {$STYLE_PROXY_BODY_READ_TIMEOUT_S}s
       # Not set on purpose: `write`/`write_idle` (the answer stream and photo
       # downloads would be cut) and `idle` (Caddy default 5 m).
     }

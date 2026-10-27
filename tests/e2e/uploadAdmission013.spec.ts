@@ -158,15 +158,15 @@ test("a 408 on the wardrobe save keeps the reviewed draft and a second press sav
   await page
     .getByLabel("Choose a clothing photo", { exact: true })
     .setInputFiles("tests/fixtures/public-shirt.jpg");
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await page.getByLabel("Details checked").check();
-  await page.getByRole("button", { name: "Add 1 items to my wardrobe" }).click();
+  await page.getByRole("button", { name: "Add 1 item to my wardrobe" }).click();
   await expect(
     page.getByText(/Your items were not saved: The upload took too long/),
   ).toBeVisible({ timeout: 20_000 });
   // The draft is still on screen and can be saved again.
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
-  await page.getByRole("button", { name: "Add 1 items to my wardrobe" }).click();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
+  await page.getByRole("button", { name: "Add 1 item to my wardrobe" }).click();
   await expect(page.getByText("Slow-upload shirt", { exact: true })).toBeVisible({
     timeout: 20_000,
   });

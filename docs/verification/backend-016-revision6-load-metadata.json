@@ -1,0 +1,9 @@
+{
+  "loadJobIds": [
+    1,
+    3
+  ],
+  "started": "2026-10-22T10:25:44.5538400+08:00",
+  "loadSeconds": 120,
+  "source": "two PowerShell CPU jobs"
+}

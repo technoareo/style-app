@@ -1,0 +1,8 @@
+2026-10-21T07:47:06.800Z ERROR [Better Auth]: Database schema mismatch
+
+  Missing tables
+    user, session, account, verification, rateLimit
+
+  help: Run `npx auth migrate` to add the missing tables and columns.
+[database] main connection quarantined: outcome=unclosed count=1
+PASS: compiled health 200 -> quarantine -> 503 twice; wardrobe and health share cached database module 87267. No public server/fault hook, SMTP, or model used.

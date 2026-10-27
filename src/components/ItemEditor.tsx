@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 import { isPhoto, type Garment } from "../domain/types";
 import { Dialog } from "./Dialog";
+import { ItemAttributes } from "./ItemAttributes";
 
 type Props = {
   garment: Garment;
@@ -79,6 +80,11 @@ export function ItemEditor({
       {field("neckline", "Neckline", "e.g. Crew, V-neck, collared")}
       {field("closure", "Closure", "e.g. Pullover, buttons, zip")}
       {field("length", "Length", "e.g. Cropped, hip, knee, full")}
+      <ItemAttributes
+        idPrefix="edit"
+        value={draft}
+        onChange={(patch) => setDraft({ ...draft, ...patch })}
+      />
       {field("brand", "Brand", "e.g. COS")}
       {field("size", "Size", "e.g. M, 8, 30x32")}
       <label htmlFor="edit-formality">Dress code</label>

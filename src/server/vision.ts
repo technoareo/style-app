@@ -1,12 +1,28 @@
 import sharp from "sharp";
 import { limits } from "./limits";
 import {
+  ANALYSIS_MODE,
   analysisSchema,
+  cleanModelWarning,
+  composeWarning,
+  parseAnalysisMode,
+  reviewAnalysisSchema,
+  PROMPT_SUFFIX,
+  usableBox,
+  CROP_UNVERIFIED_WARNING,
   CROWDED_WARNING,
   MAX_DETECTED_ITEMS,
+  evidencedShoePair,
+  mostProminentIndex,
+  MULTIPLE_ITEMS_WARNING,
+  refineSingleItem,
+  SHOE_PAIR_WARNING,
+  SINGLE_ITEM_PROMPT,
+  singleVisionOutputSchema,
   VISION_PROMPT,
   visionOutputSchema,
   type Analysis,
+  type AnalysisMode,
 } from "../domain/analysis";
 
 /** Thrown for any photo/model problem that should surface a safe, user-facing message. */
@@ -32,7 +48,50 @@ export class VisionError extends Error {
   }
 }
 
-const MODEL = "qwen3-vl:4b-instruct";
+/** Used when VISION_MODEL is unset or blank. docs/DEPLOYMENT.md and README pull this tag. */
+export const DEFAULT_VISION_MODEL = "qwen3-vl:4b-instruct";
+/**
+ * An Ollama model reference: optional namespace path, a name and an optional
+ * tag, ASCII letters, digits, dot, underscore and hyphen only. No whitespace,
+ * quotes, slashes at the ends or control characters; at most 100 characters.
+ * (Ollama's tag syntax is the same shape, for example qwen3-vl:4b-instruct or
+ * library/llava:7b.)
+ */
+const MODEL_REFERENCE =
+  /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$/;
+
+/**
+ * The vision model this process uses, from VISION_MODEL (trusted server
+ * configuration; never taken from a request). Unset or blank gives the
+ * default. A set but malformed value is NOT replaced by the default: silently
+ * running a different model than the operator named would hide the mistake, so
+ * the model is reported as unusable (analysis stays unavailable, refundable)
+ * until it is fixed. The app, the AI worker and the readiness check all call
+ * this, so they cannot disagree.
+ */
+export function configuredVisionModel(
+  env: Record<string, string | undefined> = process.env,
+): { ok: true; name: string } | { ok: false } {
+  const raw = env.VISION_MODEL;
+  if (raw === undefined || raw.trim() === "") return { ok: true, name: DEFAULT_VISION_MODEL };
+  const name = raw.trim();
+  if (name.length > 100 || !MODEL_REFERENCE.test(name)) return { ok: false };
+  return { ok: true, name };
+}
+
+let reportedBadModel = false;
+function visionModelOrNull(): string | null {
+  const model = configuredVisionModel();
+  if (model.ok) return model.name;
+  if (!reportedBadModel) {
+    reportedBadModel = true;
+    // Fixed text only: the bad value is not echoed (it could hold anything).
+    console.error(
+      "[vision] VISION_MODEL is not a valid model name; photo analysis is unavailable until it is fixed",
+    );
+  }
+  return null;
+}
 
 const UNAVAILABLE_MESSAGE =
   "Photo analysis is temporarily unavailable. Your wardrobe was not changed.";
@@ -52,6 +111,13 @@ export const ANSWER_CUT_MESSAGE =
  * minutes (see the "length" handling below).
  */
 const MAX_OUTPUT_TOKENS = 1100;
+/**
+ * One item with its attribute lists is about 200 tokens; the schema allows up
+ * to MAX_SINGLE_CANDIDATES entries so a second item can be DETECTED (only the
+ * first is ever shown). A single-item photo still normally produces one entry,
+ * so latency is not meant to grow; a three-entry answer plus the warning fits.
+ */
+const MAX_SINGLE_OUTPUT_TOKENS = 900;
 /** A chat answer larger than this is refused instead of buffered. */
 const MAX_ANSWER_CHARS = 2_000_000;
 
@@ -255,6 +321,13 @@ function ollamaUrl(): string {
 
 /** Whether the configured vision model is currently reachable and loaded. */
 export async function isModelAvailable(): Promise<boolean> {
+  const model = visionModelOrNull();
+  if (!model) return false;
+  // A malformed STYLE_ANALYSIS_MODE refuses new jobs (see enqueueAnalysisJob),
+  // so readiness must say so instead of offering uploads that cannot be accepted.
+  if (parseAnalysisMode(process.env.STYLE_ANALYSIS_MODE) === null) return false;
+  // Ollama lists an untagged pull as "<name>:latest".
+  const wanted = model.includes(":") ? model : `${model}:latest`;
   try {
     const response = await fetch(`${ollamaUrl()}/api/tags`, {
       signal: AbortSignal.timeout(2000),
@@ -263,7 +336,9 @@ export async function isModelAvailable(): Promise<boolean> {
     if (!response.ok) return false;
     const tags = await response.json();
     return Boolean(
-      tags.models?.some((m: { name: string }) => m.name === MODEL),
+      tags.models?.some(
+        (m: { name: string }) => m.name === model || m.name === wanted,
+      ),
     );
   } catch {
     return false;
@@ -302,7 +377,14 @@ export type VisionResult = { analysis: Analysis; image: string };
 export async function analyzePhoto(
   normalized: Buffer,
   signal?: AbortSignal,
+  options: { mode?: AnalysisMode } = {},
 ): Promise<VisionResult> {
+  const mode = options.mode ?? ANALYSIS_MODE;
+  const single = mode === "single";
+  const model = visionModelOrNull();
+  // A malformed VISION_MODEL is a server configuration fault: refundable, and
+  // no request is sent to Ollama.
+  if (!model) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
   const visionImage = await sharp(normalized)
     .resize(768, 768, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80 })
@@ -328,22 +410,21 @@ export async function analyzePhoto(
       ]),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         stream: true,
-        format: visionOutputSchema,
+        format: single ? singleVisionOutputSchema : visionOutputSchema,
         think: false,
         options: {
           temperature: 0,
           num_ctx: 4096,
-          num_predict: MAX_OUTPUT_TOKENS,
+          num_predict: single ? MAX_SINGLE_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS,
         },
         messages: [
           {
             role: "user",
             images: [visionImage.toString("base64")],
             content:
-              VISION_PROMPT +
-              " Keep evidence and warning concise. Do not detect drawings or prints on clothing as separate items.",
+              (single ? SINGLE_ITEM_PROMPT : VISION_PROMPT) + PROMPT_SUFFIX,
           },
         ],
       }),
@@ -373,25 +454,38 @@ export async function analyzePhoto(
     const raw = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
     // A photo that fills the item limit is treated as crowded; anything past
     // the limit (a model that ignored it) is dropped, never listed.
-    const found: unknown = raw.items ?? [];
-    if (!Array.isArray(found)) throw new Error("items is not a list");
-    const crowded = found.length >= MAX_DETECTED_ITEMS;
+    // Drop empty placeholders and instruction echoes; keep every real finding.
+    raw.warning = cleanModelWarning(raw.warning);
+    const listed: unknown = raw.items ?? [];
+    if (!Array.isArray(listed)) throw new Error("items is not a list");
+    // Single-item mode: a model that lists several (or one that ignored the
+    // schema) is cut to its most prominent item and the user is told; nothing
+    // else is ever listed. Multi-item mode keeps the crowded-photo rule.
+    // Two shoes listed separately are treated as one pair ONLY on robust
+    // evidence (see evidencedShoePair); the user is told to check the crop.
+    const pair = single ? evidencedShoePair(listed) : null;
+    const multiple = single && listed.length > 1 && !pair;
+    const found: unknown[] = pair
+      ? [pair]
+      : multiple
+        ? [listed[mostProminentIndex(listed)]]
+        : listed;
+    const limit = single ? 1 : MAX_DETECTED_ITEMS;
+    const crowded = !single && found.length >= MAX_DETECTED_ITEMS;
     let needsCrop = false;
-    raw.items = found.slice(0, MAX_DETECTED_ITEMS).map((entry) => {
-      const item = entry as { box: number[] };
-      const b = item.box;
-      const valid =
-        Array.isArray(b) &&
-        b.length === 4 &&
-        b.every((v) => Number.isFinite(v) && v >= 0 && v <= 1000) &&
-        b[2] - b[0] >= 30 &&
-        b[3] - b[1] >= 30;
-      if (!valid) needsCrop = true;
+    raw.items = found.slice(0, limit).map((entry) => {
+      const item = (single ? refineSingleItem(entry) : entry) as {
+        box: number[];
+      };
+      // The SAME rule that chose the item (usableBox: inside the frame, a slight
+      // overshoot clamped, at least 30/1000 on each side).
+      const b = usableBox(item.box);
+      if (!b) needsCrop = true;
       return {
         ...item,
         // Native model coordinates are 0..1000 integers; normalize to 0..1,
         // falling back to the full frame when the model's box is unusable.
-        box: valid
+        box: b
           ? [
               b[0] / 1000,
               b[1] / 1000,
@@ -401,17 +495,21 @@ export async function analyzePhoto(
           : [0, 0, 1, 1],
       };
     });
-    if (needsCrop)
-      raw.warning =
-        "Some item bounds could not be verified. The full photo is shown instead; adjust and check each affected crop before saving.";
-    if (crowded)
-      raw.warning = [
-        typeof raw.warning === "string" ? raw.warning : "",
-        CROWDED_WARNING,
-      ]
-        .filter(Boolean)
-        .join(" ");
-    parsed = analysisSchema.parse(raw);
+    // Every notice is APPENDED to what the model said (already cleaned): a crop
+    // notice must not hide a real finding such as "the photo is blurry".
+    const notices = [
+      needsCrop ? CROP_UNVERIFIED_WARNING : "",
+      pair ? SHOE_PAIR_WARNING : "",
+      multiple ? MULTIPLE_ITEMS_WARNING : "",
+      crowded ? CROWDED_WARNING : "",
+    ];
+    raw.warning = composeWarning(
+      typeof raw.warning === "string" ? raw.warning : "",
+      notices,
+    );
+    // Single-item results may carry an unnamed item (the review makes the user
+    // name it); multi-item verification is unchanged.
+    parsed = (single ? reviewAnalysisSchema : analysisSchema).parse(raw);
   } catch {
     throw new VisionError(
       "The analysis could not be verified. Try another photo.",

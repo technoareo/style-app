@@ -1,0 +1,446 @@
+✔ a write that cannot get the lock within its budget fails retryably before its body runs (10964.8854ms)
+✔ a contended heartbeat is degraded, not fatal; it only turns critical after half a lease (604.0439ms)
+✖ job completion survives write contention without repeating inference; beyond the bound the job is requeued, not lost (30412.6881ms)
+✔ the percentile helper is nearest-rank and keeps the exact maximum (2.0437ms)
+✔ connection initialization is reported on its own: not a gate wait, not a SQLite wait, and part of the total (686.1036ms)
+✔ the acquire measurement brackets the real SQLite wait, the gate wait and the queue depth (1002.0882ms)
+✔ the hold measurement runs from a successful BEGIN to COMMIT or ROLLBACK, on the auth path and on the write path (468.2131ms)
+✔ write path: BEGIN, body and COMMIT are one synchronous block; nothing queued at the native BEGIN return runs inside it; the reported times are bracketed by native timestamps (129.4168ms)
+✔ an injected slow COMMIT is attributed to commitMs, not to the body, and the transaction still closes before queued work runs (177.1922ms)
+✔ beginMs and backoffMs are real, additive observations of a contended acquisition (458.3644ms)
+✔ a busy-shaped BODY error is never replayed: one run, same error object, rolled back, gate free (1.5295ms)
+✔ a body that throws a primitive (not an Error) is rolled back once and surfaces unchanged (1.2241ms)
+✔ a busy-shaped COMMIT failure is never replayed: one body run, same error object, rolled back, gate free (1.8364ms)
+✔ a body that returns a Promise is still rolled back and rejected with the existing message (0.6619ms)
+✔ observers run after the native transaction ended and the process gate was handed on (191.2937ms)
+✔ the hold starts when BEGIN returned, not when the caller resumed (auth path) (102.5967ms)
+✔ a refusal's detail carries initialization, gate and SQLite time that add up to its total (334.4137ms)
+✔ concurrent observer contexts stay isolated; the process observer sees only what no context claims (670.713ms)
+✔ a refused lock never runs the body, reports where the budget went, and leaves no transaction or gate behind (425.6993ms)
+✔ a gate that times out is reported, the body never runs, and the original error type is unchanged (121.2982ms)
+✔ an observer that throws cannot change a result, mask a failure, keep a transaction open or hold the gate (589.9965ms)
+✔ observers whose property lookup throws (getter, Proxy) cannot change an outcome, leave a transaction begun, or hold the gate (42.9538ms)
+✔ a mutating observer cannot alter the metrics attached to a refusal (227.0523ms)
+✔ REAL child, strict about unhandled rejections: throwing getters, a throwing Proxy, rejecting async observers and hostile thenables change no outcome, row or gate, and raise no unhandled rejection (4951.482ms)
+✔ the diagnostics add no cost without an observer: no events are produced and the result is unchanged (69.7598ms)
+✔ C: closeAuthDatabase() whose close throws: the error surfaces, the claim stays refused, a later closeDatabases() closes it and releases (578.1355ms)
+✔ D: closeDatabases() whose main close throws: the error surfaces, the claim stays refused, the next closeDatabases() closes it and releases (675.6599ms)
+✔ D2: a close that throws AFTER the handle closed still surfaces, and the hold is released because closure is proven (552.0081ms)
+✔ E: a successful quarantine close and reopen keeps the hold throughout; it is released only by closeDatabases() (839.1601ms)
+✖ F: reopen failure with no other handle open releases the hold and the real error surfaces; a later getDatabase() retries. With auth open the hold is kept (267.4566ms)
+✔ A: quarantine with a failing ROLLBACK and CLOSE on main, auth open: the claim is refused after quarantine, after closeAuthDatabase() and after a failing closeDatabases(); granted only after the handle really closes (224.4755ms)
+✔ B: failing ROLLBACK and CLOSE on main, auth never opened: the claim stays refused until the handle really closes (597.824ms)
+✔ an exclusive claim is refused while a real idle process has the database open, and granted the moment that process is killed (5759.6089ms)
+✔ while a restore holds the exclusive claim a starting process cannot take its hold: it fails within the bound instead of waiting for ever (918.4834ms)
+✔ many holders coexist, and the claim needs every one of them gone (300.1726ms)
+✔ getDatabase() takes the hold and closeDatabases() releases it (in-process wiring) (1279.5358ms)
+✖ durable queue isolates users, enforces individual quotas, recovers leases and suppresses cancelled results (11333.3866ms)
+✔ admission returns position, conservative wait and the server deadline, and refuses work that cannot be reviewed before expiry (13046.9986ms)
+✔ admission assumes the worst case (full inference timeout), not the 120 s estimate (2091.0233ms)
+✔ the global cap stays and carries a retry hint; measured speed can raise but never lower the estimate (1231.3277ms)
+✖ quota refunds are one-time, fair, and bounded by a separate attempts counter (5211.3072ms)
+✖ repeated refunded server-side failures, a real inference timeout among them, still spend the finite attempt quota (344.808ms)
+✖ owner-only discovery lists active and recent jobs, results are retained until discard, and other accounts see nothing (388.2991ms)
+✖ cancelling, deleting the account or expiry aborts running model work promptly and the next job starts (5191.1743ms)
+✖ a worker that is shutting down returns its job to the queue instead of failing it (5336.7393ms)
+✔ W2: close-failed branch: the failing call surfaces its own error, every queued waiter is refused with DatabaseQuarantineError without running, the gate and queue are clean (577.0608ms)
+✔ body error and a failing ROLLBACK (twice): the original error surfaces, the connection is quarantined and replaced, the gate and SQLite lock are free (680.3749ms)
+✔ a COMMIT failure followed by failing ROLLBACKs reports the COMMIT error and quarantines the connection (15.2084ms)
+✔ inTransaction used directly: a failing ROLLBACK does not replace the body's error, and the connection is quarantined (2.0615ms)
+✔ a rollback that works never quarantines: an ordinary body error leaves the connection and the counter alone (0.4669ms)
+✔ W1/W4: queued writers behind a quarantined-and-replaced connection all succeed on the fresh connection, once each, with honest budgets (341.3433ms)
+✔ W3/W4: a waiter whose reopen fails rejects with that error, releases the gate, runs no body, makes no attempt, and leaks no presence (138.3269ms)
+✔ if the stuck connection cannot even be closed, every later use fails loudly, and the limit is real: the SQLite lock stays held until it is closed (2.7083ms)
+✖ the request is streamed and carries the item limit and a bounded output (90.6827ms)
+✖ a streamed answer split across lines and a one-body answer (compact or pretty) all read the same (12.6246ms)
+✖ a photo that fills the limit is flagged as crowded; one item below the limit is not (6.7642ms)
+✖ a model that ignores the limit is cut to it and flagged: nothing past the limit is listed (7.1644ms)
+✖ an answer cut at the output bound gets a cause-neutral message (the bound does not prove too many items), and is charged as a model result (8.0758ms)
+✖ a malformed item list still fails verification, as before (10.4561ms)
+✔ a server error line and a non-200 answer are 'unavailable', not a timeout (13.9984ms)
+✖ a caller abort is 'unavailable'; the inference deadline, reached while the model is still writing, is a timeout with its own message (13.0685ms)
+✔ a stream without its terminal marker is refused (done:false then EOF, compact one-body without done) (39.6615ms)
+✖ an empty body, blank lines only and a terminal with no content are refused or unverified, never accepted (25.9861ms)
+✖ malformed protocol input is refused at the first bad line and the still-open upstream request is closed (2011.0424ms)
+✖ wrong envelope types are refused: content, done, done_reason, message, error (2009.4343ms)
+✖ one-body compatibility is bounded: leading or trailing garbage is refused, and pretty-printed text is not an open-ended accepted stream (2010.9208ms)
+✖ invalid UTF-8 is refused, including a sequence cut off at the end of the stream (2015.5095ms)
+✖ an oversize answer is refused and the open upstream request is closed (2004.0465ms)
+✖ a non-200 answer and a transport that dies mid-stream are 'unavailable'; the request is closed (2008.544ms)
+✖ accepted shapes: CRLF, a final line without a newline, blank lines, surrounding whitespace, a compact body without a trailing newline (3.7537ms)
+✖ multi-byte UTF-8 split across chunk boundaries round-trips (3.6317ms)
+✖ a caller abort mid-stream is 'unavailable' and the upstream request is closed, not left generating (2012.8029ms)
+✖ the inference deadline is a 'timeout' (not overridden by the cleanup) and the upstream request is closed (3.2722ms)
+✖ a protocol failure keeps its own kind and message: the cleanup's own abort is not read as a deadline or a caller abort (2016.1311ms)
+ℹ tests 74
+ℹ suites 0
+ℹ pass 47
+ℹ fail 27
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43029.5999
+
+✖ failing tests:
+
+test at tests\contention.test.ts:2:5919
+✖ job completion survives write contention without repeating inference; beyond the bound the job is requeued, not lost (30412.6881ms)
+  Error: contention harness: the mock model endpoint received no held request within 30000 ms (requests seen: 0, hold enabled: true, url: http://127.0.0.1:49473). The worker tick never reached the mock model; check loopback access.
+      at heldResponse (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\contention.test.ts:249:17)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\contention.test.ts:292:22)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\presenceLifecycle016.test.ts:2:6339
+✖ F: reopen failure with no other handle open releases the hold and the real error surfaces; a later getDatabase() retries. With auth open the hold is kept (267.4566ms)
+  Error: EEXIST: file already exists, mkdir 'C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\.data\tests\presence016-8c7de46f-784a-44a3-ac8c-51db3f33cd28\app.db'
+      at mkdirSync (node:fs:1411:26)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\presenceLifecycle016.test.ts:227:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4075,
+    code: 'EEXIST',
+    syscall: 'mkdir',
+    path: 'C:\\Users\\arjun\\.codex\\.chatgpt-projects\\g-p-6acb68846a548191aa7e43f0646ff6c9\\style-app\\.data\\tests\\presence016-8c7de46f-784a-44a3-ac8c-51db3f33cd28\\app.db'
+  }
+
+test at tests\queue.test.ts:2:1153
+✖ durable queue isolates users, enforces individual quotas, recovers leases and suppresses cancelled results (11333.3866ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue.test.ts:107:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\queue007.test.ts:2:8062
+✖ quota refunds are one-time, fair, and bounded by a separate attempts counter (5211.3072ms)
+  Error: condition not reached in time
+      at until (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:27:33)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:269:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\queue007.test.ts:2:11037
+✖ repeated refunded server-side failures, a real inference timeout among them, still spend the finite attempt quota (344.808ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /took too long/. Input:
+  
+  'Photo analysis was unavailable and this attempt was not counted. Try again shortly.'
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:349:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Photo analysis was unavailable and this attempt was not counted. Try again shortly.',
+    expected: /took too long/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\queue007.test.ts:2:12470
+✖ owner-only discovery lists active and recent jobs, results are retained until discard, and other accounts see nothing (388.2991ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:397:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\queue007.test.ts:2:14300
+✖ cancelling, deleting the account or expiry aborts running model work promptly and the next job starts (5191.1743ms)
+  Error: condition not reached in time
+      at until (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:27:33)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:424:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\queue007.test.ts:2:16384
+✖ a worker that is shutting down returns its job to the queue instead of failing it (5336.7393ms)
+  Error: condition not reached in time
+      at until (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:27:33)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\queue007.test.ts:495:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:2744
+✖ the request is streamed and carries the item limit and a bounded output (90.6827ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:90:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:3407
+✖ a streamed answer split across lines and a one-body answer (compact or pretty) all read the same (12.6246ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:109:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:3908
+✖ a photo that fills the limit is flagged as crowded; one item below the limit is not (6.7642ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:116:17)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:4811
+✖ a model that ignores the limit is cut to it and flagged: nothing past the limit is listed (7.1644ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:129:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:5429
+✖ an answer cut at the output bound gets a cause-neutral message (the bound does not prove too many items), and is charged as a model result (8.0758ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'unverified'
+       ^
+  
+      at Object.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:142:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:140:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'unverified',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\visionCap016.test.ts:2:6084
+✖ a malformed item list still fails verification, as before (10.4561ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'unverified'
+       ^
+  
+      at Object.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:154:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:152:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'unverified',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\visionCap016.test.ts:2:7263
+✖ a caller abort is 'unavailable'; the inference deadline, reached while the model is still writing, is a timeout with its own message (13.0685ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'timeout'
+  
+      at Object.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:199:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:197:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'timeout',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\visionCap016.test.ts:2:10714
+✖ an empty body, blank lines only and a terminal with no content are refused or unverified, never accepted (25.9861ms)
+  Error: terminal only [application/x-ndjson]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'unverified'
+       ^
+  
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:295:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:11084
+✖ malformed protocol input is refused at the first bad line and the still-open upstream request is closed (2011.0424ms)
+  Error: error line [application/x-ndjson]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:316:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:12058
+✖ wrong envelope types are refused: content, done, done_reason, message, error (2009.4343ms)
+  Error: {"message":{"content":5},"done":false} [application/x-ndjson]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:335:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:12732
+✖ one-body compatibility is bounded: leading or trailing garbage is refused, and pretty-printed text is not an open-ended accepted stream (2010.9208ms)
+  Error: leading garbage then open [null]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:354:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:13622
+✖ invalid UTF-8 is refused, including a sequence cut off at the end of the stream (2015.5095ms)
+  Error: bad bytes in the middle [application/x-ndjson]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:365:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:14247
+✖ an oversize answer is refused and the open upstream request is closed (2004.0465ms)
+  Error: oversize total [application/x-ndjson]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:376:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:14702
+✖ a non-200 answer and a transport that dies mid-stream are 'unavailable'; the request is closed (2008.544ms)
+  Error: non-200 with open body [application/x-ndjson]: the upstream request was closed
+      at refused (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:267:11)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:387:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests\visionCap016.test.ts:2:15226
+✖ accepted shapes: CRLF, a final line without a newline, blank lines, surrounding whitespace, a compact body without a trailing newline (3.7537ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:425:22)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:16262
+✖ multi-byte UTF-8 split across chunk boundaries round-trips (3.6317ms)
+  Error: Photo analysis is temporarily unavailable. Your wardrobe was not changed.
+      at analyzePhoto (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\src\server\vision.ts:364:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:453:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    kind: 'unavailable'
+  }
+
+test at tests\visionCap016.test.ts:2:17053
+✖ a caller abort mid-stream is 'unavailable' and the upstream request is closed, not left generating (2012.8029ms)
+  AssertionError [ERR_ASSERTION]: the server saw the request close
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:467:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\visionCap016.test.ts:2:17668
+✖ the inference deadline is a 'timeout' (not overridden by the cleanup) and the upstream request is closed (3.2722ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'timeout'
+  
+      at Object.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:476:14)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:474:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'timeout',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\visionCap016.test.ts:2:18349
+✖ a protocol failure keeps its own kind and message: the cleanup's own abort is not read as a deadline or a caller abort (2016.1311ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(await closedWithin(state))
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\visionCap016.test.ts:494:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

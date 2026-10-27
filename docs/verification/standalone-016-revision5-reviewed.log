@@ -1,0 +1,5 @@
+
+> style-studio@1.0.0 verify:standalone
+> tsx scripts/verify-standalone.ts
+
+Standalone check passed: the bundle started and served real routes from an isolated copy with no ancestor node_modules.

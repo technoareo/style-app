@@ -1,0 +1,152 @@
+[
+  {
+    "run": 1,
+    "writer": 1,
+    "holdMean": 64.4,
+    "bodyMean": 0.2,
+    "commitMean": 64.2,
+    "acquireMax": 1884.8,
+    "beginMean": 69.1,
+    "backoffMean": 36.1
+  },
+  {
+    "run": 1,
+    "writer": 2,
+    "holdMean": 67.6,
+    "bodyMean": 0.2,
+    "commitMean": 67.4,
+    "acquireMax": 1387.3,
+    "beginMean": 69,
+    "backoffMean": 38
+  },
+  {
+    "run": 1,
+    "writer": 3,
+    "holdMean": 65.3,
+    "bodyMean": 0.2,
+    "commitMean": 65.1,
+    "acquireMax": 1256.7,
+    "beginMean": 70.7,
+    "backoffMean": 36.9
+  },
+  {
+    "run": 2,
+    "writer": 1,
+    "holdMean": 60.4,
+    "bodyMean": 0.2,
+    "commitMean": 60.3,
+    "acquireMax": 1881.9,
+    "beginMean": 70.5,
+    "backoffMean": 37.4
+  },
+  {
+    "run": 2,
+    "writer": 2,
+    "holdMean": 66.1,
+    "bodyMean": 0.2,
+    "commitMean": 66,
+    "acquireMax": 1017.2,
+    "beginMean": 67.5,
+    "backoffMean": 33.2
+  },
+  {
+    "run": 2,
+    "writer": 3,
+    "holdMean": 65.1,
+    "bodyMean": 0.2,
+    "commitMean": 65,
+    "acquireMax": 1700.4,
+    "beginMean": 65.6,
+    "backoffMean": 30.1
+  },
+  {
+    "run": 3,
+    "writer": 1,
+    "holdMean": 70.3,
+    "bodyMean": 0.2,
+    "commitMean": 70.2,
+    "acquireMax": 1244,
+    "beginMean": 68.2,
+    "backoffMean": 34.6
+  },
+  {
+    "run": 3,
+    "writer": 2,
+    "holdMean": 65.1,
+    "bodyMean": 0.2,
+    "commitMean": 64.9,
+    "acquireMax": 886,
+    "beginMean": 70,
+    "backoffMean": 37
+  },
+  {
+    "run": 3,
+    "writer": 3,
+    "holdMean": 61.2,
+    "bodyMean": 0.2,
+    "commitMean": 61,
+    "acquireMax": 1369.5,
+    "beginMean": 64.7,
+    "backoffMean": 32.4
+  },
+  {
+    "run": 4,
+    "writer": 1,
+    "holdMean": 64.3,
+    "bodyMean": 0.2,
+    "commitMean": 64.1,
+    "acquireMax": 1183.8,
+    "beginMean": 64.3,
+    "backoffMean": 31.4
+  },
+  {
+    "run": 4,
+    "writer": 2,
+    "holdMean": 57.8,
+    "bodyMean": 0.1,
+    "commitMean": 57.6,
+    "acquireMax": 1293,
+    "beginMean": 69,
+    "backoffMean": 37.2
+  },
+  {
+    "run": 4,
+    "writer": 3,
+    "holdMean": 62.1,
+    "bodyMean": 0.1,
+    "commitMean": 62,
+    "acquireMax": 1994.1,
+    "beginMean": 62.8,
+    "backoffMean": 32.7
+  },
+  {
+    "run": 5,
+    "writer": 1,
+    "holdMean": 64.9,
+    "bodyMean": 0.2,
+    "commitMean": 64.7,
+    "acquireMax": 1501.9,
+    "beginMean": 63.8,
+    "backoffMean": 31
+  },
+  {
+    "run": 5,
+    "writer": 2,
+    "holdMean": 65.2,
+    "bodyMean": 0.1,
+    "commitMean": 65.1,
+    "acquireMax": 1075.5,
+    "beginMean": 67.8,
+    "backoffMean": 34.3
+  },
+  {
+    "run": 5,
+    "writer": 3,
+    "holdMean": 62.5,
+    "bodyMean": 0.2,
+    "commitMean": 62.3,
+    "acquireMax": 1480,
+    "beginMean": 69.9,
+    "backoffMean": 35.2
+  }
+]

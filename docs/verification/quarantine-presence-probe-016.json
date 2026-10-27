@@ -1,0 +1,24 @@
+{
+  "synthetic": true,
+  "results": [
+    {
+      "stage": "quarantined before auth close",
+      "exclusiveGranted": false,
+      "errorName": "PresenceBusyError",
+      "stuckIsOpen": true,
+      "stuckIsTransaction": true
+    },
+    {
+      "stage": "after auth close",
+      "exclusiveGranted": true,
+      "stuckIsOpen": true,
+      "stuckIsTransaction": true
+    },
+    {
+      "stage": "after failed main close during shutdown",
+      "exclusiveGranted": true,
+      "stuckIsOpen": true,
+      "stuckIsTransaction": true
+    }
+  ]
+}

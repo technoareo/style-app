@@ -66,7 +66,7 @@ test("an AI formal guess is only a suggestion until the user chooses it", async 
   });
   await openUpload(page);
   await choose(page);
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   const dressCode = page.getByLabel("Dress code", { exact: true });
   await expect(dressCode).toHaveValue("unknown");
   await expect(page.getByText(/AI guessed “formal”/)).toBeVisible();
@@ -74,7 +74,7 @@ test("an AI formal guess is only a suggestion until the user chooses it", async 
   // Saving without touching it keeps the item "not sure".
   await page.getByLabel("Details checked").check();
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit Detected shirt" }).click();
@@ -194,27 +194,27 @@ test("a failed wardrobe save keeps the photo result; after reload and retry ther
   });
   await openUpload(page);
   await choose(page);
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await page.getByLabel("Details checked").check();
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   // The save failed: the dialog, results and job are all still there.
   await expect(page.getByText(/Your items were not saved/)).toBeVisible();
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   expect(state.discarded).toBe(false);
 
   // Reload: the unsaved wardrobe change is gone, the result is not.
   await page.reload();
   await page.getByRole("button", { name: "Review photo results" }).click();
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await expect(page.getByLabel("Details checked")).toBeChecked();
   expect(state.discarded).toBe(false);
 
   // Retry succeeds once; only then is the result discarded.
   failPut = false;
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
   await expect.poll(() => state.discarded).toBe(true);
@@ -242,7 +242,7 @@ test("a retry after a failed save in the same dialog adds the garment once", asy
   await openUpload(page);
   await choose(page);
   await page.getByLabel("Details checked").check();
-  const add = page.getByRole("button", { name: "Add 1 items to my wardrobe" });
+  const add = page.getByRole("button", { name: "Add 1 item to my wardrobe" });
   await add.click();
   await expect(page.getByText(/Your items were not saved/)).toBeVisible();
   expect(state.discarded).toBe(false);
@@ -283,7 +283,7 @@ test("a lost success response does not duplicate the garment when the same resul
   await openUpload(page);
   await choose(page);
   await page.getByLabel("Details checked").check();
-  const add = page.getByRole("button", { name: "Add 1 items to my wardrobe" });
+  const add = page.getByRole("button", { name: "Add 1 item to my wardrobe" });
   await add.click();
   await expect(page.getByText(/Your items were not saved/)).toBeVisible();
   expect(state.discarded).toBe(false);
@@ -307,7 +307,7 @@ test("a failed discard after a successful save is reported honestly and not offe
   await choose(page);
   await page.getByLabel("Details checked").check();
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   await expect(
     page.getByText(/Saved to your wardrobe\. The temporary photo result could not be removed/),
@@ -400,7 +400,7 @@ test("a superseded or cancelled result that arrives late cannot overwrite the ne
     page.getByLabel("Choose a clothing photo", { exact: true }),
   ).toBeEnabled();
   await choose(page);
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await page.getByLabel("Name New shirt").fill("My edited new shirt");
   await page.getByLabel("Details checked").check();
   // Now let the old, held answer go, and wait until its handler has finished
@@ -480,7 +480,7 @@ test("a cancel that is still pending when a newer photo starts cannot abort or r
   // A newer upload starts while the cancel is still pending (setInputFiles
   // ignores the disabled picker, which a person could not do).
   await choose(page);
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await page.getByLabel("Name New shirt").fill("Edited while cancel pending");
 
   // The cancel now completes. It belongs to a flow that no longer owns the
@@ -494,7 +494,7 @@ test("a cancel that is still pending when a newer photo starts cannot abort or r
   await settle(page);
   expect(state.deletes).toBe(1);
   await expect(page.getByText("Analysis cancelled.")).toHaveCount(0);
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   await expect(page.getByLabel("Name Edited while cancel pending")).toBeVisible();
   await expect(page.locator(".review-card")).toHaveCount(1);
   await expect(page.getByText("Old shirt")).toHaveCount(0);
@@ -562,7 +562,7 @@ test("a queued photo keeps processing in the background and resumes after a relo
   await page
     .getByRole("button", { name: "Review photo results" })
     .click();
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   expect(
     await page.evaluate(() =>
       sessionStorage.getItem("style-review:someone-else:job-resume"),
@@ -573,7 +573,7 @@ test("a queued photo keeps processing in the background and resumes after a relo
   // Saving the reviewed items discards the server copy (explicit save).
   await page.getByLabel("Details checked").check();
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
   await expect.poll(() => state.discarded).toBe(true);

@@ -1,0 +1,25 @@
+{
+  "scope": "Synthetic mock only; no real model or user image",
+  "results": [
+    {
+      "name": "valid terminal",
+      "accepted": true,
+      "itemCount": 0
+    },
+    {
+      "name": "missing terminal marker",
+      "accepted": true,
+      "itemCount": 0
+    },
+    {
+      "name": "malformed trailing line",
+      "accepted": true,
+      "itemCount": 0
+    },
+    {
+      "name": "malformed leading line",
+      "accepted": true,
+      "itemCount": 0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+
+> style-studio@1.0.0 build
+> next build && tsx scripts/sanitize-build-output.ts && tsx scripts/verify-packaging.ts
+
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+Failed to compile.
+
+Error: EPERM: operation not permitted, mkdir 'C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\.next\types\app\reset-password'
+
+
+> Build failed because of webpack errors

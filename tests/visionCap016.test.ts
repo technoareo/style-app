@@ -48,6 +48,8 @@ after(async () => {
   else process.env.STYLE_INFERENCE_TIMEOUT_MS = previousTimeout;
 });
 
+/** These tests cover the multi-item rules (build 016); the default is single-item (build 018). */
+const MULTI = { mode: "multi" as const };
 const item = (n: number) => ({
   name: `Item ${n}`,
   category: "Tops",
@@ -87,7 +89,7 @@ test("the request is streamed and carries the item limit and a bounded output", 
     seen = JSON.parse(body);
     streamed(res, answer(1));
   };
-  const result = await analyzePhoto(photo);
+  const result = await analyzePhoto(photo, undefined, MULTI);
   assert.equal(seen.stream, true);
   const format = seen.format as typeof visionOutputSchema;
   assert.equal(format.properties.items.maxItems, MAX_DETECTED_ITEMS);
@@ -106,19 +108,19 @@ test("a streamed answer split across lines and a one-body answer (compact or pre
       res.end(JSON.stringify({ message: { content: answer(2) }, done: true }, null, 2)),
   ]) {
     handler = (_req, res) => send(res);
-    const result = await analyzePhoto(photo);
+    const result = await analyzePhoto(photo, undefined, MULTI);
     assert.equal(result.analysis.items.length, 2);
   }
 });
 
 test("a photo that fills the limit is flagged as crowded; one item below the limit is not", async () => {
   handler = (_req, res) => streamed(res, answer(MAX_DETECTED_ITEMS - 1, "Only visible."));
-  const below = await analyzePhoto(photo);
+  const below = await analyzePhoto(photo, undefined, MULTI);
   assert.equal(below.analysis.items.length, MAX_DETECTED_ITEMS - 1);
   assert.ok(!below.analysis.warning.includes(CROWDED_WARNING));
 
   handler = (_req, res) => streamed(res, answer(MAX_DETECTED_ITEMS, "Only visible."));
-  const full = await analyzePhoto(photo);
+  const full = await analyzePhoto(photo, undefined, MULTI);
   assert.equal(full.analysis.items.length, MAX_DETECTED_ITEMS);
   assert.ok(full.analysis.warning.startsWith("Only visible."));
   assert.ok(full.analysis.warning.endsWith(CROWDED_WARNING));
@@ -126,7 +128,7 @@ test("a photo that fills the limit is flagged as crowded; one item below the lim
 
 test("a model that ignores the limit is cut to it and flagged: nothing past the limit is listed", async () => {
   handler = (_req, res) => streamed(res, answer(MAX_DETECTED_ITEMS + 4));
-  const result = await analyzePhoto(photo);
+  const result = await analyzePhoto(photo, undefined, MULTI);
   assert.equal(result.analysis.items.length, MAX_DETECTED_ITEMS);
   assert.deepEqual(
     result.analysis.items.map((i) => i.name),
@@ -422,7 +424,7 @@ test("accepted shapes: CRLF, a final line without a newline, blank lines, surrou
     for (const [label, send] of sends) {
       if (contentType === "application/x-ndjson" && label.startsWith("pretty")) continue;
       serve(send, contentType);
-      const result = await analyzePhoto(photo);
+      const result = await analyzePhoto(photo, undefined, MULTI);
       assert.equal(result.analysis.items.length, 2, `${label} [${contentType}]`);
     }
 });

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Garment } from "../domain/types";
-import { analysisSchema, MAX_DETECTED_ITEMS } from "../domain/analysis";
+import {
+  reviewAnalysisSchema,
+  FITS,
+  OCCASIONS,
+  SEASONS,
+  UNCERTAIN_KEYS,
+} from "../domain/analysis";
 import { mergeShoePair, suggestShoePairs } from "../domain/pairs";
 import { imageFromFile, cropImage, photoHash } from "../services/images";
 import {
@@ -18,12 +24,23 @@ import {
 } from "../services/analysisClient";
 import { Dialog } from "./Dialog";
 import { GarmentThumb } from "./GarmentThumb";
+import {
+  confidenceLabel,
+  ItemAttributes,
+  ShoeCropNote,
+  uncertaintyList,
+} from "./ItemAttributes";
 
 type Draft = Garment & {
   box: number[];
   cropDirty?: boolean;
   /** What the model guessed. Never applied until the user chooses it. */
   aiFormality?: Garment["formality"];
+  /** Attributes the model flagged as unsure. Review aid only: dropped on save. */
+  uncertain?: string[];
+  /** The AI's subjective guesses: offered next to the fields, applied only if the user chooses. */
+  suggestedSeasons?: Garment["seasons"];
+  suggestedOccasions?: Garment["occasions"];
 };
 
 const CATEGORIES = [
@@ -86,6 +103,16 @@ function clearReview(accountId: string, jobId: string) {
 }
 const str = (v: unknown, max: number) =>
   typeof v === "string" ? v.slice(0, max) : "";
+/** The distinct entries of `v` that are in `allowed`, at most `max`; undefined when none. */
+function keepKnown<T extends string>(
+  v: unknown,
+  allowed: readonly T[],
+  max: number,
+): T[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = [...new Set(v)].filter((x): x is T => allowed.includes(x)).slice(0, max);
+  return out.length ? out : undefined;
+}
 function loadReview(accountId: string, jobId: string): StoredReview | null {
   try {
     const raw = sessionStorage.getItem(reviewKey(accountId, jobId));
@@ -125,6 +152,15 @@ function loadReview(accountId: string, jobId: string): StoredReview | null {
         neckline: str(d.neckline, 60) || undefined,
         closure: str(d.closure, 60) || undefined,
         length: str(d.length, 60) || undefined,
+        // Build 018 attributes: restored only if they are still valid, so a
+        // tampered or older session entry can never put an unknown value in.
+        material: str(d.material, 60) || undefined,
+        fit: (FITS as readonly string[]).includes(d.fit) ? d.fit : undefined,
+        seasons: keepKnown(d.seasons, SEASONS, 4),
+        occasions: keepKnown(d.occasions, OCCASIONS, 4),
+        suggestedSeasons: keepKnown(d.suggestedSeasons, SEASONS, 4),
+        suggestedOccasions: keepKnown(d.suggestedOccasions, OCCASIONS, 4),
+        uncertain: keepKnown(d.uncertain, UNCERTAIN_KEYS, UNCERTAIN_KEYS.length),
         formality: FORMALITY.includes(d.formality) ? d.formality : "unknown",
         aiFormality: FORMALITY.includes(d.aiFormality)
           ? d.aiFormality
@@ -278,7 +314,7 @@ export function UploadDialog({
   ) {
     const superseded = () => ac.signal.aborted;
     if (superseded()) return;
-    const analysis = analysisSchema.parse(result);
+    const analysis = reviewAnalysisSchema.parse(result);
     const image = (result as { image: string }).image;
     setWarning(analysis.warning);
     setSource(image);
@@ -321,6 +357,12 @@ export function UploadDialog({
         // tab) updates the same wardrobe item instead of adding a duplicate.
         // A merged pair keeps its first detection's id.
         id: id ? `${id}-${index}` : crypto.randomUUID(),
+        // Season and occasion are subjective: the guess is only offered, never
+        // pre-applied (the user presses "Use these" or ticks boxes).
+        seasons: undefined,
+        occasions: undefined,
+        suggestedSeasons: item.seasons,
+        suggestedOccasions: item.occasions,
         image: await cropImage(image, item.box),
         photoHash: resolvedHash,
         // The model's guess is shown as a suggestion; it only becomes the
@@ -575,7 +617,15 @@ export function UploadDialog({
     setSaving(true);
     setError("");
     const items = drafts.map(
-      ({ box, cropDirty, aiFormality, ...garment }) => garment,
+      ({ box, cropDirty, aiFormality, uncertain, suggestedSeasons, suggestedOccasions, ...garment }) => {
+        void suggestedSeasons;
+        void suggestedOccasions;
+        void box;
+        void cropDirty;
+        void aiFormality;
+        void uncertain;
+        return garment;
+      },
     );
     try {
       await onSave(items);
@@ -609,14 +659,17 @@ export function UploadDialog({
   return (
     <Dialog title="Turn photos into your wardrobe" onClose={onClose} wide>
       <p>
-        Photograph one item or several clearly separated pieces. We’ll identify
-        visible details and create an item for each detected garment.
+        Photograph one clothing item per photo. We’ll suggest its visible
+        details (category, color, pattern, fit) for you to check and correct.
       </p>
       <p className="photo-tips">
-        For the best results, photograph one to three items at a time, laid
-        flat or hung apart on a plain background in good light, with nothing
-        overlapping. We list up to {MAX_DETECTED_ITEMS} items per photo, so a
-        full rack, shelf or closet will not work well.
+        For the best results, lay the item flat or hang it on a plain
+        background in good light, fully in the frame, with nothing else in the
+        picture. If several items are visible we list only the most prominent
+        one, so a full rack, shelf or closet will not work. Material is only
+        suggested when a texture such as denim, knit or leather is clearly
+        visible; fabric content can’t be seen in a photo and stays blank unless
+        you enter it.
       </p>
       <p className="privacy-note">
         Free AI runs on our private server. Your photo is held there for
@@ -628,8 +681,9 @@ export function UploadDialog({
         photo is removed from the live database. That is not a secure wipe:
         removed data can remain in unused database space until it is
         overwritten, and server backups never include temporary photos. Crops
-        are approximate, and hidden items may be missed. Size, fabric and fit
-        stay unknown unless confirmed.
+        are approximate, and hidden items may be missed. Brand and size stay
+        blank; material, fit, seasons and occasions are suggestions you can
+        correct.
       </p>
       {configured === false && (
         <p role="status" className="notice">
@@ -692,7 +746,10 @@ export function UploadDialog({
       {warning && <p className="notice">{warning}</p>}
       {!!drafts.length && (
         <>
-          <h3>Review {drafts.length} detected items</h3>
+          <h3>
+            Review {drafts.length} detected{" "}
+            {drafts.length === 1 ? "item" : "items"}
+          </h3>
           <p>
             Confirm the category, visible details and crop for every item before
             styling.
@@ -791,10 +848,12 @@ export function UploadDialog({
                     Update crop
                   </button>
                 </details>
+                <ShoeCropNote category={g.category} />
                 <label>
                   Item name
                   <input
-                    aria-label={`Name ${g.name}`}
+                    aria-label={g.name.trim() ? `Name ${g.name}` : "Item name (required)"}
+                    placeholder="Name this item"
                     value={g.name}
                     onChange={(e) => patch(g.id, { name: e.target.value })}
                   />
@@ -868,8 +927,28 @@ export function UploadDialog({
                     <option value="warm">Warm</option>
                   </select>
                 </div>
+                <ItemAttributes
+                  idPrefix={`attr-${g.id}`}
+                  value={g}
+                  uncertain={g.uncertain}
+                  suggested={{
+                    seasons: g.suggestedSeasons,
+                    occasions: g.suggestedOccasions,
+                  }}
+                  onChange={(change) => patch(g.id, change)}
+                />
+                {!!uncertaintyList(g.uncertain) && (
+                  <p role="note">
+                    The AI was unsure about: {uncertaintyList(g.uncertain)}.
+                    Please check{" "}
+                    {uncertaintyList(g.uncertain).includes(" ") ? "them" : "it"}.
+                  </p>
+                )}
                 <p>{g.evidence}</p>
                 <small>AI suggestion · confirm the visible details</small>
+                {!!confidenceLabel(g.confidence) && (
+                  <small> · {confidenceLabel(g.confidence)}</small>
+                )}
                 <label className="check-row">
                   <input
                     type="checkbox"
@@ -906,7 +985,8 @@ export function UploadDialog({
             }
             onClick={() => void finishAndSave()}
           >
-            Add {drafts.length} items to my wardrobe
+            Add {drafts.length} {drafts.length === 1 ? "item" : "items"} to my
+            wardrobe
           </button>
           {saving && <p role="status">Saving to your account…</p>}
           {jobId && (

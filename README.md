@@ -11,11 +11,15 @@ Use Node.js 24.20 or newer within the Node 24 LTS line. Install dependencies, in
 ```powershell
 npm ci
 npx tsx scripts/init-auth.ts
-ollama pull qwen3-vl:4b-instruct
+ollama pull qwen3-vl:4b-instruct   # or the model named in VISION_MODEL (.env.example)
 npm run dev -- --hostname 127.0.0.1
 npx tsx scripts/analysis-worker.ts
 npx tsx scripts/mail-worker.ts
 ```
+
+To use a different vision model locally, put `VISION_MODEL` in `.env.local`: the web process (Next.js) and the analysis worker both read it (the worker uses Next's own `@next/env` loader), and a variable already set in the shell wins. See `.env.example` for the accepted syntax. Restart both processes after changing it.
+
+**Dev versus compiled launch.** The commands above (`npm run dev` plus a worker with no `NODE_ENV`) both use Next's development settings, so they read the same `.env*` files. The compiled app (`npm run build`, then `npm run start`) runs in production mode: start its worker the same way, `$env:NODE_ENV = 'production'; npx tsx scripts/analysis-worker.ts` in PowerShell (or just use `scripts/start-local.ps1`, which does). A worker started without it would read the development files while the compiled web process reads the production ones, and a setting in `.env.development` or `.env.production` could then differ between them; keep shared settings such as `VISION_MODEL` in `.env.local` (read in both modes) to avoid this.
 
 The mail worker is optional in development without `SMTP_URL` (the web process captures mail itself) and required whenever `SMTP_URL` is set.
 
@@ -25,7 +29,7 @@ The canonical local app URL is `http://127.0.0.1:3000`. Development verification
 
 ## Consumer behavior
 
-Start with a clear single-item photo or several separated garments. The app shrinks each photo in your browser before upload; the server accepts only JPEG, PNG or WebP up to 2.5 MB, 2400 px on the longest side and 6 million pixels (configurable, see the deployment guide) and judges the file by its header, not its claimed type. Consent is required before analysis. AI suggestions and approximate crops must be reviewed before saving. Brand and size stay blank unless supplied; fabric, fit and warmth cannot reliably be determined from a whole-garment photo.
+Photograph one clothing item per photo (build 018; crowded and multi-item photos are not supported yet, and if several items are visible only the most prominent is listed). The app suggests category, colour, pattern, fit, a material only when a texture is plainly visible, seasons and occasions, with a confidence level and a note of what it is unsure about; you edit anything before saving. Their accuracy is not established: the real-model evidence so far is a handful of development runs of the local Qwen3-VL 4B and 2B models on three photos (`docs/verification/REAL_VISION_018_ROOT.md`), which is not a benchmark, plus tests against a mock. Crowded wardrobe photos are not validated. The app shrinks each photo in your browser before upload; the server accepts only JPEG, PNG or WebP up to 2.5 MB, 2400 px on the longest side and 6 million pixels (configurable, see the deployment guide) and judges the file by its header, not its claimed type. Consent is required before analysis. AI suggestions and approximate crops must be reviewed before saving. Brand and size stay blank unless supplied; fabric content and warmth cannot be determined from a photo and are never suggested, and fit, seasons and occasions are suggestions to confirm.
 
 The app builds complete outfits from a reviewed top, bottom and shoes, or a dress and shoes. Choose everyday, work, evening or formal and enter the temperature. This is a rule-based outfit composer, not live weather. Formal outfits require formal items whose dress code you chose: the upload review shows the model's guess as a suggestion but keeps "Not sure" until you pick Formal (or press "Use this"). When the model lists the two shoes of a pair separately, the review suggests a merge; nothing is merged until you confirm. Unavailable clothes are excluded; optional sample items are visibly examples.
 

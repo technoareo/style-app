@@ -1,0 +1,16 @@
+✔ the request is streamed and carries the item limit and a bounded output (58.8812ms)
+✔ a streamed answer split across lines and a one-body answer (compact or pretty) all read the same (15.7092ms)
+✔ a photo that fills the limit is flagged as crowded; one item below the limit is not (15.736ms)
+✔ a model that ignores the limit is cut to it and flagged: nothing past the limit is listed (7.9892ms)
+✔ an answer cut at the output bound says the photo has too many items, and is charged as a model result (4.8541ms)
+✔ a malformed item list still fails verification, as before (5.7392ms)
+✔ a server error line and a non-200 answer are 'unavailable', not a timeout (10.4202ms)
+✔ a caller abort is 'unavailable'; the inference deadline, reached while the model is still writing, is a timeout with its own message (10159.3067ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10664.2317

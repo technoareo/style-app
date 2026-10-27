@@ -1,0 +1,6 @@
+[
+  "docs/reviews/implementation-016-notes.md",
+  "docs\\DEPLOYMENT.md",
+  "tests/queuedWaiterQuarantine016.test.ts",
+  "tests\\backupSafety.test.ts"
+]

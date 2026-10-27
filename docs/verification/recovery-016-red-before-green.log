@@ -1,0 +1,151 @@
+✖ C: closeAuthDatabase() whose close throws: the error surfaces, the claim stays refused, a later closeDatabases() closes it and releases (332.7421ms)
+✖ D: closeDatabases() whose main close throws: the error surfaces, the claim stays refused, the next closeDatabases() closes it and releases (371.1244ms)
+✔ D2: a close that throws AFTER the handle closed still surfaces, and the hold is released because closure is proven (606.1683ms)
+✔ E: a successful quarantine close and reopen keeps the hold throughout; it is released only by closeDatabases() (329.0046ms)
+✔ F: reopen failure with no other handle open releases the hold and the real error surfaces; a later getDatabase() retries. With auth open the hold is kept (203.2909ms)
+✖ A: quarantine with a failing ROLLBACK and CLOSE on main, auth open: the claim is refused after quarantine, after closeAuthDatabase() and after a failing closeDatabases(); granted only after the handle really closes (251.4736ms)
+✖ B: failing ROLLBACK and CLOSE on main, auth never opened: the claim stays refused until the handle really closes (877.0095ms)
+✖ W2: close-failed branch: the failing call surfaces its own error, every queued waiter is refused with DatabaseQuarantineError without running, the gate and queue are clean (435.8564ms)
+✔ body error and a failing ROLLBACK (twice): the original error surfaces, the connection is quarantined and replaced, the gate and SQLite lock are free (719.4416ms)
+✔ a COMMIT failure followed by failing ROLLBACKs reports the COMMIT error and quarantines the connection (3.5338ms)
+✔ inTransaction used directly: a failing ROLLBACK does not replace the body's error, and the connection is quarantined (3.3781ms)
+✔ a rollback that works never quarantines: an ordinary body error leaves the connection and the counter alone (0.8533ms)
+✖ W1/W4: queued writers behind a quarantined-and-replaced connection all succeed on the fresh connection, once each, with honest budgets (6.2841ms)
+✖ W3/W4: a waiter whose reopen fails rejects with that error, releases the gate, runs no body, makes no attempt, and leaks no presence (12.6192ms)
+✔ if the stuck connection cannot even be closed, every later use fails loudly, and the limit is real: the SQLite lock stays held until it is closed (9.6793ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 8
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5269.0946
+
+✖ failing tests:
+
+test at docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:2:2794
+✖ C: closeAuthDatabase() whose close throws: the error surfaces, the claim stays refused, a later closeDatabases() closes it and releases (332.7421ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:121:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:2:3813
+✖ D: closeDatabases() whose main close throws: the error surfaces, the claim stays refused, the next closeDatabases() closes it and releases (371.1244ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:145:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:2:8153
+✖ A: quarantine with a failing ROLLBACK and CLOSE on main, auth open: the claim is refused after quarantine, after closeAuthDatabase() and after a failing closeDatabases(); granted only after the handle really closes (251.4736ms)
+  AssertionError [ERR_ASSERTION]: (b) after closeAuthDatabase()
+  
+  false !== true
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\presenceLifecycle016.test.ts:263:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\presenceLifecycleNoAuth016.test.ts:2:2004
+✖ B: failing ROLLBACK and CLOSE on main, auth never opened: the claim stays refused until the handle really closes (877.0095ms)
+  AssertionError [ERR_ASSERTION]: after a failing closeDatabases()
+  
+  false !== true
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\presenceLifecycleNoAuth016.test.ts:76:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\queuedWaiterQuarantine016.test.ts:2:1774
+✖ W2: close-failed branch: the failing call surfaces its own error, every queued waiter is refused with DatabaseQuarantineError without running, the gate and queue are clean (435.8564ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok((r as PromiseRejectedResult).reason instanceof DatabaseQuarantineError)
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\queuedWaiterQuarantine016.test.ts:66:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\rollbackFailure016.test.ts:2:7791
+✖ W1/W4: queued writers behind a quarantined-and-replaced connection all succeed on the fresh connection, once each, with honest budgets (6.2841ms)
+  AssertionError [ERR_ASSERTION]: {"status":"rejected","reason":{"code":"ERR_INVALID_STATE"}}
+  + actual - expected
+  
+  + 'rejected'
+  - 'fulfilled'
+  
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\rollbackFailure016.test.ts:257:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'fulfilled',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs\verification\red-before-green-016\tests\rollbackFailure016.test.ts:2:9985
+✖ W3/W4: a waiter whose reopen fails rejects with that error, releases the gate, runs no body, makes no attempt, and leaks no presence (12.6192ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to:
+  
+  'ERR_INVALID_STATE'
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\docs\verification\red-before-green-016\tests\rollbackFailure016.test.ts:315:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ERR_INVALID_STATE',
+    expected: 'ERR_INVALID_STATE',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }

@@ -8,6 +8,7 @@ import {
   TOO_SLOW_MESSAGE,
   VisionError,
 } from "./vision";
+import { jobAnalysisMode, parseAnalysisMode } from "../domain/analysis";
 import { sleep } from "./sqliteRetry";
 import { limits, PHOTO_LIFETIME_MS } from "./limits";
 import {
@@ -432,6 +433,16 @@ function describe(
 
 /** Enqueues a new job for `userId` with the given canonical JPEG photo. */
 export function enqueueAnalysisJob(userId: string, photo: Buffer): JobView {
+  // The mode NEW jobs are accepted under (STYLE_ANALYSIS_MODE, default single).
+  // A malformed value refuses the upload instead of guessing which behaviour the
+  // operator wanted; jobs already queued keep the mode stored with them.
+  const mode = parseAnalysisMode(process.env.STYLE_ANALYSIS_MODE);
+  if (!mode)
+    throw new RequestError(
+      503,
+      "Photo analysis is temporarily unavailable. Your wardrobe was not changed.",
+      { code: "analysis-mode-invalid" },
+    );
   const db = getDatabase();
   ensureSchema(db);
   const now = Date.now();
@@ -441,8 +452,8 @@ export function enqueueAnalysisJob(userId: string, photo: Buffer): JobView {
     checkAdmission(db, userId, now);
     const id = randomUUID();
     db.prepare(
-      "INSERT INTO analysis_jobs(id,user_id,status,input_image,created_at,expires_at,attempts) VALUES(?,?,'queued',?,?,?,0)",
-    ).run(id, userId, photo, now, now + QUEUE_EXPIRE_MS);
+      "INSERT INTO analysis_jobs(id,user_id,status,input_image,created_at,expires_at,attempts,analysis_mode) VALUES(?,?,'queued',?,?,?,0,?)",
+    ).run(id, userId, photo, now, now + QUEUE_EXPIRE_MS, mode);
     db.prepare(
       "INSERT INTO usage_daily(user_id,day,count,attempts) VALUES(?,?,1,1) ON CONFLICT(user_id,day) DO UPDATE SET count=count+1, attempts=attempts+1",
     ).run(userId, day);
@@ -884,9 +895,16 @@ export async function runWorkerTick(
   const claimedLease = claim.lease;
 
   const photoRow = db
-    .prepare("SELECT input_image, created_at FROM analysis_jobs WHERE id=?")
+    .prepare(
+      "SELECT input_image, created_at, analysis_mode FROM analysis_jobs WHERE id=?",
+    )
     .get(claimedId) as
-    { input_image: Uint8Array | null; created_at: number } | undefined;
+    | {
+        input_image: Uint8Array | null;
+        created_at: number;
+        analysis_mode: string | null;
+      }
+    | undefined;
 
   onClaimed();
 
@@ -937,7 +955,11 @@ export async function runWorkerTick(
       if (remainingMs <= 0) throw new Error("photo-expired");
       const signals = [jobAbort.signal, AbortSignal.timeout(remainingMs)];
       if (signal) signals.push(signal);
-      const outcome = await analyzePhoto(photo, AbortSignal.any(signals));
+      // A job runs under the mode it was accepted under. A row with no mode
+      // was queued by a build before 018 and keeps the multi-item behaviour.
+      const outcome = await analyzePhoto(photo, AbortSignal.any(signals), {
+        mode: jobAnalysisMode(photoRow.analysis_mode),
+      });
       // Flattened to {items, warning, image} — the shape the client parses
       // with analysisSchema and reads `.image` from directly.
       const resultJson = JSON.stringify({

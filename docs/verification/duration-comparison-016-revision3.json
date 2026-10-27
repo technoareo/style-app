@@ -1,0 +1,50 @@
+[
+  {
+    "test": "restoring an older backup invalidates every password; the email reset flow recovers each user; deleted users stay deleted; data is kept",
+    "beforeMs": 21912.0044,
+    "afterMs": 33834.817,
+    "deltaMs": 11922.8
+  },
+  {
+    "test": "ledger policy on a fresh server: missing, absent file, damaged, tampered and stale ledgers are all refused, nothing is created, and the diagnostic carries no user data",
+    "beforeMs": 12535.0599,
+    "afterMs": 23231.5148,
+    "deltaMs": 10696.5
+  },
+  {
+    "test": "a fresh server restores the backup with the latest exported ledger: post-backup deletion honoured, every password invalidated, data intact, self-service reset works",
+    "beforeMs": 19513.6825,
+    "afterMs": 29437.8398,
+    "deltaMs": 9924.2
+  },
+  {
+    "test": "build 006 databases migrate in place without losing users, wardrobes, photos, looks or queued jobs",
+    "beforeMs": 17520.8066,
+    "afterMs": 26662.9398,
+    "deltaMs": 9142.1
+  },
+  {
+    "test": "the real worker stays healthy through sustained slow deliveries, where the 008 loop went stale",
+    "beforeMs": 27894.365,
+    "afterMs": 36490.6933,
+    "deltaMs": 8596.3
+  },
+  {
+    "test": "durable queue isolates users, enforces individual quotas, recovers leases and suppresses cancelled results",
+    "beforeMs": 11159.2983,
+    "afterMs": 18777.1079,
+    "deltaMs": 7617.8
+  },
+  {
+    "test": "admission returns position, conservative wait and the server deadline, and refuses work that cannot be reviewed before expiry",
+    "beforeMs": 12764.2617,
+    "afterMs": 20214.9078,
+    "deltaMs": 7450.6
+  },
+  {
+    "test": "build 007 databases gain the mail outbox in place without losing users, tokens, wardrobes, photos or queued jobs",
+    "beforeMs": 18801.3399,
+    "afterMs": 25632.4487,
+    "deltaMs": 6831.1
+  }
+]

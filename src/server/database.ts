@@ -411,6 +411,24 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
     "INSERT OR IGNORE INTO schema_migrations(id, applied_at) VALUES(?, ?)",
   ).run(QUEUE_METADATA_MIGRATION, Date.now());
   migrateMailOutbox(db);
+  migrateAnalysisMode(db);
+}
+
+export const ANALYSIS_MODE_MIGRATION = "018-analysis-mode";
+
+/**
+ * Build 018: the analysis mode a job was ACCEPTED under ('single' | 'multi').
+ * Jobs queued by an earlier build have no value (NULL), which the worker reads
+ * as 'multi', the only behaviour they were admitted under, so an upgrade with
+ * photos still in the queue neither changes their prompt nor their result
+ * shape. Purely additive and idempotent; no existing row is rewritten.
+ */
+function migrateAnalysisMode(db: DatabaseSync): void {
+  if (!columnExists(db, "analysis_jobs", "analysis_mode"))
+    db.exec("ALTER TABLE analysis_jobs ADD COLUMN analysis_mode TEXT");
+  db.prepare(
+    "INSERT OR IGNORE INTO schema_migrations(id, applied_at) VALUES(?, ?)",
+  ).run(ANALYSIS_MODE_MIGRATION, Date.now());
 }
 
 export const MAIL_OUTBOX_MIGRATION = "008-mail-outbox";
@@ -485,9 +503,14 @@ function applicationMigrationApplied(db: DatabaseSync): boolean {
           )
           .get(name),
       );
+    const modeRecorded = db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(ANALYSIS_MODE_MIGRATION);
     return (
       Boolean(recorded) &&
       Boolean(mailRecorded) &&
+      Boolean(modeRecorded) &&
+      columnExists(db, "analysis_jobs", "analysis_mode") &&
       tablePresent("mail_outbox") &&
       tablePresent("mail_worker_state") &&
       ["started_at", "finished_at", "refunded", "failure_kind"].every((c) =>

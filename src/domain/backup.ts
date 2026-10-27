@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FITS, OCCASIONS, SEASONS } from "./analysis";
 const image = z
   .string()
   .max(9_000_000)
@@ -22,6 +23,10 @@ const garment = z.object({
   neckline: z.string().max(60).optional(),
   closure: z.string().max(60).optional(),
   length: z.string().max(60).optional(),
+  material: z.string().max(60).optional(),
+  fit: z.enum(FITS).optional(),
+  seasons: z.array(z.enum(SEASONS)).max(4).optional(),
+  occasions: z.array(z.enum(OCCASIONS)).max(4).optional(),
   formality: z.enum(["casual", "smart", "formal", "unknown"]).optional(),
   warmth: z.enum(["light", "medium", "warm", "unknown"]).optional(),
   available: z.boolean().optional(),

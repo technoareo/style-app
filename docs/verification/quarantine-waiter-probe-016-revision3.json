@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "secondCalls": 1,
+  "freshSucceeded": true,
+  "results": [
+    {
+      "status": "rejected",
+      "name": "Error",
+      "message": "first body failure"
+    },
+    {
+      "status": "fulfilled"
+    }
+  ]
+}

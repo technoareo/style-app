@@ -2,6 +2,8 @@
 
 Written for: root (to freeze a candidate and run the checks) and the next independent Claude reviewer.
 
+**Current status (added in build 016 part 2): this file is the author's statement for the batch as written, not the current state.** Root's actual results are in `docs/verification/BUILD015_CHECKS.md`: typecheck and lint PASS; the fixture-corrected wardrobe file 22/22 plus 20 repetitions; the reviewed-permission full `npm test` FAILED (261 total, 256 pass, 1 fail, 4 skip, 69.654 s) on the mixed multi-process scenario (G1, open). The reviewed verdict is in `docs/reviews/build-015-fixture-corrected-claude.md`.
+
 **Nothing in this batch was executed.** I used Read, Glob, Grep, Edit and Write only: no shell, no type check, no tests, no build, no network, no browser. Every test below is WRITTEN, NOT RUN, and none of the code has been compiled. Expect that root's first run may find typos or type errors. This is a candidate, not a readiness claim. It closes no gate.
 
 Scope kept out on purpose: the transport (`Connection: close`) candidate, any model change, stress counts, deadlines, the 10 s budget, full `npm` scripts, suite serialization, password hashing and library semantics. None was touched.

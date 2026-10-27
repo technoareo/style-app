@@ -76,6 +76,20 @@ export type AcquireEvent = {
   attempts: number;
   /** Callers already waiting in the gate queue when this call arrived. */
   queueDepth: number;
+  /**
+   * Write path only (absent on the auth path). Time spent inside native
+   * `BEGIN IMMEDIATE` calls, SUMMED over all attempts of this one call: it is
+   * not a per-attempt latency (one 200 ms native wait and five 40 ms waits
+   * look the same), and percentiles of these per-call sums are not percentiles
+   * of attempts. Quote it together with `attempts`. Observation only.
+   */
+  beginMs?: number;
+  /**
+   * Write path only. Real time between a refused BEGIN and the next attempt
+   * (the async back-off sleep including timer lateness), SUMMED over this one
+   * call; not per-attempt and not the requested delay. Observation only.
+   */
+  backoffMs?: number;
 };
 
 /** A transaction that held the lock: from a successful BEGIN to its end. */
@@ -83,6 +97,17 @@ export type HoldEvent = {
   path: LockPath;
   holdMs: number;
   outcome: "commit" | "rollback";
+  /**
+   * Write path only: successful BEGIN until the body returned or threw (one
+   * value per call; for a rolled-back call it ends at the throw).
+   */
+  bodyMs?: number;
+  /**
+   * Write path only: body end until COMMIT returned, or, for a rolled-back
+   * call, until ROLLBACK returned (so it is rollback time there). It is the
+   * disk's cost as much as the code's.
+   */
+  commitMs?: number;
 };
 
 export type LockObserver = {

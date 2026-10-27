@@ -1,0 +1,9 @@
+[
+  "docs/reviews/implementation-016-notes.md",
+  "docs\\DEPLOYMENT.md",
+  "src\\server\\backupDatabase.ts",
+  "src\\server\\directoryLock.ts",
+  "tests/healthUnusable016.test.ts",
+  "tests/queuedWaiterQuarantine016.test.ts",
+  "tests\\backupSafety.test.ts"
+]

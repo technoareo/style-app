@@ -13,6 +13,12 @@ export type Garment = {
   neckline?: string;
   closure?: string;
   length?: string;
+  /** Only a visibly identifiable texture (denim, knit, leather...). Empty/absent = not known. */
+  material?: string;
+  fit?: "fitted" | "regular" | "relaxed" | "oversized" | "unknown";
+  /** Suggestions the user confirmed or edited at review. */
+  seasons?: Array<"spring" | "summer" | "autumn" | "winter">;
+  occasions?: Array<"everyday" | "work" | "evening" | "active" | "lounge" | "event">;
   formality?: "casual" | "smart" | "formal" | "unknown";
   warmth?: "light" | "medium" | "warm" | "unknown";
   available?: boolean;

@@ -116,12 +116,12 @@ test("upload review validates detections, crop, cancel, and persistence", async 
   await page
     .getByLabel("Choose a clothing photo", { exact: true })
     .setInputFiles("tests/fixtures/public-shirt.jpg");
-  await expect(page.getByText("Review 1 detected items")).toBeVisible();
+  await expect(page.getByText("Review 1 detected item")).toBeVisible();
   const frame = await page.locator(".review-image").boundingBox();
   const photo = await page.locator(".review-image img").boundingBox();
   expect(photo!.height).toBeLessThanOrEqual(frame!.height + 1);
   await expect(
-    page.getByRole("button", { name: "Add 1 items to my wardrobe" }),
+    page.getByRole("button", { name: "Add 1 item to my wardrobe" }),
   ).toBeDisabled();
   await page.getByText("Adjust item crop", { exact: true }).click();
   await page.getByLabel("Left", { exact: true }).fill("10");
@@ -130,7 +130,7 @@ test("upload review validates detections, crop, cancel, and persistence", async 
   await expect(page.getByLabel("Details checked")).toBeEnabled();
   await page.getByLabel("Details checked").check();
   await page
-    .getByRole("button", { name: "Add 1 items to my wardrobe" })
+    .getByRole("button", { name: "Add 1 item to my wardrobe" })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
   await expect(page.getByText(/ALL CHANGES SAVED/)).toBeVisible();

@@ -1,0 +1,42 @@
+✔ C: closeAuthDatabase() whose close throws: the error surfaces, the claim stays refused, a later closeDatabases() closes it and releases (332.1292ms)
+✔ D: closeDatabases() whose main close throws: the error surfaces, the claim stays refused, the next closeDatabases() closes it and releases (591.985ms)
+✔ D2: a close that throws AFTER the handle closed still surfaces, and the hold is released because closure is proven (425.2399ms)
+✔ E: a successful quarantine close and reopen keeps the hold throughout; it is released only by closeDatabases() (533.8534ms)
+✖ F: reopen failure with no other handle open releases the hold and the real error surfaces; a later getDatabase() retries. With auth open the hold is kept (346.4705ms)
+✔ A: quarantine with a failing ROLLBACK and CLOSE on main, auth open: the claim is refused after quarantine, after closeAuthDatabase() and after a failing closeDatabases(); granted only after the handle really closes (205.483ms)
+✔ B: failing ROLLBACK and CLOSE on main, auth never opened: the claim stays refused until the handle really closes (821.3824ms)
+✔ W2: close-failed branch: the failing call surfaces its own error, every queued waiter is refused with DatabaseQuarantineError without running, the gate and queue are clean (427.3786ms)
+✔ body error and a failing ROLLBACK (twice): the original error surfaces, the connection is quarantined and replaced, the gate and SQLite lock are free (508.9253ms)
+✔ a COMMIT failure followed by failing ROLLBACKs reports the COMMIT error and quarantines the connection (3.5929ms)
+✔ inTransaction used directly: a failing ROLLBACK does not replace the body's error, and the connection is quarantined (2.7673ms)
+✔ a rollback that works never quarantines: an ordinary body error leaves the connection and the counter alone (0.5814ms)
+✔ W1/W4: queued writers behind a quarantined-and-replaced connection all succeed on the fresh connection, once each, with honest budgets (249.6884ms)
+✔ W3/W4: a waiter whose reopen fails rejects with that error, releases the gate, runs no body, makes no attempt, and leaks no presence (81.7218ms)
+✔ if the stuck connection cannot even be closed, every later use fails loudly, and the limit is real: the SQLite lock stays held until it is closed (2.7293ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5022.2565
+
+✖ failing tests:
+
+test at tests\presenceLifecycle016.test.ts:2:6339
+✖ F: reopen failure with no other handle open releases the hold and the real error surfaces; a later getDatabase() retries. With auth open the hold is kept (346.4705ms)
+  Error: EEXIST: file already exists, mkdir 'C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\.data\tests\presence016-f328bdc4-fa22-40df-9b56-b6a40f3ded3a\app.db'
+      at mkdirSync (node:fs:1411:26)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\presenceLifecycle016.test.ts:227:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4075,
+    code: 'EEXIST',
+    syscall: 'mkdir',
+    path: 'C:\\Users\\arjun\\.codex\\.chatgpt-projects\\g-p-6acb68846a548191aa7e43f0646ff6c9\\style-app\\.data\\tests\\presence016-f328bdc4-fa22-40df-9b56-b6a40f3ded3a\\app.db'
+  }

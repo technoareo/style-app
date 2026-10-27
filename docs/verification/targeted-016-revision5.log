@@ -1,0 +1,28 @@
+✔ a completed backup is sanitised, verified and published under a final name only (2823.8258ms)
+✔ a failure at any stage leaves no final file, no partial and no marker bytes, and keeps the earlier backup and the live data (1282.7053ms)
+✔ pruning happens only after a backup completed (555.7678ms)
+✔ a cleanup that cannot remove the partial says so instead of claiming it is gone (394.1662ms)
+✔ a killed owner leaves only a partial that restore refuses; its lock dies with it, the next backup takes over at once and removes the dead partial (2328.4627ms)
+✔ two contenders waiting on a live owner cannot take its lock; when it is killed they proceed one at a time and both succeed (5252.5232ms)
+﹣ the lock module: a second holder is refused while the first lives (same process too), granted after release, and the coordinator file is guarded (338.1258ms) # coordinator link guard not exercised: this account may not create links
+✔ the optional busy callback is a diagnostic only: called once on the first real refusal, never when the lock is free, and a throwing or rejecting callback changes neither the wait, the deadline, the error nor the grant (529.5738ms)
+✔ a throwing onBusy GETTER, read while a lock is held, is contained: the wait is kept, the error is LockBusyError and a later grant still works (477.7544ms)
+✔ a throwing onLockWait GETTER does not change a backup that has to wait for the lock (607.3435ms)
+✔ a failing onLockWait seam does not change a backup that has to wait for the lock (636.2352ms)
+✔ a LIVE owner whose main thread is blocked for a long time keeps its lock and its partial and completes (the first 009 failure) (8601.6381ms)
+✔ publication never replaces an existing backup, even when the name is taken at the last moment (416.0951ms)
+✔ two backups started in the same millisecond are serialised and never replace an earlier backup (7352.0634ms)
+✔ physical path guards: a linked backups directory is refused and a linked partial name is unlinked without touching its target (298.315ms)
+✔ before any fault the route is ready; the flag is false (4191.3887ms)
+✔ a quarantine whose close succeeds logs one fixed line, keeps the route ready, and a failing logger changes nothing (3.8256ms)
+✔ own process: healthy, then a failed rollback and failed close: the route answers exactly 503 {ready:false} with no-store and the operator line says unclosed (41.95ms)
+[database] main connection quarantined: outcome=unclosed count=1
+✔ W2: close-failed branch: the failing call surfaces its own error, every queued waiter is refused with DatabaseQuarantineError without running, the gate and queue are clean (102.616ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 34260.0977

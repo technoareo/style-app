@@ -54,6 +54,7 @@ const answer = JSON.stringify({
       warning: "",
     }),
   },
+  done: true, // the strict stream reader requires Ollama's terminal marker
 });
 const server = createServer((req, res) => {
   requests++;
@@ -71,7 +72,7 @@ const server = createServer((req, res) => {
       res.statusCode = 500;
       res.end("{}");
     } else if (mode === "garbage")
-      res.end(JSON.stringify({ message: { content: "not json at all" } }));
+      res.end(JSON.stringify({ message: { content: "not json at all" }, done: true }));
     else res.end(answer);
   });
 });
@@ -328,6 +329,48 @@ test("quota refunds are one-time, fair, and bounded by a separate attempts count
   assert.equal(blocked.extra?.code, "attempt-limit");
   assert.ok((blocked.extra?.retryAfterSeconds as number) > 0);
   reset();
+});
+
+test("repeated refunded server-side failures, a real inference timeout among them, still spend the finite attempt quota", async () => {
+  // A photo that is too slow is a 'server' failure: the chargeable allowance is
+  // refunded. Resubmitting it must still be bounded by the separate, never
+  // refunded attempt counter (build 016 review, refund loop).
+  reset();
+  process.env.STYLE_DAILY_ATTEMPTS = "3";
+  process.env.STYLE_INFERENCE_TIMEOUT_MS = "10000"; // the smallest the limit allows
+  try {
+    const u = await signUp("refund-loop");
+
+    mode = "hold"; // the model never answers: the explicit deadline ends it
+    const slow = q.enqueueAnalysisJob(u, image);
+    assert.equal(await tick(), true);
+    const timedOut = q.getAnalysisJobForOwner(u, slow.id);
+    assert.equal(timedOut.status, "failed");
+    assert.match(timedOut.error ?? "", /took too long/);
+    assert.equal(timedOut.refunded, true, "a timeout is refunded");
+    assert.equal(row(slow.id)?.failure_kind, "server");
+    assert.deepEqual(usage(u), { count: 0, attempts: 1 });
+    release?.();
+    release = undefined;
+
+    mode = "error"; // two more refunded server-side failures
+    for (let n = 2; n <= 3; n++) {
+      const job = q.enqueueAnalysisJob(u, image);
+      assert.equal(await tick(), true);
+      assert.equal(q.getAnalysisJobForOwner(u, job.id).refunded, true);
+      assert.deepEqual(usage(u), { count: 0, attempts: n });
+    }
+
+    // Every chargeable allowance was refunded, but the attempts are spent.
+    const blocked = failure(() => q.enqueueAnalysisJob(u, image));
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.extra?.code, "attempt-limit");
+    assert.deepEqual(usage(u), { count: 0, attempts: 3 }, "a refused photo is not counted again");
+    assert.equal(requests >= 3, true);
+  } finally {
+    delete process.env.STYLE_INFERENCE_TIMEOUT_MS;
+    reset();
+  }
 });
 
 test("owner-only discovery lists active and recent jobs, results are retained until discard, and other accounts see nothing", async () => {

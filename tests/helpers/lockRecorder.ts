@@ -74,9 +74,17 @@ class PathRecorder {
   readonly sqlite: Series;
   readonly attempts: Series;
   readonly hold: Series;
+  readonly begin: Series;
+  readonly backoff: Series;
+  readonly body: Series;
+  readonly commit: Series;
   commits = 0;
   rollbacks = 0;
   constructor(cap: number) {
+    this.begin = new Series(cap);
+    this.backoff = new Series(cap);
+    this.body = new Series(cap);
+    this.commit = new Series(cap);
     this.total = new Series(cap);
     this.totalOk = new Series(cap);
     this.totalFailed = new Series(cap);
@@ -97,11 +105,16 @@ class PathRecorder {
     this.gate.add(e.gateMs);
     this.sqlite.add(e.sqliteMs);
     this.attempts.add(e.attempts);
+    // Additive write-path fields; the auth path does not report them.
+    if (typeof e.beginMs === "number") this.begin.add(e.beginMs);
+    if (typeof e.backoffMs === "number") this.backoff.add(e.backoffMs);
   }
   holdEvent(e: HoldEvent): void {
     if (e.outcome === "commit") this.commits++;
     else this.rollbacks++;
     this.hold.add(e.holdMs);
+    if (typeof e.bodyMs === "number") this.body.add(e.bodyMs);
+    if (typeof e.commitMs === "number") this.commit.add(e.commitMs);
   }
   summary() {
     return {
@@ -118,15 +131,26 @@ class PathRecorder {
         gateMs: this.gate.summary(),
         sqliteMs: this.sqlite.summary(),
         attempts: this.attempts.summary(),
+        beginMs: this.begin.summary(),
+        backoffMs: this.backoff.summary(),
       },
       hold: {
         count: this.commits + this.rollbacks,
         commit: this.commits,
         rollback: this.rollbacks,
         holdMs: this.hold.summary(),
+        bodyMs: this.body.summary(),
+        commitMs: this.commit.summary(),
       },
+      // Any series that kept only a prefix makes its percentiles partial.
       truncated:
-        this.total.truncated || this.gate.truncated || this.hold.truncated,
+        this.total.truncated ||
+        this.gate.truncated ||
+        this.hold.truncated ||
+        this.begin.truncated ||
+        this.backoff.truncated ||
+        this.body.truncated ||
+        this.commit.truncated,
     };
   }
 }

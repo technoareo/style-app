@@ -1,0 +1,58 @@
+2026-10-13T07:35:10.486Z WARN [Better Auth]: Invalid password
+✔ verified accounts isolate wardrobes and photos, handle conflicts, recover and delete themselves (7031.7774ms)
+✔ time spent waiting for the gate is deducted from the SQLite budget, and the failed begin releases the gate (670.4609ms)
+✔ a gate wait that is shorter than the budget still leaves the rest for the SQLite lock, which is then acquired (507.7524ms)
+✔ a gate wait that uses the whole budget fails as a gate timeout: no BEGIN is attempted and nothing is left held (150.6669ms)
+✔ STATIC: begin() derives the SQLite timeout from one deadline and the shared retry accepts an explicit remaining budget (0.8133ms)
+✔ auth: a stalled, trickling, aborted or oversized body is answered before any auth, contention or database work (runs first) (4576.8776ms)
+2026-10-13T07:35:11.020Z WARN [Better Auth]: Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket. Ensure your runtime forwards a trusted client IP header, then set `advanced.ipAddress.ipAddressHeaders` or `advanced.ipAddress.trustedProxies` so the address can be resolved.
+✔ auth: ordinary valid sign-up, invalid request and read-only request still behave as before (2916.1992ms)
+✔ wardrobe and photo uploads: auth and quota run before the read, a timeout answers 408 before any write, and ordinary requests are unchanged (3997.563ms)
+✔ a write that cannot get the lock within its budget fails retryably before its body runs (4145.9102ms)
+✔ a contended heartbeat is degraded, not fatal; it only turns critical after half a lease (607.0299ms)
+Could not record an analysis result under database contention; the job will be requeued after its lease.
+✔ job completion survives write contention without repeating inference; beyond the bound the job is requeued, not lost (2530.1924ms)
+✔ the percentile helper is nearest-rank and keeps the exact maximum (2.6747ms)
+✔ connection initialization is reported on its own: not a gate wait, not a SQLite wait, and part of the total (140.9305ms)
+✔ the acquire measurement brackets the real SQLite wait, the gate wait and the queue depth (914.7357ms)
+✔ the hold measurement runs from a successful BEGIN to COMMIT or ROLLBACK, on the auth path and on the write path (564.7839ms)
+✖ write path: the body runs in the same turn as BEGIN, before a queued microtask, and the hold is body plus COMMIT (225.5337ms)
+✔ beginMs and backoffMs are real, additive observations of a contended acquisition (460.1084ms)
+✔ a busy-shaped BODY error is never replayed: one run, same error object, rolled back, gate free (1.6533ms)
+✔ a busy-shaped COMMIT failure is never replayed: one body run, same error object, rolled back, gate free (0.8012ms)
+✔ a body that returns a Promise is still rolled back and rejected with the existing message (0.5498ms)
+✔ observers run after the native transaction ended and the process gate was handed on (176.9564ms)
+✔ the hold starts when BEGIN returned, not when the caller resumed (auth path) (106.3968ms)
+✔ a refusal's detail carries initialization, gate and SQLite time that add up to its total (335.6819ms)
+✔ concurrent observer contexts stay isolated; the process observer sees only what no context claims (416.776ms)
+✔ a refused lock never runs the body, reports where the budget went, and leaves no transaction or gate behind (414.8615ms)
+✔ a gate that times out is reported, the body never runs, and the original error type is unchanged (121.3177ms)
+✔ an observer that throws cannot change a result, mask a failure, keep a transaction open or hold the gate (635.9471ms)
+✔ observers whose property lookup throws (getter, Proxy) cannot change an outcome, leave a transaction begun, or hold the gate (168.5604ms)
+✔ a mutating observer cannot alter the metrics attached to a refusal (236.041ms)
+✔ REAL child, strict about unhandled rejections: throwing getters, a throwing Proxy, rejecting async observers and hostile thenables change no outcome, row or gate, and raise no unhandled rejection (4817.2617ms)
+✔ the diagnostics add no cost without an observer: no events are produced and the result is unchanged (23.2722ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 30
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11890.5948
+
+✖ failing tests:
+
+test at tests\lockDiagnostics.test.ts:274:1
+✖ write path: the body runs in the same turn as BEGIN, before a queued microtask, and the hold is body plus COMMIT (225.5337ms)
+  AssertionError [ERR_ASSERTION]: the 100 ms microtask is outside the hold (114 ms)
+      at TestContext.<anonymous> (C:\Users\arjun\.codex\.chatgpt-projects\g-p-6acb68846a548191aa7e43f0646ff6c9\style-app\tests\lockDiagnostics.test.ts:331:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -127,6 +127,12 @@ export type BackupOptions = {
   dataDir: string;
   /** How long to wait for another running backup to finish before giving up. */
   lockWaitMs?: number;
+  /**
+   * Test seam: called once when the backups lock is first found held by another
+   * backup (see ProcessLockOptions.onBusy). Throws and rejections are contained;
+   * time spent synchronously in it still counts against lockWaitMs.
+   */
+  onLockWait?: () => void;
   /** Completed backups older than this are removed after a successful backup. */
   retentionMs?: number;
   now?: () => Date;
@@ -360,6 +366,8 @@ export async function createBackup(
   const dir = privateBackupDirectory(options.dataDir);
   const lock = await acquireProcessLock(path.join(dir, LOCK_NAME), {
     waitMs: options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS,
+    // Always a thunk: the property is read only inside the lock's guard.
+    onBusy: () => options.onLockWait?.(),
   });
   const stage = async (s: BackupStage) => {
     await options.onStage?.(s);

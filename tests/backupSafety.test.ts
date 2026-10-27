@@ -1,6 +1,6 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import { execFile, fork } from "node:child_process";
+import { execFile, fork, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   existsSync,
@@ -84,18 +84,6 @@ function run(
     );
   });
 }
-const child = (env: Record<string, string>) =>
-  run("tests/helpers/backupChild.ts", [], env);
-const lines = (out: string) =>
-  JSON.parse(out.trim().split("\n").filter(Boolean).at(-1)!) as {
-    startedAt: number;
-    rawCopiedAt: number;
-    doneAt: number;
-    file?: string;
-    leftovers: string[];
-    error?: string;
-  };
-
 before(async () => {
   const { getReadyAuth } = await import("../src/server/auth");
   const auth = await getReadyAuth();
@@ -274,7 +262,46 @@ test("a cleanup that cannot remove the partial says so instead of claiming it is
 // time-compressed. The waits below are only for processes to reach a point.
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** A backup child with an IPC channel; `raw` resolves when it reaches the raw-copied stage. */
+// Bounds apply only to failure: a success path returns as soon as the awaited
+// message or exit arrives, so none of them adds latency.
+const CHILD_BOUND_MS = 60_000; // a child reaching a stage under full-suite load
+const CHILD_EXIT_BOUND_MS = 120_000; // a child finishing after its holds
+const REAP_BOUND_MS = 15_000; // a SIGKILLed child closing
+// The repo has no --test-timeout. node:test does not cancel a body when this
+// fires, so it must exceed the longest chain of failure bounds above (the
+// contender test: 60 + 60 + 120 + 120 + 15 s, about 375 s). Real lock budgets
+// and workloads are unchanged.
+const TEST_TIMEOUT_MS = 600_000;
+
+/** Rejects (with `label`) if `promise` has not settled within `ms`; the timer never lingers. */
+function within<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms: ${label}`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+type Mark = { stage: string; at: number; receivedAt: number };
+type Forked = { proc: ChildProcess; exited: Promise<number | null> };
+const liveChildren = new Set<Forked>();
+
+/**
+ * A backup child with an IPC channel. Messages are told apart by `stage`:
+ * `raw` resolves at "raw-copied" (and only then flips `reached()`); `waiting`
+ * resolves at "waiting", which the child sends the first time the lock is
+ * found HELD by another backup (a real busy refusal). Both reject, never
+ * hang, if the child closes first. Every child is tracked so a test can reap
+ * it on failure (see {@link withChildren}).
+ */
 function forkBackup(env: Record<string, string>) {
   const proc = fork(path.join(process.cwd(), "tests", "helpers", "backupChild.ts"), [], {
     cwd: process.cwd(),
@@ -284,109 +311,194 @@ function forkBackup(env: Record<string, string>) {
     windowsHide: true,
   });
   let stdout = "";
+  let stderr = "";
   let reached = false;
+  const marks: Mark[] = [];
   proc.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
-  const raw = new Promise<void>((resolve, reject) => {
-    proc.on("message", () => {
-      reached = true;
-      resolve();
-    });
-    proc.on("exit", () => reject(new Error("the child exited before the raw-copied stage")));
-  });
-  raw.catch(() => {});
+  proc.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
   // "close", not "exit": it fires after the child's stdout has been read.
   const exited = new Promise<number | null>((resolve) => proc.on("close", resolve));
+  const stageReached = (wanted: string, what: string) => {
+    const promise = new Promise<Mark>((resolve, reject) => {
+      proc.on("message", (message) => {
+        const body = message as { stage?: unknown; at?: unknown } | null;
+        if (!body || body.stage !== wanted) return;
+        const mark = { stage: wanted, at: Number(body.at ?? 0), receivedAt: Date.now() };
+        marks.push(mark);
+        if (wanted === "raw-copied") reached = true;
+        resolve(mark);
+      });
+      void exited.then((code) =>
+        reject(new Error(`the child closed (code ${code}) before ${what}: ${stdout.trim()} ${stderr.trim()}`)),
+      );
+    });
+    promise.catch(() => {});
+    return promise;
+  };
+  const raw = stageReached("raw-copied", "the raw-copied stage");
+  const waiting = stageReached("waiting", "being refused by the lock");
   const result = () =>
     JSON.parse(stdout.trim().split("\n").at(-1)!) as {
       startedAt: number;
+      waitingAt: number;
       rawCopiedAt: number;
       doneAt: number;
       file?: string;
       leftovers: string[];
     };
-  return { proc, raw, exited, stdout: () => stdout, reached: () => reached, result };
+  const forked = {
+    proc,
+    raw,
+    waiting,
+    exited,
+    marks: () => marks,
+    stdout: () => stdout,
+    reached: () => reached,
+    result,
+  };
+  liveChildren.add(forked);
+  return forked;
 }
 
-test("a killed owner leaves only a partial that restore refuses; its lock dies with it, the next backup takes over at once and removes the dead partial", async () => {
+/** SIGKILLs every still-running tracked child and waits (bounded) for each to close. Never throws. */
+async function reapChildren(): Promise<unknown> {
+  const pending = [...liveChildren];
+  liveChildren.clear();
+  let firstError: unknown;
+  for (const entry of pending) {
+    try {
+      if (entry.proc.exitCode === null && entry.proc.signalCode === null) entry.proc.kill("SIGKILL");
+      await within(entry.exited, REAP_BOUND_MS, "a child closing after SIGKILL");
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  return firstError;
+}
+
+/**
+ * Runs a test body and always reaps its children afterwards, so a failure in
+ * the middle cannot leave an owner alive (holding the coordinator lock for up
+ * to two minutes) to break the next test. The body's own error wins; a cleanup
+ * error is reported only if the body succeeded.
+ */
+async function withChildren(body: () => Promise<void>): Promise<void> {
+  let cleanupError: unknown;
+  try {
+    await body();
+  } finally {
+    cleanupError = await reapChildren();
+    if (cleanupError) console.warn("child cleanup problem:", cleanupError);
+  }
+  if (cleanupError) throw cleanupError;
+}
+
+test("a killed owner leaves only a partial that restore refuses; its lock dies with it, the next backup takes over at once and removes the dead partial", { timeout: TEST_TIMEOUT_MS }, async () => {
   resetBackups();
   const prior = await b.createBackup(db, {
     dataDir,
     now: () => new Date("2026-02-02T00:00:00.000Z"),
     retentionMs: 10 * 365 * 86_400_000,
   });
-  // The child reports the raw-copied stage over IPC and then waits; the PARENT
-  // kills it with SIGKILL (TerminateProcess on Windows): no exit hooks, no
-  // signal handlers, no cleanup of any kind runs in the child.
-  const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: "120000" });
-  await owner.raw;
-  const leftover = partials().find((n) => n.endsWith(".partial"))!;
-  assert.ok(leftover, "the owner's partial exists");
-  // While the owner lives, nobody else can have the lock.
-  await assert.rejects(
-    b.createBackup(db, { dataDir, lockWaitMs: 0 }),
-    /Another backup is running/,
-  );
-  assert.ok(existsSync(path.join(backupsDir, leftover)), "a live owner's partial is not touched");
-  owner.proc.kill("SIGKILL");
-  await owner.exited;
-  assert.deepEqual(finals(), [prior.file], "no final file from the killed run");
-  assert.doesNotMatch(leftover, FINAL, "not a restore or retention candidate");
-  assert.ok(existsSync(path.join(backupsDir, leftover)), "the killed run left its partial");
+  await withChildren(async () => {
+    // The child reports the raw-copied stage over IPC and then waits; the PARENT
+    // kills it with SIGKILL (TerminateProcess on Windows): no exit hooks, no
+    // signal handlers, no cleanup of any kind runs in the child.
+    const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: "120000" });
+    await within(owner.raw, CHILD_BOUND_MS, "the owner reaching raw-copied");
+    const leftover = partials().find((n) => n.endsWith(".partial"))!;
+    assert.ok(leftover, "the owner's partial exists");
+    // While the owner lives, nobody else can have the lock.
+    await assert.rejects(
+      b.createBackup(db, { dataDir, lockWaitMs: 0 }),
+      /Another backup is running/,
+    );
+    assert.ok(existsSync(path.join(backupsDir, leftover)), "a live owner's partial is not touched");
+    owner.proc.kill("SIGKILL");
+    await within(owner.exited, REAP_BOUND_MS, "the killed owner closing");
+    assert.deepEqual(finals(), [prior.file], "no final file from the killed run");
+    assert.doesNotMatch(leftover, FINAL, "not a restore or retention candidate");
+    assert.ok(existsSync(path.join(backupsDir, leftover)), "the killed run left its partial");
 
-  // The restore command refuses it by name.
-  const restore = await run("scripts/restore-database.ts", [leftover], {
-    STYLE_RESTORE_CONFIRMED: "true",
+    // The restore command refuses it by name.
+    const restore = await run("scripts/restore-database.ts", [leftover], {
+      STYLE_RESTORE_CONFIRMED: "true",
+    });
+    assert.equal(restore.code, 1);
+    assert.equal(count("user"), 1, "the live database is untouched");
+
+    // The kernel released the dead process's lock: no lease to wait out. (A few
+    // seconds of waiting are allowed only for the operating system to finish
+    // tearing the killed process down.)
+    const began = Date.now();
+    const next = await b.createBackup(db, { dataDir, lockWaitMs: 5_000 });
+    assert.ok(Date.now() - began < 5_000, "taken over without waiting for any lease");
+    assert.deepEqual(next.leftovers, []);
+    assert.ok(!existsSync(path.join(backupsDir, leftover)), "the dead partial was removed");
+    assert.deepEqual(finals().sort(), [prior.file, next.file].sort());
+    assert.deepEqual(filesWithMarkers(), [], "no marker bytes remain anywhere");
   });
-  assert.equal(restore.code, 1);
-  assert.equal(count("user"), 1, "the live database is untouched");
-
-  // The kernel released the dead process's lock: no lease to wait out. (A few
-  // seconds of waiting are allowed only for the operating system to finish
-  // tearing the killed process down.)
-  const began = Date.now();
-  const next = await b.createBackup(db, { dataDir, lockWaitMs: 5_000 });
-  assert.ok(Date.now() - began < 5_000, "taken over without waiting for any lease");
-  assert.deepEqual(next.leftovers, []);
-  assert.ok(!existsSync(path.join(backupsDir, leftover)), "the dead partial was removed");
-  assert.deepEqual(finals().sort(), [prior.file, next.file].sort());
-  assert.deepEqual(filesWithMarkers(), [], "no marker bytes remain anywhere");
 });
 
-test("two contenders waiting on a live owner cannot take its lock; when it is killed they proceed one at a time and both succeed", async () => {
+test("two contenders waiting on a live owner cannot take its lock; when it is killed they proceed one at a time and both succeed", { timeout: TEST_TIMEOUT_MS }, async () => {
   resetBackups();
-  const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: "120000" });
-  await owner.raw;
-  const ownersPartial = partials().find((n) => n.endsWith(".partial"))!;
-  // Two other backups start while the owner is alive and wait for the lock.
-  const env = { TEST_BACKUP_HOLD_MS: "1500", TEST_BACKUP_WAIT_MS: "90000" };
-  const b1 = forkBackup(env);
-  const b2 = forkBackup(env);
-  await sleep(4_000); // long enough for both to have started and be waiting
-  assert.equal(b1.reached(), false, "contender 1 cannot start while the owner lives");
-  assert.equal(b2.reached(), false, "contender 2 cannot start while the owner lives");
-  assert.ok(existsSync(path.join(backupsDir, ownersPartial)), "the owner's partial is intact");
+  await withChildren(async () => {
+    const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: "120000" });
+    await within(owner.raw, CHILD_BOUND_MS, "the owner reaching raw-copied");
+    const ownersPartial = partials().find((n) => n.endsWith(".partial"))!;
+    // Two other backups start while the owner is alive and wait for the lock.
+    const env = { TEST_BACKUP_HOLD_MS: "1500", TEST_BACKUP_WAIT_MS: "90000" };
+    const b1 = forkBackup(env);
+    const b2 = forkBackup(env);
+    // Causal, not timed: each contender sends "waiting" from inside the lock
+    // call, on its first real busy refusal. The owner holds the lock for the
+    // whole test, so that refusal is certain; only then is the owner killed.
+    // (A fixed sleep proved nothing about start-up under load: build 016
+    // revision 3, full run 01.)
+    const [waiting1, waiting2] = await Promise.all([
+      within(b1.waiting, CHILD_BOUND_MS, "contender 1 refused by the lock"),
+      within(b2.waiting, CHILD_BOUND_MS, "contender 2 refused by the lock"),
+    ]);
+    assert.equal(b1.reached(), false, "contender 1 cannot start while the owner lives");
+    assert.equal(b2.reached(), false, "contender 2 cannot start while the owner lives");
+    assert.ok(existsSync(path.join(backupsDir, ownersPartial)), "the owner's partial is intact");
 
-  const killedAt = Date.now();
-  owner.proc.kill("SIGKILL");
-  assert.equal(await b1.exited, 0, b1.stdout());
-  assert.equal(await b2.exited, 0, b2.stdout());
-  await owner.exited;
-  const [first, second] = [b1.result(), b2.result()].sort(
-    (p, q) => p.rawCopiedAt - q.rawCopiedAt,
-  );
-  assert.ok(first.rawCopiedAt >= killedAt, "neither started before the owner died");
-  // One at a time: the second copies only after the first has finished, and
-  // both were waiting (started) well before that.
-  assert.ok(second.rawCopiedAt >= first.doneAt - 50, "the contenders did not overlap");
-  assert.ok(second.startedAt < first.rawCopiedAt, "both were contenders for the same release");
-  assert.ok(!existsSync(path.join(backupsDir, ownersPartial)), "the dead owner's partial was removed");
-  assert.equal(finals().length, 2, "each contender produced its own backup");
-  assert.ok(finals().includes(first.file!) && finals().includes(second.file!));
-  assert.deepEqual(partials(), []);
-  assert.deepEqual(filesWithMarkers(), []);
+    const killedAt = Date.now();
+    owner.proc.kill("SIGKILL");
+    assert.equal(await within(b1.exited, CHILD_EXIT_BOUND_MS, "contender 1 exiting"), 0, b1.stdout());
+    assert.equal(await within(b2.exited, CHILD_EXIT_BOUND_MS, "contender 2 exiting"), 0, b2.stdout());
+    await within(owner.exited, REAP_BOUND_MS, "the killed owner closing");
+    const [first, second] = [b1.result(), b2.result()].sort(
+      (p, q) => p.rawCopiedAt - q.rawCopiedAt,
+    );
+    const detail = JSON.stringify({
+      killedAt,
+      waiting1,
+      waiting2,
+      first,
+      second,
+    });
+    assert.ok(
+      waiting1.at <= killedAt && waiting2.at <= killedAt,
+      `both refusals were observed before the owner was killed ${detail}`,
+    );
+    assert.ok(first.rawCopiedAt >= killedAt, `neither started before the owner died ${detail}`);
+    // One at a time: the second copies only after the first has finished, and
+    // both were waiting (started) well before that.
+    assert.ok(second.rawCopiedAt >= first.doneAt - 50, `the contenders did not overlap ${detail}`);
+    assert.ok(
+      second.startedAt < first.rawCopiedAt,
+      `both were contenders for the same release ${detail}`,
+    );
+    assert.ok(!existsSync(path.join(backupsDir, ownersPartial)), "the dead owner's partial was removed");
+    assert.equal(finals().length, 2, "each contender produced its own backup");
+    assert.ok(finals().includes(first.file!) && finals().includes(second.file!));
+    assert.deepEqual(partials(), []);
+    assert.deepEqual(filesWithMarkers(), []);
+  });
 });
 
-test("the lock module: a second holder is refused while the first lives (same process too), granted after release, and the coordinator file is guarded", async () => {
+test("the lock module: a second holder is refused while the first lives (same process too) and granted after release", async () => {
   resetBackups();
   const { acquireProcessLock, LockBusyError } = await import("../src/server/directoryLock");
   const file = path.join(backupsDir, ".backup-coordinator.db");
@@ -408,51 +520,252 @@ test("the lock module: a second holder is refused while the first lives (same pr
   second.release();
   const third = await acquireProcessLock(file, { waitMs: 0 });
   third.release();
+});
 
-  // A coordinator "file" that is a link is refused, and its target untouched.
-  unlinkSync(file);
+test("the lock module: a coordinator file that is a link is refused and its target untouched", async (t) => {
+  resetBackups();
+  const { acquireProcessLock } = await import("../src/server/directoryLock");
+  const file = path.join(backupsDir, ".backup-coordinator.db");
   const outsideFile = path.join(process.cwd(), ".data", "tests", `${randomUUID()}.txt`);
   writeFileSync(outsideFile, "outside canary");
   try {
-    symlinkSync(outsideFile, file);
-  } catch {
-    console.warn("Skipped coordinator link guard: this account may not create links.");
-    return;
+    // Probe link creation first: a skip below means nothing in this test ran.
+    try {
+      symlinkSync(outsideFile, file);
+    } catch {
+      t.skip("coordinator link guard not exercised: this account may not create links");
+      return;
+    }
+    await assert.rejects(acquireProcessLock(file, { waitMs: 0 }), /not a plain file/);
+    assert.equal(readFileSync(outsideFile, "utf8"), "outside canary");
+  } finally {
+    // Failure-safe cleanup of the link and the canary; resetBackups would
+    // otherwise be the only thing to remove the link for the next test.
+    for (const leftover of [file, outsideFile]) {
+      try {
+        unlinkSync(leftover);
+      } catch {
+        // already gone
+      }
+    }
   }
-  await assert.rejects(acquireProcessLock(file, { waitMs: 0 }), /not a plain file/);
-  assert.equal(readFileSync(outsideFile, "utf8"), "outside canary");
-  unlinkSync(file);
 });
 
-test("a LIVE owner whose main thread is blocked for a long time keeps its lock and its partial and completes (the first 009 failure)", async () => {
+test("the optional busy callback is a diagnostic only: called once on the first real refusal, never when the lock is free, and a throwing or rejecting callback changes neither the wait, the deadline, the error nor the grant", async () => {
   resetBackups();
-  const BLOCK_MS = 7_000;
-  const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: String(BLOCK_MS) });
-  await owner.raw;
-  const partial = partials().find((n) => n.endsWith(".partial"))!;
-  assert.ok(partial);
-  // The owner's main thread is now blocked in native code (Atomics.wait stands
-  // in for VACUUM). However long that lasts, the OS lock is still its own.
-  await sleep(4_000);
-  assert.ok(existsSync(path.join(backupsDir, partial)), "the active partial is still there");
-  await assert.rejects(
-    b.createBackup(db, { dataDir, lockWaitMs: 0 }),
-    /Another backup is running/,
-    "a second backup is refused",
-  );
-  assert.ok(existsSync(path.join(backupsDir, partial)), "and it did not remove the owner's partial");
+  const { acquireProcessLock, LockBusyError } = await import("../src/server/directoryLock");
+  const file = path.join(backupsDir, ".backup-coordinator.db");
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  const holder = await acquireProcessLock(file, { waitMs: 0 });
+  try {
+    // Throws, no waiting: the refusal is still LockBusyError.
+    let calls = 0;
+    await assert.rejects(
+      acquireProcessLock(file, {
+        waitMs: 0,
+        onBusy: () => {
+          calls++;
+          throw new Error("callback failure");
+        },
+      }),
+      LockBusyError,
+    );
+    assert.equal(calls, 1);
 
-  // The owner wakes, still holds its lock, and finishes normally.
-  assert.equal(await owner.exited, 0, owner.stdout());
-  const done = owner.result();
-  assert.ok(done.doneAt - done.rawCopiedAt >= BLOCK_MS - 200, "the block really lasted");
-  assert.deepEqual(finals(), [done.file]);
-  assert.deepEqual(partials(), []);
-  assert.deepEqual(filesWithMarkers(), []);
-  // And the lock is free again.
-  const after = await b.createBackup(db, { dataDir, lockWaitMs: 0 });
-  assert.equal(finals().length, 2);
-  assert.ok(finals().includes(after.file));
+    // Rejects asynchronously, with polling: once only, the whole wait is kept.
+    calls = 0;
+    const began = Date.now();
+    await assert.rejects(
+      acquireProcessLock(file, {
+        waitMs: 300,
+        pollMs: 20,
+        onBusy: (async () => {
+          calls++;
+          throw new Error("async callback failure");
+        }) as () => void,
+      }),
+      LockBusyError,
+    );
+    assert.equal(calls, 1, "once, although the lock was polled many times");
+    assert.ok(Date.now() - began >= 250, "the wait was not shortened by the callback failure");
+
+    // A throwing callback does not stop a waiter from being granted the lock.
+    let waiterCalls = 0;
+    const waiter = acquireProcessLock(file, {
+      waitMs: 5_000,
+      pollMs: 20,
+      onBusy: () => {
+        waiterCalls++;
+        throw new Error("callback failure while waiting");
+      },
+    });
+    await sleep(150);
+    holder.release();
+    const granted = await waiter;
+    granted.assertHeld();
+    granted.release();
+    assert.equal(waiterCalls, 1);
+
+    // Free lock: never called.
+    let freeCalls = 0;
+    const free = await acquireProcessLock(file, { waitMs: 0, onBusy: () => void freeCalls++ });
+    free.release();
+    assert.equal(freeCalls, 0);
+
+    await sleep(50); // let any stray rejection surface
+    assert.deepEqual(unhandled, [], "a rejected callback is contained");
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    holder.release();
+  }
+});
+
+test("a throwing onBusy GETTER, read while a lock is held, is contained: the wait is kept, the error is LockBusyError and a later grant still works", async () => {
+  resetBackups();
+  const { acquireProcessLock, LockBusyError } = await import("../src/server/directoryLock");
+  const file = path.join(backupsDir, ".backup-coordinator.db");
+  const holder = await acquireProcessLock(file, { waitMs: 0 });
+  try {
+    // Refusal after a real wait: LockBusyError (not the getter's error), no early abort.
+    let reads = 0;
+    const began = Date.now();
+    let caught: unknown;
+    try {
+      await acquireProcessLock(file, {
+        waitMs: 300,
+        pollMs: 20,
+        get onBusy(): () => void {
+          reads++;
+          throw new Error("getter failure");
+        },
+      });
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught instanceof LockBusyError, `expected LockBusyError, got ${String(caught)}`);
+    assert.ok(reads >= 1, "the getter was really read on the refusal");
+    assert.ok(Date.now() - began >= 250, "the wait was not shortened by the getter failure");
+
+    // A waiter with a throwing getter is still granted the lock once it is free.
+    let waiterReads = 0;
+    const waiter = acquireProcessLock(file, {
+      waitMs: 5_000,
+      pollMs: 20,
+      get onBusy(): () => void {
+        waiterReads++;
+        throw new Error("getter failure while waiting");
+      },
+    });
+    await sleep(150);
+    holder.release();
+    const granted = await waiter;
+    granted.assertHeld();
+    granted.release();
+    assert.ok(waiterReads >= 1);
+
+    // Free lock: the getter is never read.
+    let freeReads = 0;
+    const free = await acquireProcessLock(file, {
+      waitMs: 0,
+      get onBusy(): () => void {
+        freeReads++;
+        throw new Error("never read");
+      },
+    });
+    free.release();
+    assert.equal(freeReads, 0);
+  } finally {
+    holder.release();
+  }
+});
+
+test("a throwing onLockWait GETTER does not change a backup that has to wait for the lock", async () => {
+  resetBackups();
+  const { acquireProcessLock } = await import("../src/server/directoryLock");
+  const holder = await acquireProcessLock(path.join(backupsDir, ".backup-coordinator.db"), { waitMs: 0 });
+  let reads = 0;
+  try {
+    const pending = b.createBackup(db, {
+      dataDir,
+      lockWaitMs: 10_000,
+      get onLockWait(): () => void {
+        reads++;
+        throw new Error("getter failure");
+      },
+    });
+    await sleep(250);
+    holder.release();
+    const result = await pending;
+    assert.match(result.file, FINAL);
+    assert.ok(reads >= 1, "the getter was really read while the lock was held");
+    assert.deepEqual(result.leftovers, []);
+    assert.deepEqual(finals(), [result.file]);
+    assert.deepEqual(partials(), []);
+  } finally {
+    holder.release();
+  }
+});
+
+test("a failing onLockWait seam does not change a backup that has to wait for the lock", async () => {
+  resetBackups();
+  const { acquireProcessLock } = await import("../src/server/directoryLock");
+  const holder = await acquireProcessLock(path.join(backupsDir, ".backup-coordinator.db"), { waitMs: 0 });
+  let calls = 0;
+  try {
+    const pending = b.createBackup(db, {
+      dataDir,
+      lockWaitMs: 10_000,
+      onLockWait: () => {
+        calls++;
+        throw new Error("seam failure");
+      },
+    });
+    await sleep(250);
+    holder.release();
+    const result = await pending;
+    assert.match(result.file, FINAL);
+    assert.equal(calls, 1);
+    assert.deepEqual(result.leftovers, []);
+    assert.deepEqual(finals(), [result.file]);
+    assert.deepEqual(partials(), []);
+  } finally {
+    holder.release();
+  }
+});
+
+test("a LIVE owner whose main thread is blocked for a long time keeps its lock and its partial and completes (the first 009 failure)", { timeout: TEST_TIMEOUT_MS }, async () => {
+  resetBackups();
+  await withChildren(async () => {
+    const BLOCK_MS = 7_000;
+    const owner = forkBackup({ TEST_BACKUP_BLOCK_MS: String(BLOCK_MS) });
+    await within(owner.raw, CHILD_BOUND_MS, "the owner reaching raw-copied");
+    const partial = partials().find((n) => n.endsWith(".partial"))!;
+    assert.ok(partial);
+    // The owner's main thread is now blocked in native code (Atomics.wait stands
+    // in for VACUUM). However long that lasts, the OS lock is still its own.
+    await sleep(4_000);
+    assert.ok(existsSync(path.join(backupsDir, partial)), "the active partial is still there");
+    await assert.rejects(
+      b.createBackup(db, { dataDir, lockWaitMs: 0 }),
+      /Another backup is running/,
+      "a second backup is refused",
+    );
+    assert.ok(existsSync(path.join(backupsDir, partial)), "and it did not remove the owner's partial");
+
+    // The owner wakes, still holds its lock, and finishes normally.
+    assert.equal(await within(owner.exited, CHILD_EXIT_BOUND_MS, "the owner finishing"), 0, owner.stdout());
+    const done = owner.result();
+    assert.ok(done.doneAt - done.rawCopiedAt >= BLOCK_MS - 200, "the block really lasted");
+    assert.deepEqual(finals(), [done.file]);
+    assert.deepEqual(partials(), []);
+    assert.deepEqual(filesWithMarkers(), []);
+    // And the lock is free again.
+    const after = await b.createBackup(db, { dataDir, lockWaitMs: 0 });
+    assert.equal(finals().length, 2);
+    assert.ok(finals().includes(after.file));
+  });
 });
 
 test("publication never replaces an existing backup, even when the name is taken at the last moment", async () => {
@@ -476,33 +789,64 @@ test("publication never replaces an existing backup, even when the name is taken
   assert.deepEqual(partials(), []);
 });
 
-test("two backups started in the same millisecond are serialised and never replace an earlier backup", async () => {
+test("two backups started in the same millisecond are serialised and never replace an earlier backup", { timeout: TEST_TIMEOUT_MS }, async () => {
   resetBackups();
   const stamp = "2026-03-03T03:03:03.003Z";
   const sameName = `style-${stamp.replace(/[:.]/g, "-")}.db`;
   const sentinel = Buffer.from("EARLIER-COMPLETED-BACKUP-SENTINEL");
   writeFileSync(path.join(backupsDir, sameName), sentinel);
-  const env = { TEST_BACKUP_STAMP: stamp, TEST_BACKUP_HOLD_MS: "3000" };
-  const [x, y] = await Promise.all([child(env), child(env)]);
-  assert.equal(x.code, 0, x.stderr);
-  assert.equal(y.code, 0, y.stderr);
-  const [first, second] = [lines(x.stdout), lines(y.stdout)].sort(
-    (p, q) => p.rawCopiedAt - q.rawCopiedAt,
-  );
+  // The same scenario as before (same backup clock in both, the first holding
+  // its copy for 3 s) but the overlap no longer depends on the later child
+  // starting within those 3 s: the winner additionally waits at its hold for the
+  // parent's release, which is sent only after the loser reports a real busy
+  // refusal ("waiting"), so the loser provably contended with a live holder.
+  const env = {
+    TEST_BACKUP_STAMP: stamp,
+    TEST_BACKUP_HOLD_MS: "3000",
+    TEST_BACKUP_RELEASE_GATE: "1",
+    TEST_BACKUP_WAIT_MS: "90000",
+  };
+  let outcome: [ReturnType<typeof forkBackup>, ReturnType<typeof forkBackup>, Mark] | undefined;
+  await withChildren(async () => {
+    const x = forkBackup(env);
+    const y = forkBackup(env);
+    const loserWaiting = await within(
+      Promise.race([x.waiting, y.waiting]),
+      CHILD_BOUND_MS,
+      "one of the two backups refused by the lock",
+    );
+    for (const entry of [x, y]) {
+      try {
+        entry.proc.send({ cmd: "release" });
+      } catch {
+        // A child that already ended is reported by its exit code below.
+      }
+    }
+    assert.equal(await within(x.exited, CHILD_EXIT_BOUND_MS, "backup x exiting"), 0, x.stdout());
+    assert.equal(await within(y.exited, CHILD_EXIT_BOUND_MS, "backup y exiting"), 0, y.stdout());
+    outcome = [x, y, loserWaiting];
+  });
+  const [x, y, loserWaiting] = outcome!;
+  const [first, second] = [x.result(), y.result()].sort((p, q) => p.rawCopiedAt - q.rawCopiedAt);
+  const detail = JSON.stringify({ loserWaiting, first, second });
   assert.ok(
     second.startedAt < first.doneAt,
-    "the two processes really overlapped in time",
+    `the two processes really overlapped in time ${detail}`,
+  );
+  assert.ok(
+    loserWaiting.at <= first.doneAt && loserWaiting.at < second.rawCopiedAt,
+    `the later backup was refused while the first still held the lock ${detail}`,
   );
   // 50 ms tolerance: doneAt is taken just after the first process returned
   // from the call that released the lock, and the second needs at least a
   // lock poll and a file copy after that release.
   assert.ok(
     second.rawCopiedAt >= first.doneAt - 50,
-    "the second backup did not start copying until the first had finished",
+    `the second backup did not start copying until the first had finished ${detail}`,
   );
   assert.ok(
     second.rawCopiedAt - first.rawCopiedAt >= 2_500,
-    "the first backup's 3 s hold was not overlapped by the second's copy",
+    `the first backup's 3 s hold was not overlapped by the second's copy ${detail}`,
   );
   assert.ok(
     readFileSync(path.join(backupsDir, sameName)).equals(sentinel),
@@ -529,7 +873,7 @@ test("two backups started in the same millisecond are serialised and never repla
   }
 });
 
-test("physical path guards: a linked backups directory is refused and a linked partial name is unlinked without touching its target", async () => {
+test("physical path guards: a linked backups directory is refused and a linked partial name is unlinked without touching its target", async (t) => {
   // 1. backups/ itself is a link: refused, nothing written outside.
   const other = path.join(process.cwd(), ".data", "tests", randomUUID());
   const outside = path.join(other, "outside");
@@ -538,7 +882,8 @@ test("physical path guards: a linked backups directory is refused and a linked p
   try {
     symlinkSync(outside, path.join(other, "backups"), "junction");
   } catch {
-    console.warn("Skipped link guards: this account may not create links.");
+    // A real skip, reported as one: nothing below this probe has run.
+    t.skip("link guards not exercised: this account may not create links");
     return;
   }
   await assert.rejects(

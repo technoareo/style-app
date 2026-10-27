@@ -1,0 +1,22 @@
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+import path from 'node:path';
+process.env.STYLE_DATA_DIR=path.join(process.cwd(),'.data','probes','quarantine-waiter-016-'+randomUUID());
+mkdirSync(process.env.STYLE_DATA_DIR,{recursive:true});
+const {getDatabase,closeDatabases}=await import('../../src/server/database.ts');
+const {runWriteTransaction}=await import('../../src/server/writeTransaction.ts');
+const {acquireWriteGate}=await import('../../src/server/writeGate.ts');
+const db=getDatabase();db.exec('CREATE TABLE probe(v INTEGER)');
+const originalExec=db.exec.bind(db);
+db.exec=sql=>{if(sql==='ROLLBACK')throw new Error('injected rollback failure');return originalExec(sql);};
+const release=await acquireWriteGate();
+let secondCalls=0;
+const first=runWriteTransaction(d=>{d.exec('INSERT INTO probe VALUES(1)');throw new Error('first body failure');});
+const second=runWriteTransaction(d=>{secondCalls++;d.exec('INSERT INTO probe VALUES(2)');});
+const resultsPromise=Promise.allSettled([first,second]);
+release();
+const results=await resultsPromise;
+let freshSucceeded=false;
+try{await runWriteTransaction(d=>d.exec('INSERT INTO probe VALUES(3)'));freshSucceeded=true;}finally{closeDatabases();}
+const output={synthetic:true,secondCalls,freshSucceeded,results:results.map(r=>r.status==='rejected'?{status:r.status,name:r.reason?.name,code:r.reason?.code,message:r.reason?.message}:{status:r.status})};
+writeFileSync(new URL('./quarantine-waiter-probe-016.json',import.meta.url),JSON.stringify(output,null,2));console.log(JSON.stringify(output));

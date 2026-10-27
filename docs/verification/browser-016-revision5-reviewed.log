@@ -1,0 +1,60 @@
+[WebServer] (node:1936) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:6104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026-10-22T02:19:46.740Z ERROR [Better Auth]: Database schema mismatch
+[WebServer] 
+[WebServer]   Missing tables
+[WebServer]     user, session, account, verification, rateLimit
+[WebServer] 
+[WebServer]   help: Run `npx auth migrate` to add the missing tables and columns.
+
+Running 38 tests using 1 worker
+
+(node:3876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images (1.3s)
+  ok  2 [desktop] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota (7.0s)
+  ok  3 [desktop] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser (3.6s)
+  ok  4 [desktop] › tests\e2e\consumer.spec.ts:2:5 › consumer can create, style, save, edit and reload wardrobe (1.4s)
+  ok  5 [desktop] › tests\e2e\consumer.spec.ts:48:5 › backup merges into the signed-in account and invalid backup preserves data (1.9s)
+  ok  6 [desktop] › tests\e2e\consumer.spec.ts:83:5 › upload review validates detections, crop, cancel, and persistence (2.0s)
+  ok  7 [desktop] › tests\e2e\consumer.spec.ts:144:5 › sign-out is guarded while a save is delayed and then fails (1.4s)
+  ok  8 [desktop] › tests\e2e\consumer.spec.ts:188:5 › manual item entry stays focused and Escape closes dialog (987ms)
+  ok  9 [desktop] › tests\e2e\review007.spec.ts:53:5 › an AI formal guess is only a suggestion until the user chooses it (1.5s)
+  ok 10 [desktop] › tests\e2e\review007.spec.ts:86:5 › a shoe pair is merged only after confirmation, and distinct items stay separate (1.3s)
+  ok 11 [desktop] › tests\e2e\review007.spec.ts:181:5 › a failed wardrobe save keeps the photo result; after reload and retry there is one durable garment and the result is discarded only after the acknowledged save (2.3s)
+  ok 12 [desktop] › tests\e2e\review007.spec.ts:230:5 › a retry after a failed save in the same dialog adds the garment once (2.0s)
+  ok 13 [desktop] › tests\e2e\review007.spec.ts:267:5 › a lost success response does not duplicate the garment when the same result is saved again (2.1s)
+  ok 14 [desktop] › tests\e2e\review007.spec.ts:301:5 › a failed discard after a successful save is reported honestly and not offered again (1.6s)
+  ok 15 [desktop] › tests\e2e\review007.spec.ts:332:5 › a superseded or cancelled result that arrives late cannot overwrite the newer reviewed photo (1.5s)
+  ok 16 [desktop] › tests\e2e\review007.spec.ts:417:5 › a cancel that is still pending when a newer photo starts cannot abort or reset the newer flow, and a second press is ignored (1.4s)
+  ok 17 [desktop] › tests\e2e\review007.spec.ts:503:5 › a queued photo keeps processing in the background and resumes after a reload (1.8s)
+  ok 18 [desktop] › tests\e2e\uploadAdmission013.spec.ts:14:5 › several reviewed items from one photo save together, and a refused upload is repeated without losing the draft (3.3s)
+  ok 19 [desktop] › tests\e2e\uploadAdmission013.spec.ts:116:5 › a 408 on the wardrobe save keeps the reviewed draft and a second press saves it (1.7s)
+(node:13456) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 20 [mobile] › tests\e2e\api.spec.ts:3:5 › analysis rejects foreign origins, missing consent and unreadable images (1.4s)
+  ok 21 [mobile] › tests\e2e\api.spec.ts:31:5 › giant rasters are refused from their header, and cancel survives an exhausted change quota (6.8s)
+  -  22 [mobile] › tests\e2e\auth.spec.ts:5:5 › consumer signs up, verifies email, signs in and opens their wardrobe in another browser
+  ok 23 [mobile] › tests\e2e\consumer.spec.ts:2:5 › consumer can create, style, save, edit and reload wardrobe (1.7s)
+  ok 24 [mobile] › tests\e2e\consumer.spec.ts:48:5 › backup merges into the signed-in account and invalid backup preserves data (1.2s)
+  ok 25 [mobile] › tests\e2e\consumer.spec.ts:83:5 › upload review validates detections, crop, cancel, and persistence (1.9s)
+  ok 26 [mobile] › tests\e2e\consumer.spec.ts:144:5 › sign-out is guarded while a save is delayed and then fails (1.6s)
+  ok 27 [mobile] › tests\e2e\consumer.spec.ts:188:5 › manual item entry stays focused and Escape closes dialog (906ms)
+  ok 28 [mobile] › tests\e2e\review007.spec.ts:53:5 › an AI formal guess is only a suggestion until the user chooses it (1.6s)
+  ok 29 [mobile] › tests\e2e\review007.spec.ts:86:5 › a shoe pair is merged only after confirmation, and distinct items stay separate (1.5s)
+  ok 30 [mobile] › tests\e2e\review007.spec.ts:181:5 › a failed wardrobe save keeps the photo result; after reload and retry there is one durable garment and the result is discarded only after the acknowledged save (2.4s)
+  ok 31 [mobile] › tests\e2e\review007.spec.ts:230:5 › a retry after a failed save in the same dialog adds the garment once (2.2s)
+  ok 32 [mobile] › tests\e2e\review007.spec.ts:267:5 › a lost success response does not duplicate the garment when the same result is saved again (2.2s)
+  ok 33 [mobile] › tests\e2e\review007.spec.ts:301:5 › a failed discard after a successful save is reported honestly and not offered again (1.5s)
+  ok 34 [mobile] › tests\e2e\review007.spec.ts:332:5 › a superseded or cancelled result that arrives late cannot overwrite the newer reviewed photo (1.4s)
+  ok 35 [mobile] › tests\e2e\review007.spec.ts:417:5 › a cancel that is still pending when a newer photo starts cannot abort or reset the newer flow, and a second press is ignored (1.5s)
+  ok 36 [mobile] › tests\e2e\review007.spec.ts:503:5 › a queued photo keeps processing in the background and resumes after a reload (2.0s)
+  ok 37 [mobile] › tests\e2e\uploadAdmission013.spec.ts:14:5 › several reviewed items from one photo save together, and a refused upload is repeated without losing the draft (3.5s)
+  ok 38 [mobile] › tests\e2e\uploadAdmission013.spec.ts:116:5 › a 408 on the wardrobe save keeps the reviewed draft and a second press saves it (1.7s)
+
+  1 skipped
+  37 passed (1.4m)

@@ -73,7 +73,35 @@ export type ProcessLockOptions = {
   /** How long to wait for a busy lock. 0 = fail at once. */
   waitMs: number;
   pollMs?: number;
+  /**
+   * Optional diagnostic seam (tests): called once, synchronously, on the FIRST
+   * refusal because the lock is held elsewhere, before the first poll sleep. It
+   * changes nothing about locking: a throw (including a throwing `onBusy`
+   * getter) or a rejected promise is contained here and never reaches the
+   * caller or changes the error that would have been raised. It does NOT make
+   * the callback free: synchronous time spent in it runs on the event loop and
+   * counts against the existing deadline (waitMs), so keep it trivial, such as
+   * a fixed non-blocking IPC send. Production callers leave it unset.
+   */
+  onBusy?: () => void;
 };
+
+function notifyBusy(callback: (() => unknown) | undefined): void {
+  if (!callback) return;
+  try {
+    const returned = callback();
+    if (
+      returned !== null &&
+      typeof returned === "object" &&
+      typeof (returned as { then?: unknown }).then === "function"
+    ) {
+      // A rejection must not become an unhandled rejection of the process.
+      (returned as PromiseLike<unknown>).then(undefined, () => {});
+    }
+  } catch {
+    // A diagnostic callback never changes how the lock behaves.
+  }
+}
 
 function assertPlainFileOrAbsent(file: string): void {
   let info;
@@ -95,6 +123,7 @@ export async function acquireProcessLock(
   // event loop's critical path, and bounded by waitMs.
   const db = new DatabaseSync(file, { timeout: 0 });
   const deadline = Date.now() + options.waitMs;
+  let busyReported = false;
   try {
     for (;;) {
       try {
@@ -102,6 +131,11 @@ export async function acquireProcessLock(
         break;
       } catch (error) {
         if (!isSqliteBusy(error)) throw error;
+        if (!busyReported) {
+          busyReported = true;
+          // A thunk, so reading the property happens inside notifyBusy's guard.
+          notifyBusy(() => options.onBusy?.());
+        }
         if (Date.now() >= deadline) throw new LockBusyError();
         await sleep(
           Math.min(options.pollMs ?? 100, Math.max(5, deadline - Date.now())),

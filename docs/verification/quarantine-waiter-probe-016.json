@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "secondCalls": 0,
+  "freshSucceeded": true,
+  "results": [
+    {
+      "status": "rejected",
+      "name": "Error",
+      "message": "first body failure"
+    },
+    {
+      "status": "rejected",
+      "name": "Error",
+      "code": "ERR_INVALID_STATE",
+      "message": "database is not open"
+    }
+  ]
+}

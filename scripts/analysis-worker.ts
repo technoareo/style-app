@@ -1,3 +1,4 @@
+import "../src/server/localEnvAuto"; // first: same .env.local/.env as the web process (local runs only)
 import { randomUUID } from "node:crypto";
 import { getReadyAuth } from "../src/server/auth";
 import { closeDatabases } from "../src/server/database";

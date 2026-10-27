@@ -1,0 +1,28 @@
+{
+  "scope": "Synthetic mock only; no real model or user image",
+  "results": [
+    {
+      "name": "valid terminal",
+      "accepted": true,
+      "itemCount": 0
+    },
+    {
+      "name": "missing terminal marker",
+      "accepted": false,
+      "kind": "unavailable",
+      "message": "Photo analysis is temporarily unavailable. Your wardrobe was not changed."
+    },
+    {
+      "name": "malformed trailing line",
+      "accepted": false,
+      "kind": "unavailable",
+      "message": "Photo analysis is temporarily unavailable. Your wardrobe was not changed."
+    },
+    {
+      "name": "malformed leading line",
+      "accepted": false,
+      "kind": "unavailable",
+      "message": "Photo analysis is temporarily unavailable. Your wardrobe was not changed."
+    }
+  ]
+}

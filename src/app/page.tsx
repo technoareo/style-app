@@ -50,6 +50,7 @@ function WardrobeApp({
   const analysisJobs = useAnalysisJobs(uploadOpen, user.id);
   const [context, setContext] = useState<StyleContext>({
     occasion: "everyday",
+    season: "any",
     temperature: 25,
     variation: 0,
   });
@@ -155,7 +156,14 @@ function WardrobeApp({
             context={context}
             onContext={setContext}
             onSave={() =>
-              store.saveLook(result.items, result.message, context.occasion)
+              store.saveLook(
+                result.items,
+                result.message,
+                context.occasion,
+                context.season && context.season !== "any"
+                  ? context.season
+                  : undefined,
+              )
             }
             onAddPhotos={() => setUploadOpen(true)}
             onSample={store.loadSample}

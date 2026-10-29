@@ -196,7 +196,12 @@ export function useStyleStore(user: { id: string; name: string }) {
     change((s) => ({ ...s, wardrobe: s.wardrobe.filter((g) => g.id !== id) }));
   const removeLook = (id: string) =>
     change((s) => ({ ...s, looks: s.looks.filter((l) => l.id !== id) }));
-  const saveLook = (items: Garment[], name: string, occasion: string) => {
+  const saveLook = (
+    items: Garment[],
+    name: string,
+    occasion: string,
+    season?: SavedLook["season"],
+  ) => {
     if (!items.length) return;
     change((s) => ({
       ...s,
@@ -205,6 +210,7 @@ export function useStyleStore(user: { id: string; name: string }) {
           id: crypto.randomUUID(),
           name,
           occasion,
+          ...(season ? { season } : {}),
           createdAt: new Date().toISOString(),
           items: items.map((g) => ({ ...g })),
         },

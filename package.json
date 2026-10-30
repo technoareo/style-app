@@ -13,7 +13,9 @@
     "verify:packaging": "tsx scripts/verify-packaging.ts",
     "worker": "tsx scripts/analysis-worker.ts",
     "mail-worker": "tsx scripts/mail-worker.ts",
-    "verify:standalone": "tsx scripts/verify-standalone.ts"
+    "verify:standalone": "tsx scripts/verify-standalone.ts",
+    "backup:encrypted": "tsx scripts/backup-encrypted.ts",
+    "restore:encrypted": "tsx scripts/restore-encrypted.ts"
   },
   "dependencies": {
     "@better-auth/core": "1.7.7",

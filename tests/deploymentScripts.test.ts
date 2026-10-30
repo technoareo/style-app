@@ -88,6 +88,8 @@ test("every operator script that compose.yaml or the deployment guide runs in th
     "scripts/mail-worker.ts",
     "scripts/restore-database.ts",
     "scripts/export-deletion-ledger.ts",
+    "scripts/backup-encrypted.ts",
+    "scripts/restore-encrypted.ts",
   ])
     assert.ok(referenced.includes(expected), `${expected} should be found as referenced`);
 
@@ -98,6 +100,18 @@ test("every operator script that compose.yaml or the deployment guide runs in th
 
 test("the ledger export script is copied explicitly", () => {
   assert.ok(runtimeCopies(read("Dockerfile")).files.includes("scripts/export-deletion-ledger.ts"));
+});
+
+test("the encrypted backup and restore commands (build 021) are copied explicitly, with every module they import", () => {
+  const copies = runtimeCopies(read("Dockerfile"));
+  for (const script of ["scripts/backup-encrypted.ts", "scripts/restore-encrypted.ts"])
+    assert.ok(copies.files.includes(script), script);
+  // The scripts import only from the copied src/server tree, and the shared restore lives there too.
+  assert.ok(copies.dirs.includes("src/server"));
+  for (const module of ["encryptedPackage", "encryptedBackup", "encryptedRestore", "restoreDatabase", "backupPassphrase"])
+    assert.ok(existsSync(path.join(root, "src/server", module + ".ts")), module);
+  // The documented commands name the two scripts, so the generic check above covers them.
+  assert.ok(scriptsReferenced(read("docs/DEPLOYMENT.md"), /docker compose (exec|run)\b/).includes("scripts/restore-encrypted.ts"));
 });
 
 test("the checker reports an unpackaged script, a missing script and an import that leaves the image", () => {

@@ -185,7 +185,35 @@ export const ALLOWED_OVERRIDE_DIFFS = [
   "services.proxy.restart",
   "services.proxy.ports",
   "services.ollama.",
+  // A consequence of replacing ollama's mounts, not a change of its own: with the model volume no longer referenced by any
+  // service, `docker compose config` leaves the unused top-level `model-data` volume out of its output (GitHub run
+  // 41091590200 reported exactly this path). `overrideProblems` below accepts ONLY that removal; a changed or added
+  // volume, or any other volume going missing, is still a failure.
+  "volumes.model-data",
 ] as const;
+
+const mentions = (value: unknown, text: string): boolean =>
+  typeof value === "string" ? value === text : Array.isArray(value) ? value.some((v) => mentions(v, text)) : isObject(value) ? Object.values(value).some((v) => mentions(v, text)) : false;
+
+type ComposeConfig = { services?: Record<string, unknown>; volumes?: Record<string, unknown> };
+
+/**
+ * Everything wrong with the merged config compared with the shipped one: any
+ * differing path outside ALLOWED_OVERRIDE_DIFFS, and the one allowed top-level
+ * volume path (`volumes.model-data`) unless it was merely dropped because no
+ * service in the merged config uses it any more.
+ */
+export function overrideProblems(shipped: ComposeConfig, merged: ComposeConfig): string[] {
+  const problems = unexpectedDiffs(diffPaths(shipped, merged)).map((p) => `changed ${p}`);
+  const was = shipped.volumes?.["model-data"];
+  const now = merged.volumes?.["model-data"];
+  if (JSON.stringify(was) !== JSON.stringify(now)) {
+    if (now !== undefined)
+      problems.push(was === undefined ? "the model-data volume appeared only in the merged config" : "the model-data volume was changed, not just dropped");
+    else if (mentions(merged.services, "model-data")) problems.push("model-data is missing from the merged volumes but a service still uses it");
+  }
+  return problems;
+}
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 

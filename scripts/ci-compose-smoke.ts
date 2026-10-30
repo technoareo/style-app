@@ -31,7 +31,6 @@ import {
   composeArgs,
   composeSupportsOverride,
   configArgs,
-  diffPaths,
   downArgs,
   execArgs,
   generateAuthSecret,
@@ -46,7 +45,7 @@ import {
   securityHeaderProblems,
   smokeNames,
   stalledWindowMs,
-  unexpectedDiffs,
+  overrideProblems,
   upArgs,
   type SmokeNames,
 } from "./ci-compose-smoke-plan";
@@ -556,10 +555,10 @@ async function realScenario(ctx: SmokeContext): Promise<void> {
 
   // 1. The override changes only what it says -----------------------------------------
   ctx.step("compose.smoke.yaml changes only the allow-listed settings; the shipped values reach app and proxy");
-  type Config = { services: Record<string, Record<string, any>> };
+  type Config = { services: Record<string, Record<string, any>>; volumes?: Record<string, unknown> };
   const merged = JSON.parse((await ctx.docker(configArgs(project, dir, true), { sensitive: true })).stdout) as Config;
   const shipped = JSON.parse((await ctx.docker(configArgs(project, dir, false), { sensitive: true })).stdout) as Config;
-  const unexpected = unexpectedDiffs(diffPaths(shipped, merged));
+  const unexpected = overrideProblems(shipped, merged);
   expect(unexpected.length === 0, `compose.smoke.yaml changed settings it must not: ${unexpected.join(", ")}`);
   ctx.ok("only image, pull policy, restart, proxy ports and the mock model differ from the shipped compose.yaml");
   const s = merged.services;

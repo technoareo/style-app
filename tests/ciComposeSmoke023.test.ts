@@ -36,6 +36,7 @@ import {
   execArgs,
   generateAuthSecret,
   listByNameArgs,
+  overrideProblems,
   makeRunId,
   parseComposeVersion,
   projectEnvFile,
@@ -320,6 +321,81 @@ test("parsePs reads both shapes of `docker compose ps --format json`", () => {
   assert.deepEqual(parsePs(JSON.stringify(row)), [row]);
   assert.deepEqual(parsePs(`${JSON.stringify(row)}\n${JSON.stringify({ ...row, Service: "proxy" })}\n`).map((r) => r.Service), ["app", "proxy"]);
   assert.deepEqual(parsePs(""), []);
+});
+
+// The real merge shape (GitHub run 41091590200 failed with "changed settings it must not: volumes.model-data"): the override
+// replaces ollama's mounts, nothing references the top-level model-data volume any more, and `docker compose config` leaves an
+// unreferenced top-level volume out. The other three volumes stay.
+const volumes = (...names: string[]) => Object.fromEntries(names.map((n) => [n, { name: `style-smoke-abc_${n}` }]));
+const shippedShape = () => ({
+  name: "style-smoke-abc",
+  services: {
+    app: { command: ["sh", "-c", "x"], volumes: [{ type: "volume", source: "app-data", target: "/data" }], restart: "unless-stopped", ports: undefined },
+    ollama: { image: "ollama/ollama:0.40.3", volumes: [{ type: "volume", source: "model-data", target: "/root/.ollama" }] },
+    proxy: {
+      command: ["sh", "-c", "y"],
+      restart: "unless-stopped",
+      ports: [{ mode: "ingress", target: 80, published: "80", protocol: "tcp" }],
+      volumes: [
+        { type: "bind", source: "/p/deploy/Caddyfile", target: "/etc/caddy/Caddyfile", read_only: true },
+        { type: "volume", source: "proxy-data", target: "/data" },
+        { type: "volume", source: "proxy-config", target: "/config" },
+      ],
+    },
+  },
+  volumes: volumes("app-data", "model-data", "proxy-data", "proxy-config"),
+});
+const mergedShape = () => {
+  const m = JSON.parse(JSON.stringify(shippedShape()));
+  m.services.app.image = "style-studio:ci";
+  m.services.app.restart = "no";
+  m.services.ollama = { image: "node:24-bookworm-slim", command: ["node", "/mock.mjs"], volumes: [{ type: "bind", source: "/p/deploy/ci/mock-ollama.mjs", target: "/mock.mjs", read_only: true }] };
+  m.services.proxy.restart = "no";
+  m.services.proxy.ports = [{ mode: "ingress", host_ip: "127.0.0.1", target: 80, published: "18080", protocol: "tcp" }];
+  delete m.volumes["model-data"]; // what compose config does once no service uses it
+  return m;
+};
+
+test("regression (run 41091590200): the real merge shape passes, because the unreferenced model-data volume is dropped; nothing else may drift", () => {
+  const shipped = shippedShape();
+  const merged = mergedShape();
+  assert.deepEqual(diffPaths(shipped, merged).filter((p) => p.startsWith("volumes")), ["volumes.model-data"], "this is the exact path the CI run reported");
+  assert.deepEqual(unexpectedDiffs(diffPaths(shipped, merged)), [], "the path is on the allow-list");
+  assert.deepEqual(overrideProblems(shipped, merged), []);
+
+  const problems = (mutate: (m: any) => void) => {
+    const m = mergedShape();
+    mutate(m);
+    return overrideProblems(shipped, m);
+  };
+  // model-data may only be DROPPED, and only when nothing uses it.
+  assert.match(problems((m) => (m.volumes["model-data"] = { name: "style-smoke-abc_model-data", driver: "local" })).join(";"), /model-data volume was changed/);
+  assert.match(problems((m) => (m.services.ollama.volumes = [{ type: "volume", source: "model-data", target: "/root/.ollama" }])).join(";"), /still uses it/);
+  assert.match(problems((m) => (m.services.app.volumes = [{ type: "volume", source: "model-data", target: "/data" }])).join(";"), /still uses it|changed services.app.volumes/);
+  const noModel = shippedShape();
+  delete (noModel.volumes as Record<string, unknown>)["model-data"];
+  assert.match(overrideProblems(noModel, mergedShape()).join(";") || "none", /^none$/, "a shipped file without it makes the allowance unused, not wrong");
+  const appeared = mergedShape();
+  assert.match(overrideProblems(noModel, { ...appeared, volumes: { ...appeared.volumes, "model-data": { name: "x" } } }).join(";"), /appeared only in the merged config/);
+  // The other production volumes are NOT covered by the allowance.
+  for (const name of ["app-data", "proxy-data", "proxy-config"])
+    assert.deepEqual(problems((m) => delete m.volumes[name]), [`changed volumes.${name}`], `dropping ${name} fails`);
+  assert.deepEqual(problems((m) => (m.volumes["extra"] = { name: "x" })), ["changed volumes.extra"], "a new volume fails");
+  assert.deepEqual(problems((m) => (m.volumes["app-data"] = { name: "other" })), ["changed volumes.app-data.name"]);
+  // Production behaviour of app and proxy is still protected.
+  assert.deepEqual(problems((m) => (m.services.app.command = ["sh", "-c", "z"])), ["changed services.app.command"]);
+  assert.deepEqual(problems((m) => (m.services.proxy.volumes = [])), ["changed services.proxy.volumes"]);
+  assert.deepEqual(problems((m) => (m.services.proxy.command = ["x"])), ["changed services.proxy.command"]);
+});
+
+test("regression: the allow-list names volumes.model-data exactly (no wildcard for volumes) and the override file still replaces only ollama's mounts", () => {
+  assert.ok(ALLOWED_OVERRIDE_DIFFS.includes("volumes.model-data"));
+  assert.deepEqual((ALLOWED_OVERRIDE_DIFFS as readonly string[]).filter((r) => r.startsWith("volumes")), ["volumes.model-data"], "no wildcard for volumes");
+  const code = read("deploy/ci/compose.smoke.yaml").replace(/^\s*#.*$/gm, "");
+  assert.equal((code.match(/volumes: !override/g) ?? []).length, 1, "one replaced mount list");
+  assert.match(code, /ollama:[\s\S]*volumes: !override[\s\S]*mock-ollama\.mjs/);
+  assert.doesNotMatch(code, /^volumes:/m, "no top-level volumes section in the override");
+  assert.match(read("compose.yaml"), /^volumes:\n  app-data:\n  model-data:\n  proxy-data:\n  proxy-config:/m, "the shipped file declares these four");
 });
 
 // --- the programs that run inside the containers, run for real here -------------------

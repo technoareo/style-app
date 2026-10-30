@@ -15,6 +15,7 @@
     "mail-worker": "tsx scripts/mail-worker.ts",
     "verify:standalone": "tsx scripts/verify-standalone.ts",
     "ci:backup-drill": "tsx scripts/ci-backup-drill.ts",
+    "ci:compose-smoke": "tsx scripts/ci-compose-smoke.ts",
     "backup:encrypted": "tsx scripts/backup-encrypted.ts",
     "restore:encrypted": "tsx scripts/restore-encrypted.ts"
   },

@@ -78,6 +78,33 @@ jobs:
       - name: Drill cleanup sweep
         if: always()
         run: npx tsx scripts/ci-backup-drill.ts --cleanup-only
+      # Build 023. Real `docker compose` (the shipped compose.yaml and
+      # deploy/Caddyfile, copied unchanged into a throw-away folder and merged
+      # with deploy/ci/compose.smoke.yaml) starts app + proxy from the image
+      # built above, with Caddy's own internal CA for a `.localhost` site name:
+      # no public domain, no public certificate, no model (the CI mock), no SMTP
+      # delivery, no external account. It checks the body-timeout derivation and
+      # fail-closed start guards, HTTP/1.1, headers, the hidden upload counters
+      # and direct-versus-proxied errors. Written but not yet run by the author:
+      # the first run on a Docker host is the evidence. The stalled-upload probes
+      # take about 20 s and 30 s, so the step has the same 15-minute ceiling.
+      - name: Compose + Caddy smoke test
+        timeout-minutes: 15
+        run: npx tsx scripts/ci-compose-smoke.ts
+        env:
+          IMAGE: style-studio:ci
+          SMOKE_LOG_DIR: ${{ runner.temp }}/compose-smoke-logs
+      - name: Compose smoke cleanup sweep
+        if: always()
+        run: npx tsx scripts/ci-compose-smoke.ts --cleanup-only
+      - name: Compose smoke service logs (redacted, no secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-smoke-logs
+          path: ${{ runner.temp }}/compose-smoke-logs
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Container logs (no secrets, tokens or bodies are logged by the app)
         if: always()
         run: |

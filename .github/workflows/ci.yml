@@ -63,6 +63,48 @@ jobs:
             ./node_modules/.bin/tsx scripts/mail-worker.ts
       - name: Smoke test through the containers
         run: BASE_URL=http://127.0.0.1:3000 STYLE_DATA_DIR="$RUNNER_TEMP/style-data" npx tsx scripts/ci-docker-smoke.ts
+      # Build 022. Encrypted backup TRANSFER and FRESH RESTORE drill against the
+      # real built image (style-studio:ci) and the real backup:encrypted /
+      # restore:encrypted commands, on isolated named volumes. No model, no AI
+      # worker. The passphrase is generated in the script, never logged, and held
+      # on its own volume. The script removes its own containers, volumes and
+      # files in a finally block; the step after it sweeps by label as well.
+      - name: Encrypted backup transfer and fresh restore drill
+        timeout-minutes: 15
+        run: npx tsx scripts/ci-backup-drill.ts
+        env:
+          IMAGE: style-studio:ci
+          DRILL_PORT: "3100"
+      - name: Drill cleanup sweep
+        if: always()
+        run: npx tsx scripts/ci-backup-drill.ts --cleanup-only
+      # Build 023. Real `docker compose` (the shipped compose.yaml and
+      # deploy/Caddyfile, copied unchanged into a throw-away folder and merged
+      # with deploy/ci/compose.smoke.yaml) starts app + proxy from the image
+      # built above, with Caddy's own internal CA for a `.localhost` site name:
+      # no public domain, no public certificate, no model (the CI mock), no SMTP
+      # delivery, no external account. It checks the body-timeout derivation and
+      # fail-closed start guards, HTTP/1.1, headers, the hidden upload counters
+      # and direct-versus-proxied errors. Written but not yet run by the author:
+      # the first run on a Docker host is the evidence. The stalled-upload probes
+      # take about 20 s and 30 s, so the step has the same 15-minute ceiling.
+      - name: Compose + Caddy smoke test
+        timeout-minutes: 15
+        run: npx tsx scripts/ci-compose-smoke.ts
+        env:
+          IMAGE: style-studio:ci
+          SMOKE_LOG_DIR: ${{ runner.temp }}/compose-smoke-logs
+      - name: Compose smoke cleanup sweep
+        if: always()
+        run: npx tsx scripts/ci-compose-smoke.ts --cleanup-only
+      - name: Compose smoke service logs (redacted, no secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-smoke-logs
+          path: ${{ runner.temp }}/compose-smoke-logs
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Container logs (no secrets, tokens or bodies are logged by the app)
         if: always()
         run: |

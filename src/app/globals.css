@@ -1186,3 +1186,9 @@ footer .text-link {
   padding: 18px;
   background: #fff1cb;
 }
+
+.styling-warning {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: #8a4b00;
+}

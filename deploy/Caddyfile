@@ -1,7 +1,10 @@
-# Build 016/017 transport hardening. Validated with official Caddy 2.11.7 and
-# run in local loopback TLS replicas (untrusted internal certificate; app 20 s
-# and 60 s settings). NOT run in Docker, on Linux, on a public domain, behind a
-# real certificate, or at an app setting of 120 s. See docs/DEPLOYMENT.md
+# Build 016/017 transport hardening. Validated with official Caddy 2.11.7 in
+# local loopback TLS replicas (untrusted internal certificate; app 20 s and 60 s
+# settings). Build 023 then ran this file in Docker, copied byte for byte and with
+# the deferred security headers below, on a GitHub-hosted Linux runner with
+# Caddy's own internal `.localhost` CA, at app settings of 20 s and 30 s (GitHub Actions run 41401896088, commit e91b01c). NOT run on a
+# public domain, behind a publicly trusted certificate, on an operator host, or
+# at an app setting of 60 s or 120 s in Docker. See docs/DEPLOYMENT.md
 # "Proxy transport behaviour" for exact scope and gates.
 {
   servers {

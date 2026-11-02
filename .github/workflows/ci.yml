@@ -27,8 +27,9 @@ jobs:
 
   # Build 008. Builds the real image and runs app + AI worker + mail worker in
   # containers against a MOCK model (no model download, no real AI, no real
-  # email, no external accounts). Written but not yet run by the author: the
-  # first run on a Docker host is part of the launch evidence.
+  # email, no external accounts). First passed in GitHub Actions run
+  # 41401896088 (commit e91b01c). That is CI evidence only, not a rehearsal on
+  # an operator host.
   docker:
     runs-on: ubuntu-latest
     needs: build
@@ -85,8 +86,9 @@ jobs:
       # no public domain, no public certificate, no model (the CI mock), no SMTP
       # delivery, no external account. It checks the body-timeout derivation and
       # fail-closed start guards, HTTP/1.1, headers, the hidden upload counters
-      # and direct-versus-proxied errors. Written but not yet run by the author:
-      # the first run on a Docker host is the evidence. The stalled-upload probes
+      # and direct-versus-proxied errors. First passed in full in GitHub Actions
+      # run 41401896088 (commit e91b01c); that says nothing about a public domain,
+      # a trusted certificate or an operator host. The stalled-upload probes
       # take about 20 s and 30 s, so the step has the same 15-minute ceiling.
       - name: Compose + Caddy smoke test
         timeout-minutes: 15

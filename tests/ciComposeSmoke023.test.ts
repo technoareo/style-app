@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { execFile, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +13,7 @@ import {
   AUTH_LOCK_MS,
   CADDY_SERVERS_COMMAND,
   DIRECT_PROBE_SOURCE,
+  HTTPS_CLIENT_ALPN,
   LOCK_HOLDER_SOURCE,
   PROC_ENV_SOURCE,
   PROXY_ENV_COMMAND,
@@ -40,6 +42,7 @@ import {
   makeRunId,
   parseComposeVersion,
   projectEnvFile,
+  protocolProblems,
   proxyCapSeconds,
   runNoDepsArgs,
   smokeNames,
@@ -562,6 +565,63 @@ test("http client: keep-alive reuse, raw headers, the plain redirect port, and a
     client.close();
     server.closeAllConnections();
     server.close();
+  }
+});
+
+// --- HTTPS protocol check (GitHub run 41094023413: "HTTP/1.1 (ALPN false), expected HTTP/1.1") ---
+
+test("protocolProblems: the exact run-41094023413 evidence, and what must still fail", () => {
+  // The evidence: Caddy answered HTTP/1.1 over TLS, and a client that offered no ALPN saw alpnProtocol === false.
+  assert.deepEqual(protocolProblems({ httpVersion: "1.1", alpn: false, offered: [] }), [], "no ALPN offered: false is Node's normal report");
+  assert.deepEqual(protocolProblems({ httpVersion: "1.1", alpn: null, offered: [] }), []);
+  // The shipped client offers http/1.1, so the same false would now be a real finding.
+  assert.deepEqual(HTTPS_CLIENT_ALPN, ["http/1.1"]);
+  assert.match(protocolProblems({ httpVersion: "1.1", alpn: false, offered: HTTPS_CLIENT_ALPN }).join(";"), /ALPN was false/);
+  assert.deepEqual(protocolProblems({ httpVersion: "1.1", alpn: "http/1.1", offered: HTTPS_CLIENT_ALPN }), []);
+  // HTTP/1.1 is still required of the answer itself, and h2 is never accepted.
+  assert.match(protocolProblems({ httpVersion: "2.0", alpn: "h2", offered: HTTPS_CLIENT_ALPN }).join(";"), /HTTP\/2\.0/);
+  assert.match(protocolProblems({ httpVersion: "2.0", alpn: false, offered: [] }).join(";"), /HTTP\/2\.0/);
+  assert.match(protocolProblems({ httpVersion: "1.1", alpn: "h2", offered: [] }).join(";"), /expected none or/);
+  assert.match(protocolProblems({ httpVersion: "1.1", alpn: "h2", offered: HTTPS_CLIENT_ALPN }).join(";"), /ALPN was h2/);
+});
+
+test("the real client offers http/1.1 over TLS, so the per-response ALPN is observable; an h2-offering probe still lands on http/1.1", async (t) => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "smoke-tls-"));
+  const made = spawnSync(
+    "openssl",
+    ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "k.pem", "-out", "c.pem", "-days", "1", "-subj", `/CN=${SMOKE_DOMAIN}`, "-addext", `subjectAltName=DNS:${SMOKE_DOMAIN}`],
+    { cwd: dir, encoding: "utf8" },
+  );
+  if (made.status !== 0) {
+    rmSync(dir, { recursive: true, force: true });
+    return t.skip("openssl is not available");
+  }
+  const key = readFileSync(path.join(dir, "k.pem"), "utf8");
+  const cert = readFileSync(path.join(dir, "c.pem"), "utf8");
+  const server = https.createServer({ key, cert }, (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.end("ok");
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as AddressInfo).port;
+  const client = realHttp({ domain: SMOKE_DOMAIN, httpPort: port, httpsPort: port, ca: cert });
+  try {
+    const first = await client.request({ method: "GET", path: "/", keepAlive: true });
+    const second = await client.request({ method: "GET", path: "/", keepAlive: true });
+    for (const r of [first, second]) {
+      assert.equal(r.httpVersion, "1.1");
+      assert.equal(r.alpn, "http/1.1", "the client offered http/1.1, so the negotiated protocol is reported, not false");
+      assert.deepEqual(protocolProblems({ httpVersion: r.httpVersion, alpn: r.alpn, offered: HTTPS_CLIENT_ALPN }), []);
+    }
+    assert.equal(second.reusedSocket, true);
+    assert.equal(await client.alpn(["h2", "http/1.1"]), "http/1.1");
+    const stalled = await client.stalledUpload({ path: "/", declaredLength: 0, timeoutMs: 3000 }).catch(() => null);
+    if (stalled) assert.equal(stalled.alpn, "http/1.1");
+  } finally {
+    client.close();
+    server.closeAllConnections();
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

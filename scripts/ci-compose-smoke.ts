@@ -13,6 +13,7 @@ import {
   CA_PATH_IN_PROXY,
   DEFAULT_BODY_MS,
   DIRECT_PROBE_SOURCE,
+  HTTPS_CLIENT_ALPN,
   LOCK_HOLDER_SOURCE,
   LOCK_READY_MARKER,
   PROC_ENV_SOURCE,
@@ -40,6 +41,7 @@ import {
   makeRunId,
   projectEnvFile,
   proxyCapSeconds,
+  protocolProblems,
   psArgs,
   runNoDepsArgs,
   securityHeaderProblems,
@@ -211,7 +213,7 @@ export function realHttp(o: {
   const host = o.host ?? "127.0.0.1";
   const secure = (o.scheme ?? "https") === "https";
   const keepAliveAgent: http.Agent = secure
-    ? new https.Agent({ keepAlive: true, maxSockets: 1, ca: o.ca })
+    ? new https.Agent({ keepAlive: true, maxSockets: 1, ca: o.ca, ALPNProtocols: HTTPS_CLIENT_ALPN })
     : new http.Agent({ keepAlive: true, maxSockets: 1 });
   const target = (plain?: boolean) => {
     const useTls = secure && !plain;
@@ -219,7 +221,7 @@ export function realHttp(o: {
     return {
       module: (useTls ? https : http) as typeof http,
       port,
-      tlsOptions: useTls ? { servername: o.domain, ca: o.ca } : {},
+      tlsOptions: useTls ? { servername: o.domain, ca: o.ca, ALPNProtocols: HTTPS_CLIENT_ALPN } : {},
       hostHeader: `${o.domain}:${port}`,
     };
   };
@@ -650,7 +652,8 @@ async function realScenario(ctx: SmokeContext): Promise<void> {
   const health1 = await http().request({ method: "GET", path: "/api/health", keepAlive: true });
   const health2 = await http().request({ method: "GET", path: "/api/health", keepAlive: true });
   for (const h of [health1, health2]) {
-    expect(h.httpVersion === "1.1" && h.alpn === "http/1.1", `health was answered with HTTP/${h.httpVersion} (ALPN ${String(h.alpn)}), expected HTTP/1.1`);
+    const protocol = protocolProblems({ httpVersion: h.httpVersion, alpn: h.alpn, offered: HTTPS_CLIENT_ALPN });
+    expect(protocol.length === 0, `health over HTTPS: ${protocol.join("; ")}`);
     expect(h.status === 200 && JSON.parse(h.body).ready === true, "health through the proxy was not ready");
     const hm = headerMap(h.rawHeaders);
     expect(hm.get("cache-control")?.join() === "no-store", "health lost Cache-Control: no-store");

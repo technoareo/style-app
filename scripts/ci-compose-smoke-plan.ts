@@ -283,6 +283,30 @@ export function compareHeaders(direct: readonly string[], proxied: readonly stri
   return problems;
 }
 
+/**
+ * ALPN the smoke client offers on every HTTPS request. Node's https client offers none by default, and
+ * then `socket.alpnProtocol` is `false` whatever the server speaks (GitHub run 41094023413: HTTP/1.1
+ * answer, ALPN false). Offering it makes the negotiated value observable per response.
+ */
+export const HTTPS_CLIENT_ALPN = ["http/1.1"];
+
+/**
+ * What one HTTPS answer must show. The answer itself must be HTTP/1.1. If the client offered ALPN, the
+ * server must have selected "http/1.1" (no ALPN back, or h2, is a proxy defect). If the client offered
+ * none, `false`/null is what Node reports and says nothing about the server, so only the version counts.
+ * Whether h2 is refused when offered is the job of the separate offered-h2 probe and the Caddy config check.
+ */
+export function protocolProblems(r: { httpVersion: string; alpn: string | false | null; offered: readonly string[] }): string[] {
+  const problems: string[] = [];
+  if (r.httpVersion !== "1.1") problems.push(`answered with HTTP/${r.httpVersion}, expected HTTP/1.1`);
+  if (r.offered.length > 0) {
+    if (r.alpn !== "http/1.1") problems.push(`ALPN was ${String(r.alpn)} although the client offered ${JSON.stringify(r.offered)}, expected "http/1.1"`);
+  } else if (r.alpn !== false && r.alpn !== null && r.alpn !== "http/1.1") {
+    problems.push(`ALPN was ${String(r.alpn)}, expected none or "http/1.1"`);
+  }
+  return problems;
+}
+
 /** The five Caddyfile headers must be present once with exactly the shipped value. */
 export function securityHeaderProblems(proxied: readonly string[]): string[] {
   const p = headerMap(proxied);

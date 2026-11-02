@@ -43,12 +43,18 @@
   request_body {
     max_size 10MB
   }
+  # Ownership: the EDGE owns these five headers on every answer. The ">" prefix defers
+  # each one until the response is written and then SETS it, replacing whatever the
+  # app sent. Without it a header the app also sets (X-Content-Type-Options on its
+  # private JSON answers) arrived twice through the error path, where copy_response
+  # adds the upstream headers on top of the ones set here (GitHub run 41400225274:
+  # 401 answered with "nosniff" twice). tests/proxyConfig.test.ts requires the prefix.
   header {
-    Strict-Transport-Security "max-age=31536000"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "same-origin"
-    X-Frame-Options "DENY"
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    >Strict-Transport-Security "max-age=31536000"
+    >X-Content-Type-Options "nosniff"
+    >Referrer-Policy "same-origin"
+    >X-Frame-Options "DENY"
+    >Permissions-Policy "camera=(), microphone=(), geolocation=()"
   }
   # Operator-only upload counters: never served through the public proxy.
   # They stay reachable inside the app container; see docs/DEPLOYMENT.md.

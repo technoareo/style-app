@@ -114,7 +114,7 @@ test("the refusal texts and security headers the smoke test expects are the ones
   const shipped = Object.fromEntries(
     block
       .split("\n")
-      .map((l) => /^\s*([A-Za-z-]+)\s+"(.*)"\s*$/.exec(l))
+      .map((l) => /^\s*>?([A-Za-z-]+)\s+"(.*)"\s*$/.exec(l))
       .filter((m): m is RegExpExecArray => m !== null)
       .map((m) => [m[1].toLowerCase(), m[2]]),
   );
@@ -566,6 +566,25 @@ test("http client: keep-alive reuse, raw headers, the plain redirect port, and a
     server.closeAllConnections();
     server.close();
   }
+});
+
+test("run 41400225274: the app and the edge both set X-Content-Type-Options; the comparison fails on two, the Caddyfile makes the edge the single owner", () => {
+  // Exact evidence: direct ["nosniff"], proxied ["nosniff","nosniff"].
+  const doubled = [...PROXIED, "X-Content-Type-Options", "nosniff"];
+  const found = compareHeaders(APP_JSON, doubled, { expectClose: true }).join(";");
+  assert.match(found, /x-content-type-options/i);
+  assert.match(found, /expected "nosniff"/);
+  // One effective value passes; other security headers stay checked.
+  assert.deepEqual(compareHeaders(APP_JSON, PROXIED, { expectClose: true }), []);
+  assert.match(compareHeaders(APP_JSON, without(PROXIED, "X-Content-Type-Options").concat(["X-Content-Type-Options", "sniff"]), { expectClose: true }).join(";"), /x-content-type-options/i);
+  // The cause: the app sends the header itself ...
+  assert.match(read("src/server/access.ts"), /"X-Content-Type-Options": "nosniff"/);
+  // ... and the edge sets it on every answer, so every Caddyfile security header must be deferred (">" = set after the handler).
+  const caddy = read("deploy/Caddyfile").replace(/^\s*#.*$/gm, "");
+  const block = /header \{([\s\S]*?)\n  \}/.exec(caddy)?.[1] ?? "";
+  const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+  assert.equal(lines.length, Object.keys(SECURITY_HEADERS).length);
+  for (const l of lines) assert.match(l, /^>[A-Za-z-]+ "/, "not deferred: " + l);
 });
 
 // --- HTTPS protocol check (GitHub run 41094023413: "HTTP/1.1 (ALPN false), expected HTTP/1.1") ---

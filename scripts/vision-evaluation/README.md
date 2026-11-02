@@ -39,3 +39,52 @@ Matching is deterministic one-to-one maximum matching at the IoU threshold (clas
 5. Only after step 4 run models, record `run.startedAt`, then `score`.
 
 Templates here are unlabeled on purpose; no label was created or guessed.
+
+---
+
+# Single-item launch gate (build 024)
+
+For the supported **easy single-prominent-item** photo workflow only. Crowded and multi-item recognition stays with the build 014 harness above, which is unchanged: the single-item files have their own schemas (`single-item-*`) and commands (`single-*`), and neither side accepts the other's files. Same rules as before: offline, never runs a model or the app, writes NEW files only (`--out` must not exist), refuses (exit 2) instead of repairing. The adapter and schemas import vocabulary constants and the result schema from `src/domain/analysis.ts` (read only) so they cannot drift from the app.
+
+**This is a foundation. It contains no benchmark images and no labels, and no run of it shows that recognition works or that the product may launch.** The default policy is an unsigned proposal, so the gate reports `NOT_EVALUATED` until a named person approves a policy and a large enough, frozen, rights-cleared benchmark is scored. A benchmark of about 360 images (60 development, 240 held-out in-scope, 60 held-out rejection) is a *recommendation* from the research summarised in `docs/reviews/implementation-024-notes.md`, not a proven standard.
+
+Run with `npm run vision:single -- <command>` or `tsx scripts/vision-evaluation/run.ts <command>`:
+
+| Command | What it does |
+|---|---|
+| `inspect <image>...` | (build 014) sha256 and stored width/height/EXIF orientation of JPEG/PNG files. |
+| `single-template --kind manifest, gold, record or policy --out NEW` | Writes a blank template. Manifest, gold and record templates are invalid until people fill them in. |
+| `single-freeze --manifest M --images-dir D --out-manifest NEW --out-receipt NEW [--against M...]` | Validates rights, hashes, dimensions and leakage (also against the other split's manifest), sets `frozenAt` to now and writes the frozen manifest plus a receipt holding its exact sha256. Run it **before any model sees an image**. A frozen manifest is never refrozen. |
+| `single-validate --manifest M... --gold G... [--receipt R...] --images-dir D [--policy P]` | All integrity checks, no predictions. With `--policy`, also fails (exit 2) if the held-out strata are below the policy minimums. |
+| `single-adapt-qwen --record R or --records-dir DIR, --manifest M... --images-dir D --out NEW` | Converts saved `analyzePhoto()` records into one prediction report. Each record carries the sha256 of the image it analysed; it is checked against the manifest. |
+| `single-score --manifest M... --gold G... --receipt R... --predictions P --images-dir D --policy P --out NEW` | Writes the report: per-split metrics, the launch gate and every case. |
+
+## Files
+
+- **Manifest** (`single-item-manifest`): per image, immutable `sha256` and measured `dimensions`; `sceneType`; `stratum` (`in_scope` or `rejection`) and `rejectionReason`; leakage groups `sourceShootId` and `garmentId`; `priorInference`; `addedAt`; and rights evidence (`sourceCollection`, `sourcePageUrl`, `originalUrl`, `creator`, `license {id, version, url}`, `retrievedAt`, `attribution`, `modifications`, `originalSha256`, `distributedSha256`, `verifiedBy`, `verifiedAt`).
+- **Gold** (`single-item-gold`): one human label per image: exactly one prominent item (`category`, coarse `color`, `pattern`, `fit` or `unknown`, observable `material` or `none_visible`/`unknown`, `box` as normalized corners, suggested `seasons` and `occasions`) or an explicit rejection. `annotation` records the human annotators, status, completion time and `modelAssisted: false`.
+- **Predictions** (`single-item-predictions`) and the **saved record** (`analyze-photo-record`, one `analyzePhoto()` call per file): see the templates in `templates/`.
+- **Policy** (`single-item-launch-policy`): explicit IoU settings, strata minimums and one rule per metric (`metric`, `comparator`, `threshold`, `bound` point or Wilson 95 %, `minN`, `gate` or `informational`).
+
+## What is refused (fail closed, nothing is written)
+
+Missing or unclear rights; a licence outside the allow-list (CC0, PDM, CC BY, CC BY-SA at listed versions), so every NonCommercial, NoDerivatives, unknown or reserved licence; DeepFashion anywhere in the rights evidence; `distributedSha256` that differs from the file; hash mismatch, missing image or re-measured dimensions that differ; incomplete labels, a label for different bytes, a stratum that disagrees with the label; model-made or model-assisted labels (non-human annotator, `modelAssisted: true`, a model-like annotator id or tool); the same bytes, shoot, garment, source page or original file in two splits; a held-out image that has `priorInference`, is a known development image, or was added after the freeze; no freeze receipt, or a manifest that no longer matches it; a run that started before the freeze; labels completed after the run started; unknown fields anywhere; invalid JSON.
+
+Too-small strata are not a refusal: the report is written and the gate says `NOT_EVALUATED` with each shortfall listed (use `single-validate --policy` to make it an error).
+
+## Reading the report
+
+- `selection` is the share of in-scope photos whose single returned item overlaps the human box at the policy IoU. `crop.usefulRate` also needs the item to be covered. A box the app replaced by the full frame (with its "bounds could not be verified" notice) is *not* scored as a box.
+- Each attribute (`category`, `color`, `pattern`, `fit`, `material`) reports `coverage` (answered / known gold), `accuracyOnAnswered`, `endToEndCorrect` (abstentions and failures count as misses), macro F1 and per-class rows. An **abstention** is the model listing the attribute in `uncertain`, the app's `Unsorted` category, an empty colour/pattern, or fit `unknown`. Gold `unknown` fit/material is excluded from scoring and only checked for overclaiming. Free-text colour/pattern is mapped to the gold vocabulary by a fixed table; text that cannot be mapped is **wrong**, never guessed.
+- `refusal.falseAcceptRate`: rejection photos the app accepted as a clean item with no notice. `falseRefusal`: in-scope photos where it returned no item. Failed, timed-out, invalid, unverified and missing cases keep their gold in every denominator and count in `reliability.failureRate`.
+- Latency is the nearest-rank p50/p95/max over every case that ran; one missing duration makes latency not evaluated.
+- The model's `confidence` is stored as `selfConfidence` and **never used as correctness** (the app caps it at 0.5 whenever doubts are listed; the adapter refuses a record that breaks that cap). `seasons` and `occasions` are suggestions: informational Jaccard only, and a policy may not gate on them.
+- Verdict: `NOT_EVALUATED` if the policy has no approval, no held-out predictions exist, or a stratum is below the policy minimum; otherwise `FAIL` if a gate rule fails, `NOT_EVALUATED` if a gate rule lacks `minN` observations, and `PASS` only if every gate rule passes. The held-out split alone decides.
+
+## Operator workflow
+
+1. Choose images whose rights you verified one by one (Wikimedia Commons or Open Images files, not DeepFashion). `inspect` them; fill the manifest (`single-template --kind manifest`).
+2. `single-freeze` the held-out manifest (and freeze development) **before any inference**.
+3. Have people label every image (`single-template --kind gold`); `single-validate`.
+4. Run the app's analysis over each frozen image with your own wrapper that saves one `analyze-photo-record` per image (including the sha256 of the bytes analysed, start time and duration).
+5. `single-adapt-qwen`, then `single-score` with a policy the owner approved. Keep every output; nothing is overwritten.

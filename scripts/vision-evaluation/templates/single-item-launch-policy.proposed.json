@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "kind": "single-item-launch-policy",
+  "id": "single-item-launch-policy",
+  "version": "1.0.0-proposed",
+  "approval": null,
+  "notes": "Proposed by the build 024 builder from the recommended benchmark shape (360 images: 60 development, 240 in-scope held-out, 60 held-out rejection). The numbers are proposals for the owner to accept or change, not a proven standard.",
+  "iou": {
+    "selection": 0.5,
+    "usefulCrop": 0.6,
+    "usefulCropMinCoverage": 0.85
+  },
+  "minimums": {
+    "heldoutInScope": 240,
+    "heldoutRejection": 60,
+    "perCategory": 20,
+    "perRequiredScene": 20,
+    "perRejectionReason": 10,
+    "requiredScenes": [
+      "flat_lay",
+      "hanging",
+      "mannequin",
+      "worn",
+      "product_shot"
+    ],
+    "requiredRejectionReasons": [
+      "multiple_items",
+      "no_garment",
+      "unusable_quality"
+    ]
+  },
+  "rules": [
+    {
+      "id": "selection-rate",
+      "metric": "selection.rate",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "bound": "wilson95_lower",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of in-scope photos where the model's single item overlaps the gold item (IoU)."
+    },
+    {
+      "id": "false-accept-rate",
+      "metric": "refusal.falseAcceptRate",
+      "comparator": "<=",
+      "threshold": 0.1,
+      "bound": "wilson95_upper",
+      "minN": 60,
+      "kind": "gate",
+      "note": "Share of rejection photos the app accepted silently as a clean single item."
+    },
+    {
+      "id": "false-refusal-rate",
+      "metric": "inScope.falseRefusalRate",
+      "comparator": "<=",
+      "threshold": 0.05,
+      "bound": "wilson95_upper",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of in-scope photos where the app returned no item."
+    },
+    {
+      "id": "failure-rate",
+      "metric": "reliability.failureRate",
+      "comparator": "<=",
+      "threshold": 0.02,
+      "bound": "wilson95_upper",
+      "minN": 300,
+      "kind": "gate",
+      "note": "Failed, timed-out, invalid, unverified and missing cases, all of them, over all held-out cases."
+    },
+    {
+      "id": "category-accuracy",
+      "metric": "category.accuracyOnAnswered",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "bound": "wilson95_lower",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Category exactness where the model answered."
+    },
+    {
+      "id": "category-coverage",
+      "metric": "category.coverage",
+      "comparator": ">=",
+      "threshold": 0.95,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of known-gold in-scope photos where the model answered the category (no Unsorted, no doubt, no failure)."
+    },
+    {
+      "id": "category-macro-f1",
+      "metric": "category.macroF1",
+      "comparator": ">=",
+      "threshold": 0.85,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Macro F1 over categories, abstentions counted as misses."
+    },
+    {
+      "id": "color-accuracy",
+      "metric": "color.accuracyOnAnswered",
+      "comparator": ">=",
+      "threshold": 0.8,
+      "bound": "wilson95_lower",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Coarse colour exactness where the model answered; an unmappable colour counts as wrong."
+    },
+    {
+      "id": "color-coverage",
+      "metric": "color.coverage",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of in-scope photos with a mapped, undoubted colour."
+    },
+    {
+      "id": "pattern-accuracy",
+      "metric": "pattern.accuracyOnAnswered",
+      "comparator": ">=",
+      "threshold": 0.8,
+      "bound": "wilson95_lower",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Pattern exactness where the model answered."
+    },
+    {
+      "id": "pattern-coverage",
+      "metric": "pattern.coverage",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of in-scope photos with a mapped, undoubted pattern."
+    },
+    {
+      "id": "fit-accuracy",
+      "metric": "fit.accuracyOnAnswered",
+      "comparator": ">=",
+      "threshold": 0.7,
+      "bound": "wilson95_lower",
+      "minN": 100,
+      "kind": "gate",
+      "note": "Fit exactness where the model answered; unknown is an allowed abstention, so coverage is gated separately."
+    },
+    {
+      "id": "fit-coverage",
+      "metric": "fit.coverage",
+      "comparator": ">=",
+      "threshold": 0.4,
+      "bound": "point",
+      "minN": 100,
+      "kind": "gate",
+      "note": "Fit may often be unknown; require some useful answers."
+    },
+    {
+      "id": "material-accuracy",
+      "metric": "material.accuracyOnAnswered",
+      "comparator": ">=",
+      "threshold": 0.9,
+      "bound": "wilson95_lower",
+      "minN": 100,
+      "kind": "gate",
+      "note": "Observable material exactness where the model answered (none-visible counts as an answer)."
+    },
+    {
+      "id": "material-visible-recall",
+      "metric": "material.visibleMaterialRecall",
+      "comparator": ">=",
+      "threshold": 0.5,
+      "bound": "point",
+      "minN": 20,
+      "kind": "informational",
+      "note": "Recall on photos whose gold material is a visible texture; reported only."
+    },
+    {
+      "id": "crop-useful",
+      "metric": "crop.usefulRate",
+      "comparator": ">=",
+      "threshold": 0.85,
+      "bound": "wilson95_lower",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Share of in-scope photos with a crop that covers the item well."
+    },
+    {
+      "id": "latency-p50",
+      "metric": "latency.p50Ms",
+      "comparator": "<=",
+      "threshold": 60000,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Placeholder for an owner decision on waiting time; not derived from research."
+    },
+    {
+      "id": "latency-p95",
+      "metric": "latency.p95Ms",
+      "comparator": "<=",
+      "threshold": 120000,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Placeholder for an owner decision on waiting time; not derived from research."
+    },
+    {
+      "id": "latency-max",
+      "metric": "latency.maxMs",
+      "comparator": "<=",
+      "threshold": 300000,
+      "bound": "point",
+      "minN": 200,
+      "kind": "gate",
+      "note": "Placeholder for an owner decision on waiting time; not derived from research."
+    },
+    {
+      "id": "seasons-jaccard",
+      "metric": "suggestions.seasons.meanJaccard",
+      "comparator": ">=",
+      "threshold": 0.5,
+      "bound": "point",
+      "minN": 200,
+      "kind": "informational",
+      "note": "Suggestion metric only: seasons are not visible objective truth."
+    },
+    {
+      "id": "occasions-jaccard",
+      "metric": "suggestions.occasions.meanJaccard",
+      "comparator": ">=",
+      "threshold": 0.5,
+      "bound": "point",
+      "minN": 200,
+      "kind": "informational",
+      "note": "Suggestion metric only: occasions are not visible objective truth."
+    }
+  ]
+}

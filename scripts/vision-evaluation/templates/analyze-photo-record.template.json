@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "analyze-photo-record",
+  "fixtureId": "REPLACE-fixture-id",
+  "imageSha256": "REPLACE-64-hex-of-the-image-analysed",
+  "model": "REPLACE-model-name",
+  "modelVersion": "REPLACE-model-digest-or-version",
+  "promptId": "REPLACE-prompt-id",
+  "startedAt": "REPLACE-iso-timestamp",
+  "elapsedMs": null,
+  "timeoutMs": null,
+  "outcome": "REPLACE-ok|timeout|unavailable|unverified",
+  "error": null,
+  "analysis": null
+}

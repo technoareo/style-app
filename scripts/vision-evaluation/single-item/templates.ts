@@ -31,7 +31,7 @@ export const manifestTemplate = () => ({
       priorInference: false,
       priorInferenceNote: null,
       rights: {
-        sourceCollection: TODO("wikimedia-commons|open-images|self-owned-with-release|other-verified"),
+        sourceCollection: TODO("wikimedia-commons|open-images|self-owned-with-release"),
         sourcePageUrl: TODO("https-page-a-person-opened"),
         originalUrl: TODO("https-file-url"),
         creator: TODO("creator-name"),

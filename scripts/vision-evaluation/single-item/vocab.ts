@@ -82,7 +82,12 @@ export const ALLOWED_LICENSES: Readonly<Record<string, readonly string[]>> = {
   "CC-BY-SA": ["2.0", "2.5", "3.0", "4.0"],
 };
 
-export const SOURCE_COLLECTIONS = ["wikimedia-commons", "open-images", "self-owned-with-release", "other-verified"] as const;
+/**
+ * Where the bytes came from. Deliberately closed: there is no catch-all "other"
+ * collection, because a source the harness cannot name is a source whose licence
+ * statement it cannot judge. A new source is added here, in code, with review.
+ */
+export const SOURCE_COLLECTIONS = ["wikimedia-commons", "open-images", "self-owned-with-release"] as const;
 export type SourceCollection = (typeof SOURCE_COLLECTIONS)[number];
 
 const BLOCKED_LICENSE_WORDS = /(^|[^a-z])(nc|nd|noncommercial|non-commercial|noderivs|no-derivatives|unknown|proprietary|reserved)([^a-z]|$)/i;

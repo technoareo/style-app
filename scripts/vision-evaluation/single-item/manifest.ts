@@ -47,6 +47,7 @@ export type RightsEvidence = {
   modifications: string[];
   originalSha256: string;
   distributedSha256: string;
+  /** Who opened the source page and read the licence for THIS file. A name, not proof; the harness does not fetch the page. */
   verifiedBy: string;
   verifiedAt: string;
 };
@@ -57,7 +58,7 @@ export type SingleFixture = {
   /** Lowercase hex of the exact bytes scored. Immutable: a changed image is a new fixture. */
   sha256: string;
   dimensions: Dimensions;
-  /** When the fixture was added to this manifest; must not be after the freeze. */
+  /** CLAIM: when the fixture was added to this manifest. Checked not to be after the freeze; not independently provable. */
   addedAt: string;
   sceneType: SceneType;
   stratum: SingleStratum;
@@ -67,7 +68,11 @@ export type SingleFixture = {
   sourceShootId: string;
   /** Same physical garment or product. A garment must never span splits (null only when no garment is shown). */
   garmentId: string | null;
-  /** True when any model has already been run on this image. Forbidden in a held-out split. */
+  /**
+   * CLAIM by the person who built the manifest: no model has ever been run on
+   * these bytes (or a near copy). The harness checks it is false for held-out and
+   * that the hash is not a known development image; it cannot prove it.
+   */
   priorInference: boolean;
   priorInferenceNote: string | null;
   rights: RightsEvidence;
@@ -79,7 +84,7 @@ export type SingleManifest = {
   kind: "single-item-manifest";
   benchmarkId: string;
   split: Split;
-  /** When the split was fixed (before inference). Required for a held-out manifest that lists fixtures. */
+  /** Set by single-freeze at the moment it runs (the operator never types it). Required for a held-out manifest that lists fixtures. The freeze receipt, not this field, proves the file has not changed since. */
   frozenAt: string | null;
   purpose: string;
   fixtures: SingleFixture[];

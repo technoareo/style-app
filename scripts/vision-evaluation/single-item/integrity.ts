@@ -32,6 +32,9 @@ export type IntegrityInput = {
   stage?: "freeze" | "score";
 };
 
+/** What is compared across splits. Reported so a reader can see what was and was not checked. */
+export const LEAKAGE_KEYS = ["image hash", "fixture id", "file name", "source shoot", "garment", "source page", "original URL", "original file hash"] as const;
+
 const same = (a: string | null, b: string | null) => a !== null && b !== null && a === b;
 
 export function integrityProblems(input: IntegrityInput): string[] {
@@ -44,6 +47,13 @@ export function integrityProblems(input: IntegrityInput): string[] {
   const ids = new Set(input.manifests.map((m) => m.manifest.benchmarkId));
   if (ids.size > 1) out.push(`manifests belong to different benchmarks: ${[...ids].sort().join(", ")}`);
   const benchmarkId = input.manifests[0]?.manifest.benchmarkId ?? null;
+
+  // --- a held-out split is only trustworthy next to the development split it was checked against
+  const developmentInput = bySplit.get("development");
+  if (bySplit.has("heldout") && !developmentInput)
+    out.push("a held-out split was supplied without the development manifest; cross-split leakage (shoot, garment, source page, original file, bytes) cannot be checked, so held-out evidence is refused. Pass the development manifest too");
+  else if (developmentInput && bySplit.has("heldout") && developmentInput.manifest.fixtures.length === 0)
+    out.push("the development manifest lists no fixtures, so cross-split leakage checking would be empty; held-out evidence is refused");
 
   // --- images: present, exact bytes, measured dimensions
   for (const { manifest } of input.manifests) {

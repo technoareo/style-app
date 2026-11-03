@@ -65,6 +65,8 @@ export type SinglePredictionCase = {
   multipleItemsWarning: boolean;
   /** The app's "bounds could not be verified" notice was present. */
   cropUnverifiedWarning: boolean;
+  /** The app merged two shoes into one pair and said so (SHOE_PAIR_WARNING). Reported; the box is then the union of both shoes. */
+  shoePairNotice: boolean;
   invalidReasons: string[];
 };
 
@@ -101,6 +103,7 @@ const CASE_KEYS = [
   "item",
   "multipleItemsWarning",
   "cropUnverifiedWarning",
+  "shoePairNotice",
   "invalidReasons",
 ] as const;
 const ITEM_KEYS = [
@@ -198,7 +201,7 @@ export function validateSinglePredictionReport(doc: unknown): { report: SinglePr
     if (raw.elapsedMs !== null && !isNonNegativeFinite(raw.elapsedMs)) problems.push(`${at}.elapsedMs: must be null or a non-negative number`);
     if (raw.error !== null && typeof raw.error !== "string") problems.push(`${at}.error: must be null or text`);
     if (raw.itemCount !== 0 && raw.itemCount !== 1) problems.push(`${at}.itemCount: single-item mode returns 0 or 1 items`);
-    if (typeof raw.multipleItemsWarning !== "boolean" || typeof raw.cropUnverifiedWarning !== "boolean") problems.push(`${at}: warning flags must be true or false`);
+    if (typeof raw.multipleItemsWarning !== "boolean" || typeof raw.cropUnverifiedWarning !== "boolean" || typeof raw.shoePairNotice !== "boolean") problems.push(`${at}: warning flags must be true or false`);
     if (!Array.isArray(raw.invalidReasons) || !raw.invalidReasons.every((r) => typeof r === "string")) problems.push(`${at}.invalidReasons: must be a list of text`);
     if (raw.status === "completed") {
       if ((raw.itemCount === 1) !== (raw.item !== null)) problems.push(`${at}.item: present exactly when itemCount is 1`);

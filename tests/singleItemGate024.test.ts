@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { CROP_UNVERIFIED_WARNING, MULTIPLE_ITEMS_WARNING, refineSingleItem } from "../src/domain/analysis";
+import { CROP_UNVERIFIED_WARNING, MULTIPLE_ITEMS_WARNING, SHOE_PAIR_WARNING, refineSingleItem } from "../src/domain/analysis";
 import { runCli } from "../scripts/vision-evaluation/cli";
 import { EvaluationRefusal } from "../scripts/vision-evaluation/evaluate";
 import { sha256Hex } from "../scripts/vision-evaluation/image";
@@ -14,13 +14,13 @@ import {
   validateAnalyzePhotoRecord,
   type AnalyzePhotoRecord,
 } from "../scripts/vision-evaluation/single-item/adapter";
-import { SINGLE_COMMANDS, runSingleCli } from "../scripts/vision-evaluation/single-item/cli";
+import { SINGLE_COMMANDS, runSingleCli, writeAllOrNothing } from "../scripts/vision-evaluation/single-item/cli";
 import { validateGoldFile, type GoldFile, type GoldLabel } from "../scripts/vision-evaluation/single-item/gold";
 import { integrityProblems, strataProblems, type IntegrityInput } from "../scripts/vision-evaluation/single-item/integrity";
 import { validateSingleManifest, type FreezeReceipt, type SingleFixture, type SingleManifest } from "../scripts/vision-evaluation/single-item/manifest";
-import { DEFAULT_POLICY, METRIC_IDS, validatePolicy, type LaunchPolicy } from "../scripts/vision-evaluation/single-item/policy";
+import { DEFAULT_POLICY, METRIC_IDS, METRIC_SPECS, POLICY_FLOORS, REQUIRED_GATE_METRICS, approvePolicy, canonicalJson, policyContentSha256, validatePolicy, type LaunchPolicy, type PolicyChecks } from "../scripts/vision-evaluation/single-item/policy";
 import { validateSinglePredictionReport, type SinglePrediction, type SinglePredictionCase, type SinglePredictionReport } from "../scripts/vision-evaluation/single-item/predictions";
-import { evaluateSingle, percentile, wilson, type SingleReport } from "../scripts/vision-evaluation/single-item/score";
+import { RELAXED_PRECONDITION, evaluateSingle, percentile, wilson, type SingleReport } from "../scripts/vision-evaluation/single-item/score";
 import { templates } from "../scripts/vision-evaluation/single-item/templates";
 import {
   ALLOWED_LICENSES,
@@ -164,10 +164,16 @@ const DEV: Spec[] = [
   { id: "d-rej", stratum: "rejection", reason: "no_garment", scene: "other" },
 ];
 
+/** Synthetic runs only: skips the sample-size rules, never the direction, strictness, required-gate or approval-digest rules. */
+const RELAXED: PolicyChecks = { relaxedSampleChecks: true };
+const APPROVER = { by: "test-owner", at: "2026-10-20T00:00:00Z", note: "synthetic policy for tests only" };
+
+/** A test edits a policy after approving it; this re-approves the edited content so the edit is what is tested, not the digest. */
+const rebind = (p: LaunchPolicy): LaunchPolicy => (p.approval ? approvePolicy(p, APPROVER.by, APPROVER.at, APPROVER.note) : p);
+
 /** A policy that is approved and small, so tests can reach every branch with a dozen images. All rules compare the point value. */
 function testPolicy(over: Partial<LaunchPolicy> = {}): LaunchPolicy {
   const p = structuredClone(DEFAULT_POLICY);
-  p.approval = { approvedBy: "test-owner", approvedAt: "2026-10-20T00:00:00Z", note: "synthetic policy for tests only" };
   p.minimums = {
     heldoutInScope: 8,
     heldoutRejection: 4,
@@ -177,8 +183,9 @@ function testPolicy(over: Partial<LaunchPolicy> = {}): LaunchPolicy {
     requiredScenes: ["flat_lay", "hanging"],
     requiredRejectionReasons: ["multiple_items", "no_garment"],
   };
-  p.rules = p.rules.map((r) => ({ ...r, bound: "point" as const, minN: 4 }));
-  return { ...p, ...over };
+  // Material accuracy is computed only where the model NAMED a texture (a blank is an abstention): two photos here.
+  p.rules = p.rules.map((r) => ({ ...r, bound: "point" as const, minN: r.metric === "material.accuracyOnAnswered" ? 2 : 4 }));
+  return rebind({ ...p, ...over, approval: over.approval === undefined ? { ...APPROVER, approvedBy: APPROVER.by, approvedAt: APPROVER.at, policySha256: "" } : over.approval });
 }
 
 type World = {
@@ -256,6 +263,7 @@ function okCase(s: Spec, over: Partial<SinglePrediction> = {}, caseOver: Partial
     item: predictionItem(s, over),
     multipleItemsWarning: false,
     cropUnverifiedWarning: false,
+    shoePairNotice: false,
     invalidReasons: [],
     ...caseOver,
   };
@@ -271,6 +279,7 @@ const failedCase = (s: Spec, status: "failed" | "timeout" | "invalid" | "unverif
   item: null,
   multipleItemsWarning: false,
   cropUnverifiedWarning: false,
+  shoePairNotice: false,
   invalidReasons: [],
 });
 
@@ -306,7 +315,8 @@ function input(w: World, cases: SinglePredictionCase[], policy = testPolicy(), r
     receipts: w.receipts,
     predictions: reportOf(cases, run),
     images: resolverOf(w.images),
-    policy,
+    policy: rebind(policy),
+    policyChecks: RELAXED,
     createdAt: "2026-10-21T00:00:00Z",
     inputDigests: [],
   };
@@ -318,6 +328,22 @@ const heldOf = (w: World) => w.manifests.find((m) => m.manifest.split === "heldo
 const heldGold = (w: World) => w.gold.find((g) => g.split === "heldout")!;
 const fixtureById = (m: SingleManifest, id: string) => m.fixtures.find((f) => f.id === id)!;
 const labelById = (g: GoldFile, id: string) => g.labels.find((l) => l.imageId === id)!;
+
+/**
+ * A synthetic (relaxed-policy) report never carries a PASS: its verdict is NOT_EVALUATED by construction.
+ * Tests of the gate LOGIC read what the verdict would be from the per-check statuses, ignoring only that one precondition.
+ */
+function verdictOf(r: SingleReport): "PASS" | "FAIL" | "NOT_EVALUATED" {
+  if (r.policy.validation === "relaxed-sample-checks") {
+    assert.equal(r.gate.verdict, "NOT_EVALUATED", "a relaxed report must never display PASS or FAIL as a launch verdict");
+    assert.ok(r.gate.preconditions.includes(RELAXED_PRECONDITION));
+  }
+  if (r.gate.preconditions.some((p) => p !== RELAXED_PRECONDITION)) return "NOT_EVALUATED";
+  const gates = r.gate.checks.filter((c) => c.kind === "gate");
+  if (gates.some((c) => c.status === "FAIL")) return "FAIL";
+  if (gates.some((c) => c.status === "NOT_EVALUATED")) return "NOT_EVALUATED";
+  return "PASS";
+}
 
 function problemsOf(w: World, cases: SinglePredictionCase[] | null = null, run = runInfo()): string[] {
   return integrityProblems({ manifests: w.manifests, gold: w.gold, receipts: w.receipts, predictions: cases ? reportOf(cases, run) : null, images: resolverOf(w.images) });
@@ -347,7 +373,7 @@ test("valid path: the synthetic benchmark passes every schema validator and inte
 test("a perfect synthetic run passes the gate under an approved synthetic policy, and the report is deterministic", () => {
   const w = world();
   const a = evaluateSingle(input(w, allCases()));
-  assert.equal(a.gate.verdict, "PASS", JSON.stringify(a.gate.preconditions.concat(a.gate.checks.filter((c) => c.status !== "PASS" && c.kind === "gate").map((c) => `${c.id}:${c.detail}`))));
+  assert.equal(verdictOf(a), "PASS", JSON.stringify(a.gate.preconditions.concat(a.gate.checks.filter((c) => c.status !== "PASS" && c.kind === "gate").map((c) => `${c.id}:${c.detail}`))));
   assert.equal(a.splits.heldout?.selection.value, 1);
   // Same inputs, shuffled order, deep-cloned: byte-identical report.
   const shuffled = clone(w);
@@ -590,7 +616,7 @@ test("too-small strata make the gate NOT_EVALUATED (never PASS) and are listed w
   const small = HELD.filter((s) => s.id !== "h-shoe" && s.id !== "h-rej-none");
   const w = world(small, DEV);
   const report = evaluateSingle(input(w, allCases({ held: small, dev: DEV })));
-  assert.equal(report.gate.verdict, "NOT_EVALUATED");
+  assert.equal(verdictOf(report), "NOT_EVALUATED");
   const text = report.gate.preconditions.join(" | ");
   assert.match(text, /held-out in-scope images: 7 \(policy minimum 8\)/);
   assert.match(text, /held-out category "shoe": 0/);
@@ -707,8 +733,8 @@ test("rejection cases: a silent clean accept is a false accept; a refusal or a n
   assert.equal(h.falseAccept.n, 4);
   assert.equal(h.falseAccept.value, 0.5);
   const byReason = Object.fromEntries(h.rejectionByReason.map((x) => [x.reason, x]));
-  assert.deepEqual(byReason.multiple_items, { reason: "multiple_items", n: 2, refusedOrWarned: 1, falseAccept: 1, failed: 0 });
-  assert.deepEqual(byReason.unusable_quality, { reason: "unusable_quality", n: 1, refusedOrWarned: 0, falseAccept: 0, failed: 1 });
+  assert.deepEqual(byReason.multiple_items, { reason: "multiple_items", n: 2, refused: 0, acceptedWithFittingNotice: 1, unsafeAccept: 1, silentAccept: 1, failed: 0 });
+  assert.deepEqual(byReason.unusable_quality, { reason: "unusable_quality", n: 1, refused: 0, acceptedWithFittingNotice: 0, unsafeAccept: 0, silentAccept: 0, failed: 1 });
   // An in-scope photo the app refused is a false refusal.
   const refused = scored((cases) => {
     Object.assign(caseFor(cases, "h-top-1"), emptyCase(HELD.find((s) => s.id === "h-top-1")!));
@@ -748,16 +774,16 @@ test("failed, timed-out, invalid, unverified and missing cases keep their gold i
 
 test("thresholds: boundary equality passes, a miss fails, too few observations is NOT_EVALUATED, an unapproved policy is NOT_EVALUATED", () => {
   const perfect = evaluateSingle(input(world(), allCases()));
-  assert.equal(perfect.gate.verdict, "PASS");
+  assert.equal(verdictOf(perfect), "PASS");
 
   // A threshold exactly at the observed value passes (>=), one hair above fails.
   const edge = testPolicy();
   edge.rules = edge.rules.map((r) => (r.id === "category-accuracy" ? { ...r, threshold: 1 } : r));
-  assert.equal(evaluateSingle(input(world(), allCases(), edge)).gate.verdict, "PASS");
+  assert.equal(verdictOf(evaluateSingle(input(world(), allCases(), edge))), "PASS");
   const worse = scored((cases) => {
     caseFor(cases, "h-top-1").item!.category = "bottom";
   }, edge);
-  assert.equal(worse.gate.verdict, "FAIL");
+  assert.equal(verdictOf(worse), "FAIL");
   assert.equal(worse.gate.checks.find((c) => c.id === "category-accuracy")!.status, "FAIL");
 
   // minN larger than the data: that rule is NOT_EVALUATED and so is the verdict.
@@ -766,7 +792,7 @@ test("thresholds: boundary equality passes, a miss fails, too few observations i
   const ne = evaluateSingle(input(world(), allCases(), hungry));
   assert.equal(ne.gate.checks.find((c) => c.id === "color-accuracy")!.status, "NOT_EVALUATED");
   assert.match(ne.gate.checks.find((c) => c.id === "color-accuracy")!.detail, /8 observations, rule needs at least 9/);
-  assert.equal(ne.gate.verdict, "NOT_EVALUATED");
+  assert.equal(verdictOf(ne), "NOT_EVALUATED");
 
   // FAIL beats NOT_EVALUATED when a rule definitively fails and another lacks data.
   const mixed = testPolicy();
@@ -774,17 +800,17 @@ test("thresholds: boundary equality passes, a miss fails, too few observations i
   const both = scored((cases) => {
     caseFor(cases, "h-top-1").item!.category = "bottom";
   }, mixed);
-  assert.equal(both.gate.verdict, "FAIL");
+  assert.equal(verdictOf(both), "FAIL");
 
   // The shipped default policy is a proposal with no approval: never a PASS.
   const unsigned = evaluateSingle(input(world(), allCases(), { ...testPolicy(), approval: null }));
-  assert.equal(unsigned.gate.verdict, "NOT_EVALUATED");
+  assert.equal(verdictOf(unsigned), "NOT_EVALUATED");
   assert.match(unsigned.gate.preconditions.join(" "), /no approval record/);
 
   // Development-only predictions never give a verdict.
   const devOnly = evaluateSingle(input(world(), perfectCases(DEV)));
   assert.equal(devOnly.splits.heldout, null);
-  assert.equal(devOnly.gate.verdict, "NOT_EVALUATED");
+  assert.equal(verdictOf(devOnly), "NOT_EVALUATED");
   assert.match(devOnly.gate.preconditions.join(" "), /no held-out predictions/);
 });
 
@@ -822,7 +848,7 @@ test("latency percentiles are nearest-rank, over every case that ran, and gate o
   assert.equal(l.maxMs, 150000);
   const p95 = r.gate.checks.find((c) => c.id === "latency-p95")!;
   assert.equal(p95.status, "FAIL", "150 s is over the 120 s placeholder limit");
-  assert.equal(r.gate.verdict, "FAIL");
+  assert.equal(verdictOf(r), "FAIL");
   assert.match(read("docs/reviews/implementation-024-notes.md"), /75 to 132 seconds/);
 });
 
@@ -845,7 +871,7 @@ test("seasons and occasions are suggestions: metrics only, never a gate", () => 
   const r = evaluateSingle(input(withSuggestions, cases));
   assert.equal(heldCase(r, "h-top-1").seasonsJaccard, 0);
   assert.equal(r.splits.heldout!.suggestions.seasons.value, 0.875);
-  assert.equal(r.gate.verdict, "PASS", "wrong suggestions never fail the gate");
+  assert.equal(verdictOf(r), "PASS", "wrong suggestions never fail the gate");
   assert.match(r.splits.heldout!.suggestions.note, /not visible objective truth/);
   const bad = testPolicy();
   bad.rules = [...bad.rules.filter((x) => x.kind === "gate"), { ...bad.rules.find((x) => x.metric === "suggestions.seasons.meanJaccard")!, kind: "gate" as const }];
@@ -1206,4 +1232,595 @@ test("documentation: the notes state the scope honestly and make no readiness cl
   assert.match(readme, /single-freeze/);
   assert.match(readme, /NOT EVALUATED|NOT_EVALUATED/);
   assert.match(read("package.json"), /"vision:single"/);
+});
+
+// ================================================================== build 024 correction pass
+
+const prodProblems = (mutate: (p: any) => void, base: unknown = DEFAULT_POLICY): string => {
+  const p = JSON.parse(JSON.stringify(base));
+  mutate(p);
+  return validatePolicy(p).problems.join(" | ");
+};
+const ruleOf = (p: any, id: string) => p.rules.find((r: any) => r.id === id);
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ---- B1: a policy must not be able to pass everything
+
+test("B1 false-PASS probes: rules that cannot fail, wrong-direction comparators and vacuous thresholds are refused", () => {
+  // The reviewer's examples, exactly.
+  assert.match(
+    prodProblems((p) => Object.assign(ruleOf(p, "false-accept-rate"), { comparator: ">=", threshold: 0, bound: "point" })),
+    /refusal\.falseAcceptRate must use "<="/,
+  );
+  assert.match(prodProblems((p) => Object.assign(ruleOf(p, "latency-p95"), { comparator: ">=", threshold: 0 })), /latency\.p95Ms must use "<="/);
+  assert.match(prodProblems((p) => (ruleOf(p, "selection-rate").minN = 1)), /minN: 1 is below 240/);
+  assert.match(prodProblems((p) => (p.iou.selection = 0.01)), /policy\.iou\.selection: 0\.01 is below 0\.3/);
+  assert.match(prodProblems((p) => (p.iou.usefulCrop = 0.05)), /policy\.iou\.usefulCrop/);
+  assert.match(prodProblems((p) => (p.iou.usefulCropMinCoverage = 0.1)), /policy\.iou\.usefulCropMinCoverage/);
+  // Right direction, threshold nobody can miss.
+  assert.match(prodProblems((p) => (ruleOf(p, "category-accuracy").threshold = 0.01)), /below the weakest acceptable 0\.8 for category\.accuracyOnAnswered/);
+  assert.match(prodProblems((p) => (ruleOf(p, "false-accept-rate").threshold = 1)), /above the loosest acceptable 0\.2 for refusal\.falseAcceptRate/);
+  assert.match(prodProblems((p) => (ruleOf(p, "latency-p95").threshold = 1e12)), /above the loosest acceptable 300000 for latency\.p95Ms/);
+  assert.match(prodProblems((p) => (ruleOf(p, "failure-rate").threshold = 0.5)), /above the loosest acceptable 0\.05 for reliability\.failureRate/);
+  // Right direction, threshold nobody can meet (a policy that can never pass is a mistake, not rigour).
+  assert.match(prodProblems((p) => (ruleOf(p, "false-accept-rate").threshold = 0)), /can never be met/);
+  assert.match(prodProblems((p) => (ruleOf(p, "selection-rate").threshold = 1)), /can never be met/);
+  // Not even numbers.
+  const direct = structuredClone(DEFAULT_POLICY) as any;
+  direct.rules[0].threshold = Number.POSITIVE_INFINITY;
+  assert.match(validatePolicy(direct).problems.join(" | "), /finite number/);
+  direct.rules[0].threshold = Number.NaN;
+  assert.match(validatePolicy(direct).problems.join(" | "), /finite number/);
+  // The wrong comparator on every gated metric, not only the two examples.
+  let checked = 0;
+  for (const [metric, spec] of Object.entries(METRIC_SPECS)) {
+    if (!spec) continue;
+    const rule = DEFAULT_POLICY.rules.find((r) => r.metric === metric && r.kind === "gate");
+    if (!rule) continue;
+    const flipped = prodProblems((p) => {
+      const r = p.rules.find((x: any) => x.id === rule.id);
+      r.comparator = spec.comparator === ">=" ? "<=" : ">=";
+      r.bound = "point";
+    });
+    assert.match(flipped, new RegExp(`${esc(metric)} must use "${esc(spec.comparator)}"`), metric);
+    checked++;
+  }
+  assert.ok(checked >= 15);
+});
+
+test("B1: the policy must gate on every required metric, and an informational rule does not count", () => {
+  for (const needed of ["category.coverage", "inScope.falseRefusalRate", "crop.usefulRate", "category.macroF1", "refusal.unsafeAcceptRate", "inScope.warningRate", "color.coverage", "pattern.coverage", "fit.coverage", "material.accuracyOnAnswered"])
+    assert.ok((REQUIRED_GATE_METRICS as readonly string[]).includes(needed), needed);
+  for (const metric of REQUIRED_GATE_METRICS) {
+    const removed = prodProblems((p) => (p.rules = p.rules.filter((r: any) => r.metric !== metric)));
+    assert.match(removed, new RegExp(`must gate on ${esc(metric)}`), `removing ${metric}`);
+    const demoted = prodProblems((p) => p.rules.filter((r: any) => r.metric === metric).forEach((r: any) => (r.kind = "informational")));
+    assert.match(demoted, new RegExp(`must gate on ${esc(metric)}`), `demoting ${metric}`);
+  }
+  assert.equal(prodProblems(() => undefined), "", "the shipped proposal itself is valid");
+});
+
+test("B1: sample sizes follow the policy strata, interval bounds are required, and the minimums have floors", () => {
+  assert.match(prodProblems((p) => (ruleOf(p, "selection-rate").minN = 100)), /minN: 100 is below 240/);
+  assert.match(prodProblems((p) => (ruleOf(p, "false-accept-rate").minN = 5)), /minN: 5 is below 60/);
+  assert.match(prodProblems((p) => (ruleOf(p, "failure-rate").minN = 10)), /minN: 10 is below 300/);
+  assert.match(prodProblems((p) => (ruleOf(p, "fit-accuracy").minN = 10)), /minN: 10 is below 96/);
+  assert.match(prodProblems((p) => (ruleOf(p, "selection-rate").minN = 5000)), /minN: 5000 is above 240/);
+  assert.match(prodProblems((p) => (ruleOf(p, "false-accept-rate").minN = 61)), /minN: 61 is above 60/);
+  assert.match(prodProblems((p) => Object.assign(ruleOf(p, "selection-rate"), { bound: "point" })), /selection\.rate must use wilson95_lower, not point/);
+  assert.match(prodProblems((p) => Object.assign(ruleOf(p, "false-refusal-rate"), { bound: "point" })), /inScope\.falseRefusalRate must use wilson95_upper/);
+  assert.match(prodProblems((p) => Object.assign(ruleOf(p, "category-macro-f1"), { bound: "wilson95_lower" })), /category\.macroF1 must use point/);
+  assert.match(prodProblems((p) => (p.minimums.heldoutInScope = 12)), /heldoutInScope: 12 is below the floor of 100/);
+  assert.match(prodProblems((p) => (p.minimums.heldoutRejection = 3)), /heldoutRejection: 3 is below the floor of 40/);
+  assert.match(prodProblems((p) => (p.minimums.perCategory = 2)), /perCategory: 2 is below the floor of 10/);
+  assert.match(prodProblems((p) => (p.minimums.requiredScenes = ["flat_lay", "hanging"])), /at least three scene types/);
+  assert.match(prodProblems((p) => (p.minimums.requiredRejectionReasons = ["unusable_quality"])), /must include "multiple_items"/);
+  assert.match(prodProblems((p) => (p.minimums.perCategory = 60)), /perCategory x 6 categories exceeds heldoutInScope/);
+  for (const key of Object.keys(POLICY_FLOORS) as Array<keyof typeof POLICY_FLOORS>) assert.ok(DEFAULT_POLICY.minimums[key] >= POLICY_FLOORS[key], key);
+});
+
+test("B1: relaxed sample checks (synthetic only) never relax direction, strictness or the required gates; and are disclosed", () => {
+  const relaxed = (mutate: (p: LaunchPolicy) => void) => {
+    const p = structuredClone(DEFAULT_POLICY);
+    mutate(p);
+    return validatePolicy(p, { relaxedSampleChecks: true }).problems.join(" | ");
+  };
+  assert.equal(relaxed((p) => (p.minimums = testPolicy().minimums)), "", "small minimums are what 'relaxed' is for");
+  assert.match(relaxed((p) => (p.minimums.heldoutInScope = 8)), /perCategory x 6 categories exceeds heldoutInScope/, "but the strata must still be satisfiable");
+  assert.match(relaxed((p) => Object.assign(p.rules[1], { comparator: ">=" as const, threshold: 0 })), /must use "<="/);
+  assert.match(relaxed((p) => (p.rules[0].threshold = 0.05)), /below the weakest acceptable/);
+  assert.match(relaxed((p) => (p.rules = p.rules.filter((r) => r.metric !== "inScope.warningRate"))), /must gate on inScope\.warningRate/);
+  assert.match(relaxed((p) => (p.iou.selection = 0.01)), /policy\.iou\.selection/);
+  // A vacuous policy never reaches a verdict: scoring refuses it instead of reporting a PASS.
+  const lax = testPolicy();
+  lax.rules = lax.rules.map((r) => (r.id === "category-accuracy" ? { ...r, threshold: 0.01 } : r));
+  assert.match(refusal(() => evaluateSingle(input(world(), allCases(), lax))), /below the weakest acceptable/);
+  const dropped = testPolicy();
+  dropped.rules = dropped.rules.filter((r) => r.metric !== "crop.usefulRate");
+  assert.match(refusal(() => evaluateSingle(input(world(), allCases(), dropped))), /must gate on crop\.usefulRate/);
+  // The synthetic report says its policy was validated loosely.
+  const synthetic = evaluateSingle(input(world(), allCases()));
+  assert.equal(synthetic.policy.validation, "relaxed-sample-checks");
+  assert.ok(synthetic.statements.some((s) => /relaxed sample-size checks .* not launch evidence/.test(s)));
+  // Default checks (no option) are production checks: the small synthetic policy is refused.
+  assert.match(refusal(() => evaluateSingle({ ...input(world(), allCases()), policyChecks: undefined })), /below the floor|minN/);
+  // The production default, once approved, is valid.
+  assert.deepEqual(validatePolicy(approvePolicy(DEFAULT_POLICY, "owner", "2026-10-20T00:00:00Z", "approved for review")).problems, []);
+});
+
+// ---- B2: held-out evidence needs the development manifest
+
+test("B2: a held-out score or validation without the development manifest is refused and says why", () => {
+  const w = world();
+  const heldOnly = { ...w, manifests: w.manifests.filter((m) => m.manifest.split === "heldout"), gold: w.gold.filter((g) => g.split === "heldout") } as World;
+  const heldCases = allCases().filter((c) => c.fixtureId.startsWith("h-"));
+  assert.match(problemsOf(heldOnly, heldCases).join(" | "), /without the development manifest; cross-split leakage .* cannot be checked/);
+  assert.match(refusal(() => evaluateSingle(input(heldOnly, heldCases))), /without the development manifest/);
+  // The leakage the missing manifest would have hidden is exactly what the full check catches.
+  const leaky = clone(w);
+  fixtureById(heldOf(leaky), "h-top-1").sourceShootId = "shoot-d-top";
+  assert.match(problemsOf(leaky, allCases()).join(" | "), /leakage: source shoot "shoot-d-top" is in the development split/);
+  const hidden = { ...leaky, manifests: leaky.manifests.filter((m) => m.manifest.split === "heldout"), gold: leaky.gold.filter((g) => g.split === "heldout") } as World;
+  assert.ok(problemsOf(hidden).length > 0, "the same data is not accepted just because the other split was left out");
+  // An empty development manifest would make the leakage check vacuous.
+  assert.match(problemsOf(world(HELD, []), allCases({ held: HELD, dev: [] })).join(" | "), /development manifest lists no fixtures/);
+  // Development-only data is still checkable (it is not held-out evidence).
+  const devOnly = { ...w, manifests: w.manifests.filter((m) => m.manifest.split === "development"), gold: w.gold.filter((g) => g.split === "development"), receipts: [] } as World;
+  assert.deepEqual(problemsOf(devOnly), []);
+});
+
+test("B2: the report states which splits were checked together", () => {
+  const r = evaluateSingle(input(world(), allCases()));
+  assert.deepEqual(r.integrity.splitsChecked, ["development", "heldout"]);
+  assert.equal(r.integrity.crossSplitLeakageChecked, true);
+  assert.equal(r.integrity.developmentFixtures, DEV.length);
+  assert.equal(r.integrity.heldoutFixtures, HELD.length);
+  for (const key of ["source shoot", "garment", "source page", "original file hash", "image hash"]) assert.ok(r.integrity.leakageKeys.includes(key), key);
+});
+
+// ---- M1: approval is bound to the policy content
+
+test("M1: an approval binds to a canonical digest of the policy content; any later change breaks it", () => {
+  const approved = approvePolicy(DEFAULT_POLICY, "owner@example.com", "2026-10-20T00:00:00Z", "reviewed the thresholds");
+  assert.deepEqual(validatePolicy(JSON.parse(JSON.stringify(approved))).problems, []);
+  assert.equal(approved.approval!.policySha256, policyContentSha256(DEFAULT_POLICY));
+  assert.equal(policyContentSha256(approved), policyContentSha256(DEFAULT_POLICY), "the approval record is not part of what it approves");
+  // Tampering after approval: a threshold, a minimum, an IoU, a rule removed, a version, notes.
+  const edits: Array<[string, (p: any) => void]> = [
+    ["threshold", (p) => (ruleOf(p, "selection-rate").threshold = 0.91)],
+    ["minimum", (p) => (p.minimums.heldoutInScope = 239)],
+    ["iou", (p) => (p.iou.selection = 0.4)],
+    ["rule removed", (p) => (p.rules = p.rules.filter((r: any) => r.id !== "seasons-jaccard"))],
+    ["version", (p) => (p.version = "1.1.1")],
+    ["notes", (p) => (p.notes = "different notes")],
+  ];
+  for (const [what, mutate] of edits) assert.match(prodProblems(mutate, approved), /does not match this policy's content/, what);
+  // A forged, missing or malformed digest is refused too.
+  assert.match(prodProblems((p) => (p.approval.policySha256 = "a".repeat(64)), approved), /does not match this policy's content/);
+  assert.match(prodProblems((p) => (p.approval.policySha256 = "nope"), approved), /policySha256/);
+  assert.match(prodProblems((p) => delete p.approval.policySha256, approved), /policySha256|missing field/);
+  // The approval record's own wording is not part of what it approves.
+  const reworded = JSON.parse(JSON.stringify(approved));
+  reworded.approval.note = "changed wording of the approval note";
+  assert.deepEqual(validatePolicy(reworded).problems, []);
+});
+
+test("M1: the digest is canonical (independent of key order) and scoring refuses a tampered approved policy", () => {
+  assert.equal(canonicalJson({ b: 1, a: { d: [2, { z: 1, y: 2 }], c: null } }), canonicalJson({ a: { c: null, d: [2, { y: 2, z: 1 }] }, b: 1 }));
+  assert.notEqual(canonicalJson([1, 2]), canonicalJson([2, 1]), "array order is content");
+  const approved = approvePolicy(DEFAULT_POLICY, "owner", "2026-10-20T00:00:00Z", "ok");
+  const original = JSON.parse(JSON.stringify(approved));
+  const shuffled: Record<string, unknown> = {};
+  for (const k of Object.keys(original).reverse()) shuffled[k] = original[k];
+  shuffled.rules = original.rules.map((r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).reverse()));
+  assert.deepEqual(validatePolicy(shuffled).problems, [], "key order does not change the digest");
+  assert.equal(policyContentSha256(shuffled), policyContentSha256(approved));
+  // evaluateSingle re-checks the digest itself, so a caller cannot bypass the file loader.
+  const base = testPolicy();
+  const stale = { ...base, rules: base.rules.map((r) => (r.id === "category-accuracy" ? { ...r, threshold: 0.81 } : r)) };
+  assert.match(refusal(() => evaluateSingle({ ...input(world(), allCases()), policy: stale })), /does not match this policy's content/);
+  // The report exposes the content digest, the document digest and that the approval verified.
+  const report = evaluateSingle(input(world(), allCases()));
+  assert.equal(report.policy.approved, true);
+  assert.equal(report.policy.approvalBoundToContent, true);
+  assert.match(report.policy.contentSha256, /^[0-9a-f]{64}$/);
+  assert.match(report.policy.documentSha256, /^[0-9a-f]{64}$/);
+  assert.notEqual(report.policy.contentSha256, report.policy.documentSha256, "the document digest includes the approval");
+  assert.equal(report.policy.contentSha256, policyContentSha256(testPolicy()));
+  const unsigned = evaluateSingle(input(world(), allCases(), testPolicy({ approval: null })));
+  assert.equal(unsigned.policy.approved, false);
+  assert.equal(unsigned.policy.approvalBoundToContent, false);
+  assert.equal(verdictOf(unsigned), "NOT_EVALUATED");
+});
+
+test("M1: single-approve writes a bound approval; a policy edited afterwards is refused by the CLI", () => {
+  const prefix = "single-item-024-approve-";
+  const dir = makeTempDir(prefix);
+  try {
+    const proposed = path.join(dir, "policy.proposed.json");
+    const approvedFile = path.join(dir, "policy.approved.json");
+    assert.equal(runSingleCli(["single-template", "--kind", "policy", "--out", proposed], cliIo().io), 0);
+    const bad = cliIo();
+    assert.equal(runSingleCli(["single-approve", "--policy", proposed, "--out", approvedFile], bad.io), 1);
+    assert.match(bad.err.join(" "), /--approved-by .* --note/);
+    const a = cliIo("2026-10-22T00:00:00Z");
+    assert.equal(runSingleCli(["single-approve", "--policy", proposed, "--approved-by", "Owner Name", "--note", "reviewed all thresholds", "--out", approvedFile], a.io), 0, a.err.join("\n"));
+    const doc = JSON.parse(readFileSync(approvedFile, "utf8"));
+    assert.equal(doc.approval.approvedBy, "Owner Name");
+    assert.equal(doc.approval.approvedAt, "2026-10-22T00:00:00.000Z");
+    assert.equal(doc.approval.policySha256, policyContentSha256(DEFAULT_POLICY));
+    assert.deepEqual(validatePolicy(doc).problems, []);
+    assert.match(a.out.join(" "), /does not make the product ready/);
+    // never overwritten, never re-approved, never the input path
+    assert.equal(runSingleCli(["single-approve", "--policy", proposed, "--approved-by", "x", "--note", "y", "--out", approvedFile], cliIo().io), 1);
+    const again = cliIo();
+    assert.equal(runSingleCli(["single-approve", "--policy", approvedFile, "--approved-by", "x", "--note", "y", "--out", path.join(dir, "again.json")], again.io), 2);
+    assert.match(again.err.join(" "), /already approved/);
+    assert.equal(runSingleCli(["single-approve", "--policy", proposed, "--approved-by", "x", "--note", "y", "--out", proposed], cliIo().io), 1);
+    // Edit one threshold in the approved file: scoring refuses.
+    const edited = path.join(dir, "policy.edited.json");
+    const tampered = JSON.parse(readFileSync(approvedFile, "utf8"));
+    ruleOf(tampered, "selection-rate").threshold = 0.91;
+    writeFileSync(edited, JSON.stringify(tampered));
+    const sc = cliIo();
+    assert.equal(
+      runSingleCli(["single-score", "--manifest", "m.json", "--gold", "g.json", "--predictions", "p.json", "--images-dir", dir, "--policy", edited, "--out", path.join(dir, "r.json")], sc.io),
+      2,
+    );
+    assert.match(sc.err.join(" "), /does not match this policy's content/);
+    assert.equal(existsSync(path.join(dir, "r.json")), false);
+    const validateTampered = cliIo();
+    assert.equal(runSingleCli(["single-validate", "--manifest", "m.json", "--images-dir", dir, "--policy", edited], validateTampered.io), 1, "unreadable manifest is a usage error before the policy matters");
+  } finally {
+    removeTempDir(dir, prefix);
+  }
+});
+
+// ---- M2: warning about everything must not pass
+
+test("M2: a rejection photo answered with an item and the WRONG kind of notice is an unsafe accept", () => {
+  const spec = (id: string) => HELD.find((s) => s.id === id)!;
+  const r = scored((cases) => {
+    // multiple_items photo: crop-only notice (not the right notice) -> unsafe; the strict silent metric does not see it
+    Object.assign(caseFor(cases, "h-rej-multi-1"), { multipleItemsWarning: false, cropUnverifiedWarning: true });
+    // no_garment photo: an item with a multiple-items notice -> unsafe (the notice does not fit the reason)
+    Object.assign(caseFor(cases, "h-rej-none"), okCase(spec("h-rej-none"), {}, { multipleItemsWarning: true }));
+  });
+  const h = r.splits.heldout!;
+  assert.equal(heldCase(r, "h-rej-multi-1").disposition, "accepted_with_crop_warning");
+  assert.equal(heldCase(r, "h-rej-multi-1").unsafeAccept, true);
+  assert.equal(heldCase(r, "h-rej-none").unsafeAccept, true);
+  assert.equal(heldCase(r, "h-rej-multi-2").unsafeAccept, false);
+  assert.equal(heldCase(r, "h-rej-quality").unsafeAccept, false);
+  assert.equal(heldCase(r, "h-top-1").unsafeAccept, null, "in-scope photos have no unsafe-accept notion");
+  assert.equal(h.falseAccept.value, 0, "the strict silent-accept metric is unchanged and still blind to notices");
+  assert.equal(h.unsafeAccept.value, 0.5);
+  assert.equal(r.gate.checks.find((c) => c.id === "unsafe-accept-rate")!.status, "FAIL");
+  assert.equal(r.gate.checks.find((c) => c.id === "false-accept-rate")!.status, "PASS");
+  assert.equal(verdictOf(r), "FAIL");
+  const byReason = Object.fromEntries(h.rejectionByReason.map((x) => [x.reason, x]));
+  assert.deepEqual(byReason.multiple_items, { reason: "multiple_items", n: 2, refused: 0, acceptedWithFittingNotice: 1, unsafeAccept: 1, silentAccept: 0, failed: 0 });
+  assert.deepEqual(byReason.no_garment, { reason: "no_garment", n: 1, refused: 0, acceptedWithFittingNotice: 0, unsafeAccept: 1, silentAccept: 0, failed: 0 });
+  // A failure is not an accept; it is the failure rate's business.
+  const failed = scored((cases) => Object.assign(caseFor(cases, "h-rej-multi-1"), failedCase(spec("h-rej-multi-1"), "timeout", 180000)));
+  assert.equal(heldCase(failed, "h-rej-multi-1").unsafeAccept, false);
+  assert.equal(failed.splits.heldout!.unsafeAccept.value, 0);
+});
+
+test("M2: a model that warns about everything cannot pass: it fails the in-scope warning gate", () => {
+  const warnEverywhere = scored((cases) => cases.forEach((c) => (c.multipleItemsWarning = true)));
+  const h = warnEverywhere.splits.heldout!;
+  assert.equal(h.falseAccept.value, 0, "warning everywhere makes the strict metric look perfect");
+  assert.equal(h.inScopeWarning.value, 1);
+  assert.equal(warnEverywhere.gate.checks.find((c) => c.id === "in-scope-warning-rate")!.status, "FAIL");
+  assert.equal(verdictOf(warnEverywhere), "FAIL");
+  // Crop-unverified notices count as warnings too; a shoe-pair notice does not.
+  const cropEverywhere = scored((cases) => cases.forEach((c) => (c.cropUnverifiedWarning = true)));
+  assert.equal(cropEverywhere.splits.heldout!.inScopeWarning.value, 1);
+  assert.equal(verdictOf(cropEverywhere), "FAIL");
+  const pairNotice = scored((cases) => (caseFor(cases, "h-shoe").shoePairNotice = true));
+  assert.equal(pairNotice.splits.heldout!.inScopeWarning.value, 0);
+  assert.equal(pairNotice.splits.heldout!.shoePairNotices, 1);
+  assert.equal(verdictOf(pairNotice), "PASS", "a shoe-pair notice is carried and reported, not penalised");
+  assert.equal(scored(() => undefined).splits.heldout!.inScopeWarning.value, 0);
+});
+
+// ---- low items
+
+test("low: the adapter carries the shoe-pair notice through to the prediction report", () => {
+  const pair = toSingleCase(record({}, { items: [analysisItem({ category: "Shoes", name: "Black sneakers (pair)" })], warning: SHOE_PAIR_WARNING }));
+  assert.equal(pair.status, "completed");
+  assert.equal(pair.shoePairNotice, true);
+  assert.equal(pair.multipleItemsWarning, false);
+  assert.equal(toSingleCase(record()).shoePairNotice, false);
+  assert.equal(toSingleCase(record({ outcome: "timeout", analysis: null, error: "t" })).shoePairNotice, false);
+  const both = toSingleCase(record({}, { items: [analysisItem()], warning: `${SHOE_PAIR_WARNING} ${MULTIPLE_ITEMS_WARNING}` }));
+  assert.equal(both.shoePairNotice && both.multipleItemsWarning, true);
+  assert.deepEqual(validateSinglePredictionReport(JSON.parse(JSON.stringify(reportOf([pair])))).problems, []);
+  const missing = JSON.parse(JSON.stringify(reportOf([pair])));
+  delete missing.cases[0].shoePairNotice;
+  assert.match(validateSinglePredictionReport(missing).problems.join(" "), /shoePairNotice|warning flags/);
+});
+
+test("low: a blank material is an abstention, not a correct 'none visible' answer", () => {
+  const perfect = scored(() => undefined).splits.heldout!.attributes.material;
+  // Gold: leather and knit are visible textures; five photos are none_visible; the shoe is unknown. The model named only the two textures.
+  assert.equal(perfect.goldKnown, 7);
+  assert.equal(perfect.answered, 2);
+  assert.equal(perfect.correct, 2);
+  assert.equal(perfect.abstained, 5, "five blanks on none-visible gold are not credited as correct");
+  assert.equal(perfect.coverage.value, r6(2 / 7));
+  assert.equal(perfect.accuracyOnAnswered.value, 1);
+  assert.equal(perfect.endToEndCorrect.value, r6(2 / 7));
+  const r = scored((cases) => (caseFor(cases, "h-top-1").item!.material = "denim")); // gold none_visible, the model names a texture
+  assert.equal(heldCase(r, "h-top-1").attributes!.material.state, "wrong");
+  assert.equal(r.splits.heldout!.attributes.material.wrong, 1);
+  assert.equal(heldCase(r, "h-top-2").attributes!.material.state, "abstained");
+  assert.equal(heldCase(r, "h-top-2").attributes!.material.predicted, null);
+  // A model that never names a texture cannot pass the material gate by saying nothing.
+  const silent = scored((cases) => cases.forEach((c) => c.item && (c.item.material = "")));
+  assert.equal(silent.splits.heldout!.attributes.material.answered, 0);
+  assert.equal(silent.splits.heldout!.attributes.material.accuracyOnAnswered.value, null);
+  assert.equal(silent.gate.checks.find((c) => c.id === "material-accuracy")!.status, "NOT_EVALUATED");
+  assert.equal(verdictOf(silent), "NOT_EVALUATED");
+});
+
+test("low: single-freeze refuses colliding paths and writes both files or neither", () => {
+  const prefix = "single-item-024-freeze-";
+  const dir = makeTempDir(prefix);
+  try {
+    const images = path.join(dir, "images");
+    mkdirSync(images);
+    const w = world(HELD, DEV);
+    for (const [file, bytes] of w.images) writeFileSync(path.join(images, file), bytes);
+    const devFile = path.join(dir, "development.manifest.json");
+    const heldFile = path.join(dir, "heldout.manifest.json");
+    writeFileSync(devFile, JSON.stringify({ ...w.manifests.find((m) => m.manifest.split === "development")!.manifest, frozenAt: null }));
+    writeFileSync(heldFile, JSON.stringify({ ...heldOf(w), frozenAt: null }));
+    const names = () => readdirSync(dir).sort().join(",");
+    const before = names();
+    const same = path.join(dir, "same.json");
+    const a = cliIo();
+    assert.equal(runSingleCli(["single-freeze", "--manifest", devFile, "--images-dir", images, "--out-manifest", same, "--out-receipt", same], a.io), 1);
+    assert.match(a.err.join(" "), /same path/);
+    // an output path that is the input manifest
+    assert.equal(runSingleCli(["single-freeze", "--manifest", devFile, "--images-dir", images, "--out-manifest", path.join(dir, "x.json"), "--out-receipt", devFile], cliIo().io), 1);
+    assert.equal(names(), before, "nothing was written");
+    // The second file cannot be created (its directory is missing): neither file exists afterwards, and no temp file is left.
+    const b = cliIo();
+    assert.equal(
+      runSingleCli(["single-freeze", "--manifest", devFile, "--images-dir", images, "--out-manifest", path.join(dir, "dev.frozen.json"), "--out-receipt", path.join(dir, "missing-dir", "dev.receipt.json")], b.io),
+      1,
+    );
+    assert.equal(names(), before, "an incomplete freeze leaves no manifest without its receipt, and no temp files");
+    // A held-out freeze without the development manifest is refused (leakage cannot be checked).
+    const c = cliIo();
+    assert.equal(runSingleCli(["single-freeze", "--manifest", heldFile, "--images-dir", images, "--out-manifest", path.join(dir, "h.frozen.json"), "--out-receipt", path.join(dir, "h.receipt.json")], c.io), 2);
+    assert.match(c.err.join(" "), /without the development manifest/);
+    assert.equal(names(), before);
+    // The happy path still writes both, and the receipt names the file's exact bytes.
+    const d = cliIo();
+    assert.equal(runSingleCli(["single-freeze", "--manifest", devFile, "--images-dir", images, "--out-manifest", path.join(dir, "dev.frozen.json"), "--out-receipt", path.join(dir, "dev.receipt.json")], d.io), 0, d.err.join("\n"));
+    assert.equal(JSON.parse(readFileSync(path.join(dir, "dev.receipt.json"), "utf8")).manifestSha256, sha256Hex(readFileSync(path.join(dir, "dev.frozen.json"))));
+    assert.deepEqual(readdirSync(dir).filter((f) => f.includes(".tmp-")), []);
+  } finally {
+    removeTempDir(dir, prefix);
+  }
+});
+
+test("low: the source collection list is closed (no catch-all) and provenance fields are documented as claims", () => {
+  const m = clone(heldOf(world()));
+  (m.fixtures[0].rights as { sourceCollection: string }).sourceCollection = "other-verified";
+  assert.match(validateSingleManifest(JSON.parse(JSON.stringify(m))).problems.join(" "), /sourceCollection: must be one of wikimedia-commons, open-images, self-owned-with-release/);
+  assert.ok(!read("scripts/vision-evaluation/templates/single-item-manifest.template.json").includes("other-verified"));
+  assert.match(read("scripts/vision-evaluation/single-item/manifest.ts"), /CLAIM by the person who built the manifest/);
+  assert.match(read("scripts/vision-evaluation/README.md"), /Provenance fields are claims/);
+});
+
+test("documentation: the unexpected build commit, the bound approval and the unsafe-accept gate are recorded", () => {
+  const notes = read("docs/reviews/implementation-024-notes.md");
+  assert.match(notes, /a288df1/);
+  assert.match(notes, /explicit no-commit instruction/i);
+  assert.match(notes, /uncommitted for root review/i);
+  assert.match(notes, /policySha256|content digest/);
+  assert.match(notes, /unsafe accept/i);
+  assert.match(notes, /development manifest/i);
+  const readme = read("scripts/vision-evaluation/README.md");
+  assert.match(readme, /single-approve/);
+  assert.match(readme, /refusal\.unsafeAcceptRate/);
+});
+
+test("low: writeAllOrNothing never overwrites, rolls back every file it created on failure, and is deterministic (no hard links)", () => {
+  const prefix = "single-item-024-atomic-";
+  const dir = makeTempDir(prefix);
+  try {
+    const names = () => readdirSync(dir).sort().join(",");
+    const a = path.join(dir, "a.json");
+    const b = path.join(dir, "b.json");
+    // success: both exist, bytes are the canonical text, digests match the bytes, no temp files
+    const digests = writeAllOrNothing([{ file: a, value: { x: 1 } }, { file: b, value: { y: [2] } }]);
+    assert.equal(readFileSync(a, "utf8"), JSON.stringify({ x: 1 }, null, 2) + "\n");
+    assert.deepEqual(digests, [sha256Hex(readFileSync(a)), sha256Hex(readFileSync(b))]);
+    assert.equal(names(), "a.json,b.json");
+    // second path exists: refused, existing file untouched, the first new file is rolled back
+    const c = path.join(dir, "c.json");
+    assert.throws(() => writeAllOrNothing([{ file: c, value: 1 }, { file: b, value: 2 }]), /already exists/);
+    assert.equal(existsSync(c), false);
+    assert.equal(readFileSync(b, "utf8"), JSON.stringify({ y: [2] }, null, 2) + "\n", "an existing file is never overwritten");
+    // first path exists: nothing at all is created
+    const d = path.join(dir, "d.json");
+    assert.throws(() => writeAllOrNothing([{ file: a, value: 1 }, { file: d, value: 2 }]), /already exists/);
+    assert.equal(existsSync(d), false);
+    // second path cannot be created (missing directory): first is rolled back
+    const e = path.join(dir, "e.json");
+    assert.throws(() => writeAllOrNothing([{ file: e, value: 1 }, { file: path.join(dir, "nope", "f.json"), value: 2 }]), /ENOENT/);
+    assert.equal(existsSync(e), false);
+    // a directory squatting on the second name counts as existing
+    mkdirSync(path.join(dir, "g.json"));
+    assert.throws(() => writeAllOrNothing([{ file: path.join(dir, "h.json"), value: 1 }, { file: path.join(dir, "g.json"), value: 2 }]), /already exists/);
+    assert.equal(existsSync(path.join(dir, "h.json")), false);
+    assert.equal(names(), "a.json,b.json,g.json", "no partial or temporary file survives any failure");
+    assert.doesNotMatch(read("scripts/vision-evaluation/single-item/cli.ts"), /(?<!un)linkSync/);
+  } finally {
+    removeTempDir(dir, prefix);
+  }
+});
+
+// ================================================================== N1: production-scale sample sizes
+
+const PROD_CATEGORIES: GoldCategory[] = ["top", "bottom", "dress", "outerwear", "shoe", "accessory"];
+const PROD_SCENES: SceneType[] = ["flat_lay", "hanging", "mannequin", "worn", "product_shot"];
+const PROD_REASONS: RejectionReason[] = ["multiple_items", "no_garment", "unusable_quality"];
+const PROD_COLORS: GoldColor[] = ["black", "white", "gray", "beige", "brown", "red", "blue", "green"];
+const PROD_PATTERNS: GoldPattern[] = ["solid", "striped", "checked", "floral"];
+const pad = (n: number) => String(n).padStart(3, "0");
+
+/** The shipped benchmark shape: 240 in-scope + 60 rejection held-out photos (synthetic images), a small development split. */
+function productionSpecs(): { held: Spec[]; dev: Spec[] } {
+  const held: Spec[] = [];
+  for (let i = 0; i < 240; i++)
+    held.push({
+      id: `p-in-${pad(i)}`,
+      stratum: "in_scope",
+      category: PROD_CATEGORIES[i % 6],
+      scene: PROD_SCENES[i % 5],
+      color: PROD_COLORS[i % PROD_COLORS.length],
+      pattern: PROD_PATTERNS[i % PROD_PATTERNS.length],
+      fit: "regular",
+      material: i % 2 === 0 ? "leather" : "none_visible",
+    });
+  for (let i = 0; i < 60; i++) held.push({ id: `p-rej-${pad(i)}`, stratum: "rejection", reason: PROD_REASONS[i % 3], scene: "other" });
+  const dev: Spec[] = [
+    { id: "pd-1", stratum: "in_scope", category: "top" },
+    { id: "pd-2", stratum: "in_scope", category: "bottom" },
+    { id: "pd-3", stratum: "rejection", reason: "no_garment", scene: "other" },
+  ];
+  return { held, dev };
+}
+
+const PROD_APPROVED = () => approvePolicy(DEFAULT_POLICY, "owner", "2026-10-20T00:00:00Z", "synthetic production-scale test of the shipped proposal");
+
+/** Scores the production-scale world under the shipped policy and PRODUCTION checks. `abstain` marks which in-scope photos get doubts. */
+function productionRun(abstain: { category?: (i: number) => boolean; color?: (i: number) => boolean }, policy: LaunchPolicy = PROD_APPROVED()): SingleReport {
+  const { held, dev } = productionSpecs();
+  const w = world(held, dev);
+  const cases = [...perfectCases(dev), ...perfectCases(held)];
+  held
+    .filter((s) => s.stratum === "in_scope")
+    .forEach((s, i) => {
+      const item = caseFor(cases, s.id).item!;
+      const doubts: Array<"category" | "color" | "pattern"> = [];
+      if (abstain.category?.(i)) doubts.push("category");
+      if (abstain.color?.(i)) doubts.push("color", "pattern");
+      item.uncertain = doubts;
+    });
+  return evaluateSingle({ ...input(w, cases, policy), policy, policyChecks: undefined });
+}
+
+test("N1: the shipped benchmark shape is valid under production checks (strata, floors and the shipped sample sizes agree)", () => {
+  const { held, dev } = productionSpecs();
+  const w = world(held, dev);
+  assert.deepEqual(strataProblems(heldOf(w), heldGold(w), DEFAULT_POLICY), []);
+  assert.deepEqual(validatePolicy(PROD_APPROVED()).problems, []);
+  for (const id of ["category-accuracy", "color-accuracy", "pattern-accuracy"]) {
+    const minN = DEFAULT_POLICY.rules.find((r) => r.id === id)!.minN;
+    assert.ok(minN >= Math.ceil(0.6 * 240) && minN <= 240, `${id} minN ${minN} lies in the answered-sample range`);
+  }
+});
+
+test("N1: about 95% answered with perfect accuracy CAN PASS under the shipped policy and production checks", () => {
+  // Category answered on 228 of 240 (0.95 coverage), colour and pattern on 216 (0.90): exactly at the shipped coverage gates.
+  const r = productionRun({ category: (i) => i % 20 === 0, color: (i) => i % 10 === 0 });
+  const h = r.splits.heldout!;
+  assert.equal(r.policy.validation, "production");
+  assert.equal(h.attributes.category.answered, 228);
+  assert.equal(h.attributes.color.answered, 216);
+  assert.equal(h.attributes.pattern.answered, 216);
+  assert.equal(h.attributes.category.accuracyOnAnswered.value, 1);
+  assert.deepEqual(r.gate.preconditions, []);
+  const notPassing = r.gate.checks.filter((c) => c.kind === "gate" && c.status !== "PASS").map((c) => `${c.id}: ${c.status} ${c.detail}`);
+  assert.deepEqual(notPassing, []);
+  for (const id of ["category-accuracy", "color-accuracy", "pattern-accuracy"]) assert.equal(r.gate.checks.find((c) => c.id === id)!.status, "PASS", id);
+  assert.equal(r.gate.verdict, "PASS", "a compliant model with ~95% coverage and perfect accuracy reaches PASS when every other gate passes");
+  assert.equal(r.policy.approved, true);
+});
+
+test("N1: too few answers keep the accuracy gates NOT_EVALUATED, and coverage still bounds abstention", () => {
+  // Half of the categories unanswered: 120 answers < minN 216.
+  const half = productionRun({ category: (i) => i % 2 === 0 });
+  const acc = half.gate.checks.find((c) => c.id === "category-accuracy")!;
+  assert.equal(acc.status, "NOT_EVALUATED");
+  assert.match(acc.detail, /120 observations, rule needs at least 216/);
+  assert.equal(half.gate.checks.find((c) => c.id === "category-coverage")!.status, "FAIL");
+  assert.notEqual(half.gate.verdict, "PASS");
+  // Boundary: 216 answers meet minN (the accuracy gate is evaluated), 215 do not.
+  const at = productionRun({ category: (i) => i % 10 === 0 }); // 24 abstentions: 216 answered
+  assert.equal(at.splits.heldout!.attributes.category.answered, 216);
+  assert.equal(at.gate.checks.find((c) => c.id === "category-accuracy")!.status, "PASS");
+  assert.equal(at.gate.checks.find((c) => c.id === "category-coverage")!.status, "FAIL", "0.90 is below the 0.95 coverage gate: abstention is bounded there");
+  assert.equal(at.gate.verdict, "FAIL");
+  const below = productionRun({ category: (i) => i < 25 }); // 25 abstentions: 215 answered
+  assert.equal(below.splits.heldout!.attributes.category.answered, 215);
+  assert.equal(below.gate.checks.find((c) => c.id === "category-accuracy")!.status, "NOT_EVALUATED");
+  // A model that answers nothing is not evaluated on accuracy and fails coverage: never a PASS.
+  const none = productionRun({ category: () => true, color: () => true });
+  assert.equal(none.gate.checks.find((c) => c.id === "category-accuracy")!.status, "NOT_EVALUATED");
+  assert.equal(none.gate.verdict, "FAIL");
+});
+
+test("N1: when the coverage gate is passed but too few answers exist, the VERDICT is NOT_EVALUATED (not FAIL, not PASS)", () => {
+  // A valid production policy: category coverage at its floor (0.8) and the accuracy rule demanding the full 240 answers.
+  const strictSample = structuredClone(DEFAULT_POLICY);
+  strictSample.rules = strictSample.rules.map((r) =>
+    r.id === "category-coverage" ? { ...r, threshold: 0.8 } : r.id === "category-accuracy" ? { ...r, minN: 240 } : r,
+  );
+  const approved = approvePolicy(strictSample, "owner", "2026-10-20T00:00:00Z", "stricter sample for the accuracy gate");
+  assert.deepEqual(validatePolicy(approved).problems, []);
+  const r = productionRun({ category: (i) => i % 36 < 6 }, approved); // 42 abstentions spread over every category: 198 answered, coverage 0.825
+  assert.equal(r.splits.heldout!.attributes.category.answered, 198);
+  assert.equal(r.gate.checks.find((c) => c.id === "category-coverage")!.status, "PASS");
+  assert.equal(r.gate.checks.find((c) => c.id === "category-accuracy")!.status, "NOT_EVALUATED");
+  assert.deepEqual(r.gate.checks.filter((c) => c.kind === "gate" && c.status === "FAIL").map((c) => c.id), []);
+  assert.equal(r.gate.verdict, "NOT_EVALUATED");
+});
+
+test("N1: the answered-sample range is enforced by the validator and does not weaken the other minN rules", () => {
+  const accRule = (id: string, minN: number) => prodProblems((p) => (ruleOf(p, id).minN = minN));
+  for (const id of ["category-accuracy", "color-accuracy", "pattern-accuracy"]) {
+    assert.equal(accRule(id, 144), "", `${id}: 60% of 240 is allowed`);
+    assert.equal(accRule(id, 216), "");
+    assert.equal(accRule(id, 240), "");
+    assert.match(accRule(id, 143), /minN: 143 is below 144/, id);
+    assert.match(accRule(id, 1), /is below 144/, id);
+    assert.match(accRule(id, 241), /minN: 241 is above 240/, id);
+  }
+  // Metrics over the FULL in-scope sample still demand all of it.
+  assert.match(accRule("selection-rate", 216), /minN: 216 is below 240/);
+  assert.match(accRule("category-coverage", 216), /minN: 216 is below 240/);
+  assert.match(accRule("crop-useful", 100), /is below 240/);
+  assert.match(accRule("false-accept-rate", 59), /is below 60/);
+  // Every other protection is untouched.
+  assert.match(prodProblems((p) => (ruleOf(p, "category-accuracy").threshold = 0.05)), /below the weakest acceptable/);
+  assert.match(prodProblems((p) => (p.rules = p.rules.filter((r: any) => r.metric !== "category.coverage"))), /must gate on category\.coverage/);
+  assert.match(prodProblems((p) => Object.assign(ruleOf(p, "category-accuracy"), { bound: "point" })), /must use wilson95_lower/);
+});
+
+// ================================================================== relaxed checks never display a verdict
+
+test("relaxed sample checks force the overall verdict to NOT_EVALUATED, even for a perfect synthetic run", () => {
+  const r = evaluateSingle(input(world(), allCases()));
+  assert.equal(r.policy.validation, "relaxed-sample-checks");
+  assert.equal(r.gate.verdict, "NOT_EVALUATED");
+  assert.ok(r.gate.preconditions.includes(RELAXED_PRECONDITION));
+  // The per-check statuses still show the gate logic working (this is what the logic tests read).
+  assert.ok(r.gate.checks.filter((c) => c.kind === "gate").every((c) => c.status === "PASS"));
+  assert.equal(verdictOf(r), "PASS");
+  assert.equal(JSON.stringify(r.gate).includes('"verdict":"PASS"'), false, "a synthetic report never contains a PASS verdict");
+  // A failing synthetic run does not display FAIL as a verdict either; its failing check is visible.
+  const bad = scored((cases) => (caseFor(cases, "h-top-1").item!.category = "bottom"));
+  assert.equal(bad.gate.verdict, "NOT_EVALUATED");
+  assert.ok(bad.gate.checks.some((c) => c.status === "FAIL"));
+  // The production default is not affected: unapproved is NOT_EVALUATED for its own reason.
+  const production = evaluateSingle({ ...input(world(), allCases(), testPolicy({ approval: null })), policyChecks: undefined, policy: DEFAULT_POLICY });
+  assert.ok(!production.gate.preconditions.includes(RELAXED_PRECONDITION));
 });

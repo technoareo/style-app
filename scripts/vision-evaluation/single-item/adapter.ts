@@ -1,4 +1,4 @@
-import { CROP_UNVERIFIED_WARNING, MULTIPLE_ITEMS_WARNING, reviewAnalysisSchema } from "../../../src/domain/analysis";
+import { CROP_UNVERIFIED_WARNING, MULTIPLE_ITEMS_WARNING, SHOE_PAIR_WARNING, reviewAnalysisSchema } from "../../../src/domain/analysis";
 import { ID_RE, SHA256_RE, expectKeys, isIsoTimestamp, isNonEmptyString, isNonNegativeFinite, isRecord, oneOf } from "../check";
 import type { Box } from "../types";
 import type { SinglePrediction, SinglePredictionCase, SingleRunInfo } from "./predictions";
@@ -16,7 +16,9 @@ import { APP_CATEGORY_TO_GOLD, mapColor, mapPattern } from "./vocab";
  *    and is refused as invalid;
  *  - an unusable model box becomes the full frame [0,0,1,1] together with
  *    CROP_UNVERIFIED_WARNING; that box is NOT scored as a real box;
- *  - the notices MULTIPLE_ITEMS_WARNING / CROP_UNVERIFIED_WARNING are appended to the warning.
+ *  - the notices MULTIPLE_ITEMS_WARNING / CROP_UNVERIFIED_WARNING / SHOE_PAIR_WARNING are appended to the warning;
+ *    the shoe-pair notice means two shoes were merged into one pair (the box is their union). It is carried
+ *    through and reported, never scored.
  * The model's confidence is recorded as `selfConfidence` and is never used as
  * correctness: only `uncertain` (an explicit abstention) and unknown/empty values are.
  */
@@ -96,6 +98,7 @@ function failure(
     item: null,
     multipleItemsWarning: false,
     cropUnverifiedWarning: false,
+    shoePairNotice: false,
     invalidReasons: reasons,
   };
 }
@@ -114,6 +117,7 @@ export function toSingleCase(rec: AnalyzePhotoRecord): SinglePredictionCase {
 
   const multipleItemsWarning = warning.includes(MULTIPLE_ITEMS_WARNING);
   const cropUnverifiedWarning = warning.includes(CROP_UNVERIFIED_WARNING);
+  const shoePairNotice = warning.includes(SHOE_PAIR_WARNING);
   const base = {
     fixtureId: rec.fixtureId,
     imageSha256: rec.imageSha256.toLowerCase(),
@@ -122,6 +126,7 @@ export function toSingleCase(rec: AnalyzePhotoRecord): SinglePredictionCase {
     error: null,
     multipleItemsWarning,
     cropUnverifiedWarning,
+    shoePairNotice,
     invalidReasons: [] as string[],
   };
   if (items.length === 0) return { ...base, itemCount: 0, item: null };

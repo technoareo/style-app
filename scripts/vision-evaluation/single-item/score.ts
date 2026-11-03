@@ -1,11 +1,10 @@
-import { createHash } from "node:crypto";
 import { EvaluationRefusal } from "../evaluate";
 import { iou } from "../geometry";
 import type { Box, Split } from "../types";
 import type { GoldFile, GoldItem, GoldLabel } from "./gold";
-import { integrityProblems, strataCounts, strataProblems, type IntegrityInput } from "./integrity";
+import { LEAKAGE_KEYS, integrityProblems, strataCounts, strataProblems, type IntegrityInput } from "./integrity";
 import type { SingleFixture, SingleManifest } from "./manifest";
-import type { GateRule, LaunchPolicy, MetricId } from "./policy";
+import { PRODUCTION_CHECKS, policyContentSha256, policyDocumentSha256, validatePolicy, type GateRule, type LaunchPolicy, type MetricId, type PolicyChecks } from "./policy";
 import type { CaseStatus, SinglePredictionCase } from "./predictions";
 import { VISIBLE_MATERIALS, type GoldMaterial } from "./vocab";
 
@@ -32,6 +31,12 @@ export type CaseResult = {
   rejectionReason: SingleFixture["rejectionReason"];
   predictionStatus: CaseStatus | "missing";
   disposition: Disposition;
+  /** Rejection photos only: an item came back without the notice that fits the rejection reason. null for in-scope photos. */
+  unsafeAccept: boolean | null;
+  /** The app attached a multiple-items or crop-unverified notice. */
+  warned: boolean;
+  /** The app merged two shoes into one pair and said so. Reported, never scored. */
+  shoePairNotice: boolean;
   elapsedMs: number | null;
   iou: number | null;
   coverage: number | null;
@@ -91,6 +96,19 @@ function disposition(c: SinglePredictionCase | null): Disposition {
   return "accepted";
 }
 
+/**
+ * A rejection photo is handled safely when the app returned no item, or returned
+ * one WITH the notice that fits the reason (a multiple-items notice on a
+ * multiple-items photo). A silent item, a crop-only notice, or a multiple-items
+ * notice on some other kind of rejection is an unsafe accept. A failed case is
+ * not an accept (it counts in the failure rate instead).
+ */
+function unsafeAccept(d: Disposition, reason: SingleFixture["rejectionReason"]): boolean {
+  if (d === "failed" || d === "refused_empty") return false;
+  if (d === "accepted_with_multiple_warning") return reason !== "multiple_items";
+  return true;
+}
+
 function attributeCells(gold: GoldItem, c: SinglePredictionCase | null): Record<Attribute, AttrCell> {
   const item = c && c.status === "completed" ? c.item : null;
   const cell = (attr: Attribute): AttrCell => {
@@ -112,10 +130,12 @@ function attributeCells(gold: GoldItem, c: SinglePredictionCase | null): Record<
       predicted = item.fit;
       if (item.fit === "unknown") abstained = true;
     } else {
-      predicted = item.material === "" ? "none_visible" : item.material;
+      // A blank material is "named nothing", an abstention: crediting it as "none_visible" would let a model that never names a texture score on every plain garment.
+      predicted = item.material === "" ? null : item.material;
+      if (item.material === "") abstained = true;
     }
     const answered = !abstained;
-    if (!known) return { gold: g, predicted: answered ? predicted : null, state: "excluded", unmapped: false, overclaim: answered && !(attr === "material" && predicted === "none_visible") };
+    if (!known) return { gold: g, predicted: answered ? predicted : null, state: "excluded", unmapped: false, overclaim: answered };
     if (abstained) return { gold: g, predicted: null, state: "abstained", unmapped: false, overclaim: false };
     return { gold: g, predicted: unmapped ? null : predicted, state: !unmapped && predicted === g ? "correct" : "wrong", unmapped, overclaim: false };
   };
@@ -137,6 +157,9 @@ export function scoreCase(
     rejectionReason: fixture.rejectionReason,
     predictionStatus: (prediction?.status ?? "missing") as CaseStatus | "missing",
     disposition: disposition(prediction),
+    unsafeAccept: fixture.stratum === "rejection" ? unsafeAccept(disposition(prediction), fixture.rejectionReason) : null,
+    warned: prediction?.status === "completed" && (prediction.multipleItemsWarning || prediction.cropUnverifiedWarning),
+    shoePairNotice: prediction?.status === "completed" && prediction.shoePairNotice,
     elapsedMs: prediction?.elapsedMs ?? null,
   };
   if (gold.outcome !== "single_item" || !gold.item) {
@@ -232,8 +255,14 @@ export type SplitReport = {
   dispositions: Record<"in_scope" | "rejection", Record<Disposition, number>>;
   selection: Metric;
   falseRefusal: Metric;
+  /** Silent accepts only: an item with no notice at all. Stays strict, and is not the whole story (see unsafeAccept). */
   falseAccept: Metric;
-  rejectionByReason: Array<{ reason: string; n: number; refusedOrWarned: number; falseAccept: number; failed: number }>;
+  /** An item came back without the notice that fits the rejection reason. Warning about everything cannot pass this. */
+  unsafeAccept: Metric;
+  /** In-scope photos that came back with a multiple-items or crop-unverified notice. */
+  inScopeWarning: Metric;
+  shoePairNotices: number;
+  rejectionByReason: Array<{ reason: string; n: number; refused: number; acceptedWithFittingNotice: number; unsafeAccept: number; silentAccept: number; failed: number }>;
   crop: Metric & { meanIou: number | null };
   attributes: Record<Attribute, AttributeReport>;
   visibleMaterialRecall: Metric;
@@ -260,14 +289,18 @@ export function aggregateSplit(
   const selection = proportion(inScope.filter((r) => r.selected).length, inScope.length, "in-scope photos whose single returned item overlaps the gold item at the selection IoU");
   const falseRefusal = proportion(inScope.filter((r) => r.disposition === "refused_empty").length, inScope.length, "in-scope photos where the app returned no item");
   const falseAccept = proportion(rejection.filter((r) => r.disposition === "accepted").length, rejection.length, "rejection photos accepted as a clean single item without any notice");
+  const unsafe = proportion(rejection.filter((r) => r.unsafeAccept).length, rejection.length, "rejection photos where an item came back without the notice that fits the rejection reason (silent, crop-only, or a multiple-items notice on another kind of rejection)");
+  const inScopeWarning = proportion(inScope.filter((r) => r.warned).length, inScope.length, "in-scope photos that came back with a multiple-items or crop-unverified notice");
   const reasons = [...new Set(rejection.map((r) => r.rejectionReason ?? "none"))].sort();
   const rejectionByReason = reasons.map((reason) => {
     const rows = rejection.filter((r) => (r.rejectionReason ?? "none") === reason);
     return {
       reason,
       n: rows.length,
-      refusedOrWarned: rows.filter((r) => r.disposition === "refused_empty" || r.disposition === "accepted_with_multiple_warning" || r.disposition === "accepted_with_crop_warning").length,
-      falseAccept: rows.filter((r) => r.disposition === "accepted").length,
+      refused: rows.filter((r) => r.disposition === "refused_empty").length,
+      acceptedWithFittingNotice: rows.filter((r) => r.disposition === "accepted_with_multiple_warning" && !r.unsafeAccept).length,
+      unsafeAccept: rows.filter((r) => r.unsafeAccept).length,
+      silentAccept: rows.filter((r) => r.disposition === "accepted").length,
       failed: rows.filter((r) => r.disposition === "failed").length,
     };
   });
@@ -301,6 +334,8 @@ export function aggregateSplit(
   const metrics: Record<MetricId, Metric> = {
     "selection.rate": selection,
     "refusal.falseAcceptRate": falseAccept,
+    "refusal.unsafeAcceptRate": unsafe,
+    "inScope.warningRate": inScopeWarning,
     "inScope.falseRefusalRate": falseRefusal,
     "reliability.failureRate": failureRate,
     "category.accuracyOnAnswered": attributes.category.accuracyOnAnswered,
@@ -332,6 +367,9 @@ export function aggregateSplit(
     selection,
     falseRefusal,
     falseAccept,
+    unsafeAccept: unsafe,
+    inScopeWarning,
+    shoePairNotices: results.filter((r) => r.shoePairNotice).length,
     rejectionByReason,
     crop,
     attributes,
@@ -360,6 +398,10 @@ export type GateCheck = {
   detail: string;
 };
 
+/** A policy validated with relaxed sample checks is for synthetic tests: it can never produce a verdict, only per-check statuses. */
+export const RELAXED_PRECONDITION =
+  "the policy was validated with relaxed sample-size checks (synthetic use only); no launch verdict is given, read the per-check statuses";
+
 export type GateReport = { verdict: GateStatus; preconditions: string[]; checks: GateCheck[] };
 
 function evaluateRule(rule: GateRule, m: Metric | undefined): GateCheck {
@@ -380,8 +422,9 @@ function evaluateRule(rule: GateRule, m: Metric | undefined): GateCheck {
  * is then not valid evidence. Otherwise any failing gate rule is FAIL, any gate
  * rule without enough data is NOT_EVALUATED, and only all-passing is PASS.
  */
-export function launchGate(policy: LaunchPolicy, heldout: SplitReport | null, manifest: SingleManifest | undefined, gold: GoldFile | undefined): GateReport {
+export function launchGate(policy: LaunchPolicy, heldout: SplitReport | null, manifest: SingleManifest | undefined, gold: GoldFile | undefined, relaxedSampleChecks = false): GateReport {
   const preconditions: string[] = [];
+  if (relaxedSampleChecks) preconditions.push(RELAXED_PRECONDITION);
   if (!policy.approval) preconditions.push(`policy ${policy.id}@${policy.version} has no approval record; it is a proposal, so no launch decision can be made from it`);
   if (!heldout) preconditions.push("no held-out predictions were scored");
   preconditions.push(...strataProblems(manifest, gold, policy));
@@ -403,10 +446,13 @@ export const SINGLE_REPORT_STATEMENTS: readonly string[] = [
   "The model's self-reported confidence is recorded but never used as correctness.",
   "Seasons and occasions are suggestions, not visible objective truth, and never decide the verdict.",
   "Crowded and multi-item recognition is out of scope for this gate.",
+  "A policy approval binds to the policy content by digest; the harness cannot prove who approved it or that the approver understood it.",
 ];
 
 export type SingleEvaluationInput = IntegrityInput & {
   policy: LaunchPolicy;
+  /** Default: production checks. A caller (synthetic tests only) may relax the sample-size rules; the report says so. */
+  policyChecks?: PolicyChecks;
   createdAt: string;
   inputDigests: Array<{ role: string; path: string; sha256: string }>;
 };
@@ -415,7 +461,20 @@ export type SingleReport = {
   schemaVersion: 1;
   kind: "single-item-report";
   createdAt: string;
-  policy: { id: string; version: string; approved: boolean; sha256: string };
+  policy: {
+    id: string;
+    version: string;
+    approved: boolean;
+    /** The approval names this exact content (always true here: a mismatch is refused). */
+    approvalBoundToContent: boolean;
+    /** sha256 of the canonical policy content without the approval; what an approval binds to. */
+    contentSha256: string;
+    /** sha256 of the canonical whole document, approval included. */
+    documentSha256: string;
+    validation: "production" | "relaxed-sample-checks";
+  };
+  /** What the cross-file checks covered. A held-out score is refused unless both splits were checked together. */
+  integrity: { splitsChecked: Split[]; crossSplitLeakageChecked: boolean; leakageKeys: readonly string[]; developmentFixtures: number; heldoutFixtures: number };
   inputDigests: SingleEvaluationInput["inputDigests"];
   run: NonNullable<IntegrityInput["predictions"]>["run"];
   splits: { development: SplitReport | null; heldout: SplitReport | null };
@@ -426,6 +485,9 @@ export type SingleReport = {
 
 export function evaluateSingle(input: SingleEvaluationInput): SingleReport {
   if (!input.predictions) throw new EvaluationRefusal(["no prediction report was supplied"]);
+  const checks = input.policyChecks ?? PRODUCTION_CHECKS;
+  const policyCheck = validatePolicy(input.policy, checks);
+  if (policyCheck.problems.length > 0) throw new EvaluationRefusal(policyCheck.problems.map((p) => `policy ${input.policy?.id ?? "?"}: ${p}`));
   const problems = integrityProblems(input);
   if (problems.length > 0) throw new EvaluationRefusal(problems);
   const preds = new Map(input.predictions.cases.map((c) => [c.fixtureId, c]));
@@ -453,13 +515,25 @@ export function evaluateSingle(input: SingleEvaluationInput): SingleReport {
       id: input.policy.id,
       version: input.policy.version,
       approved: input.policy.approval !== null,
-      sha256: createHash("sha256").update(JSON.stringify(input.policy)).digest("hex"),
+      approvalBoundToContent: input.policy.approval !== null,
+      contentSha256: policyContentSha256(input.policy),
+      documentSha256: policyDocumentSha256(input.policy),
+      validation: checks.relaxedSampleChecks ? "relaxed-sample-checks" : "production",
+    },
+    integrity: {
+      splitsChecked: input.manifests.map((m) => m.manifest.split).sort() as Split[],
+      crossSplitLeakageChecked: input.manifests.length === 2,
+      leakageKeys: LEAKAGE_KEYS,
+      developmentFixtures: input.manifests.find((m) => m.manifest.split === "development")?.manifest.fixtures.length ?? 0,
+      heldoutFixtures: heldoutManifest?.fixtures.length ?? 0,
     },
     inputDigests: input.inputDigests,
     run: input.predictions.run,
     splits,
-    gate: launchGate(input.policy, splits.heldout, heldoutManifest, goldBySplit.get("heldout")),
+    gate: launchGate(input.policy, splits.heldout, heldoutManifest, goldBySplit.get("heldout"), checks.relaxedSampleChecks),
     cases: results,
-    statements: SINGLE_REPORT_STATEMENTS,
+    statements: checks.relaxedSampleChecks
+      ? [...SINGLE_REPORT_STATEMENTS, "The policy was validated with relaxed sample-size checks (synthetic use only); this report is not launch evidence."]
+      : SINGLE_REPORT_STATEMENTS,
   };
 }

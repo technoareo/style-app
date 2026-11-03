@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { EvaluationRefusal } from "../evaluate";
@@ -7,7 +7,7 @@ import { toSingleCase, singleRunInfo, validateAnalyzePhotoRecord, type AnalyzePh
 import { validateGoldFile, type GoldFile } from "./gold";
 import { integrityProblems, strataProblems, type ImageResolver, type ManifestInput } from "./integrity";
 import { validateFreezeReceipt, validateSingleManifest, type FreezeReceipt } from "./manifest";
-import { validatePolicy, type LaunchPolicy } from "./policy";
+import { approvePolicy, policyContentSha256, validatePolicy, type LaunchPolicy } from "./policy";
 import { validateSinglePredictionReport, type SinglePredictionReport } from "./predictions";
 import { evaluateSingle } from "./score";
 import { templates } from "./templates";
@@ -23,6 +23,7 @@ import { templates } from "./templates";
  *   single-validate  --manifest M... --gold G... [--receipt R...] --images-dir D [--policy P]
  *   single-adapt-qwen (--record R | --records-dir DIR) --manifest M... --images-dir D --out NEW
  *   single-score     --manifest M... --gold G... [--receipt R...] --predictions P --images-dir D --policy P --out NEW
+ *   single-approve   --policy P --approved-by NAME --note TEXT --out NEW
  *
  * Exit codes: 0 done, 2 refused (inputs are not trustworthy evidence), 1 usage or other error.
  */
@@ -66,6 +67,59 @@ function writeNew(file: string, value: unknown): string {
     throw e;
   }
   return sha256Hex(Buffer.from(text));
+}
+
+const sameFile = (a: string, b: string) => {
+  const x = path.resolve(a);
+  const y = path.resolve(b);
+  return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
+};
+
+/**
+ * Writes several NEW files, all or none, on every platform (no hard links, which
+ * Windows refuses on some volumes). Each file is created exclusively at its final
+ * path (flag "wx": fails if the name exists, so nothing is ever overwritten) with
+ * bytes computed beforehand, so content and digests are deterministic. If any file
+ * cannot be created or written, every file this call created is removed, including
+ * a half-written one, and the error is rethrown.
+ *
+ * Limit, stated honestly: this is rollback on ordinary failures, not a transaction.
+ * A crash or power loss between the two creates can leave the first file without the
+ * second, and another process could see the first file before the second exists. For
+ * a freeze that fails closed: a manifest without its receipt is refused by scoring.
+ * Create the files you must trust last (the receipt) so a half state is never
+ * mistaken for a complete one.
+ */
+export function writeAllOrNothing(files: Array<{ file: string; value: unknown }>): string[] {
+  const texts = files.map((f) => `${JSON.stringify(f.value, null, 2)}\n`);
+  const created: string[] = [];
+  try {
+    files.forEach((f, i) => {
+      let fd: number;
+      try {
+        fd = openSync(f.file, "wx");
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new UsageError(`${f.file} already exists; evidence is never overwritten`);
+        throw e;
+      }
+      created.push(f.file); // ours from here on, even if the write below fails halfway
+      try {
+        writeSync(fd, texts[i]);
+      } finally {
+        closeSync(fd);
+      }
+    });
+  } catch (e) {
+    for (const f of created.reverse()) {
+      try {
+        unlinkSync(f);
+      } catch {
+        /* best effort: the file is ours */
+      }
+    }
+    throw e;
+  }
+  return texts.map((t) => sha256Hex(Buffer.from(t)));
 }
 
 const list = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
@@ -132,6 +186,8 @@ function freeze(values: Values, io: CliIo): void {
   if (!manifestFile || !imagesDir) throw new UsageError("single-freeze needs exactly one --manifest, --images-dir, --out-manifest and --out-receipt");
   const outManifest = newOutput(values["out-manifest"], "--out-manifest");
   const outReceipt = newOutput(values["out-receipt"], "--out-receipt");
+  if (sameFile(outManifest, outReceipt)) throw new UsageError("--out-manifest and --out-receipt are the same path; the manifest and its receipt must be two files");
+  if (sameFile(outManifest, manifestFile) || sameFile(outReceipt, manifestFile)) throw new UsageError("an output path is the input manifest; evidence is never overwritten");
   const { value } = readJson(manifestFile);
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new EvaluationRefusal([`${manifestFile}: must be a JSON object`]);
   const raw = value as Record<string, unknown>;
@@ -150,7 +206,8 @@ function freeze(values: Values, io: CliIo): void {
     stage: "freeze",
   });
   if (issues.length > 0) throw new EvaluationRefusal(issues);
-  const manifestSha = writeNew(outManifest, manifest);
+  // The receipt names the sha256 of the manifest file exactly as it will be written.
+  const manifestSha = sha256Hex(Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));
   const receipt: FreezeReceipt = {
     schemaVersion: 1,
     kind: "single-item-freeze-receipt",
@@ -160,8 +217,26 @@ function freeze(values: Values, io: CliIo): void {
     manifestSha256: manifestSha,
     fixtureCount: manifest.fixtures.length,
   };
-  writeNew(outReceipt, receipt);
+  const [written] = writeAllOrNothing([
+    { file: outManifest, value: manifest },
+    { file: outReceipt, value: receipt },
+  ]);
+  if (written !== manifestSha) throw new Error("internal error: the manifest digest changed while writing");
   io.log(`froze ${manifest.fixtures.length} fixture(s) at ${frozenAt}: ${outManifest} (sha256 ${manifestSha}), receipt ${outReceipt}. Run models only after this point.`);
+}
+
+function approve(values: Values, io: CliIo): void {
+  const by = text(values["approved-by"]);
+  const note = text(values.note);
+  if (!by?.trim() || !note?.trim()) throw new UsageError("single-approve needs --policy, --approved-by (a person) and --note (what was approved)");
+  const out = newOutput(values.out);
+  const file = text(values.policy);
+  if (file && sameFile(file, out)) throw new UsageError("--out must be a new file, not the input policy");
+  const { policy } = loadPolicy(file);
+  if (policy.approval) throw new EvaluationRefusal([`${file}: already approved; change the policy and approve the new content under a new file`]);
+  const approved = approvePolicy(policy, by.trim(), io.now().toISOString(), note.trim());
+  writeNew(out, approved);
+  io.log(`wrote ${out}: policy ${policy.id}@${policy.version} approved by ${by.trim()}, bound to content sha256 ${policyContentSha256(policy)}. Editing any threshold afterwards invalidates the approval. This records who decided; it does not make the product ready.`);
 }
 
 type Loaded = { manifests: ManifestInput[]; gold: GoldFile[]; receipts: FreezeReceipt[]; digests: Array<{ role: string; path: string; sha256: string }> };
@@ -265,7 +340,7 @@ function score(values: Values, io: CliIo): void {
   io.log(`wrote ${out}: ${report.cases.length} case(s). Launch gate: ${report.gate.verdict}${report.gate.preconditions.length ? ` (${report.gate.preconditions.length} precondition(s) unmet)` : ""}. This is not a launch-readiness claim.`);
 }
 
-export const SINGLE_COMMANDS = ["single-template", "single-freeze", "single-validate", "single-adapt-qwen", "single-score"] as const;
+export const SINGLE_COMMANDS = ["single-template", "single-freeze", "single-validate", "single-adapt-qwen", "single-score", "single-approve"] as const;
 
 /** Returns the exit code: 0 done, 2 refused, 1 usage or other error. */
 export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
@@ -289,6 +364,8 @@ export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
         out: { type: "string" },
         "out-manifest": { type: "string" },
         "out-receipt": { type: "string" },
+        "approved-by": { type: "string" },
+        note: { type: "string" },
       },
     });
     const v: Values = values;
@@ -297,6 +374,7 @@ export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
     else if (command === "single-validate") validate(v, io);
     else if (command === "single-adapt-qwen") adaptQwen(v, io);
     else if (command === "single-score") score(v, io);
+    else if (command === "single-approve") approve(v, io);
     else throw new UsageError(`usage: ${SINGLE_COMMANDS.join(" | ")} (see scripts/vision-evaluation/README.md)`);
     return 0;
   } catch (e) {

@@ -15,10 +15,10 @@ import path from "node:path";
 import { EvaluationRefusal } from "../evaluate";
 
 /**
- * File operations of the build 026 intake and labelling tools, behind a seam so tests can make a write fail
- * half way. Only open (exclusive) / write / fsync / close / unlink / mkdir are used for output: no rename and
- * no hard link, which Windows sandboxes refuse (EPERM) on some volumes. Input reads refuse links, junctions
- * and anything that changes while it is read.
+ * File operations of the build 026/027 intake and labelling tools, behind a seam so tests can make a write fail
+ * half way or a read see a swapped file. Output uses only open (exclusive) / write / fsync / close / unlink /
+ * mkdir: no rename and no hard link, which Windows sandboxes refuse (EPERM) on some volumes. Input reads refuse
+ * links and junctions, and are bound to the opened handle's identity (see readBound).
  */
 
 export type FsOps = {
@@ -53,7 +53,7 @@ export function writeExclusive(file: string, bytes: Buffer, ops: FsOps = realFs)
   try {
     fd = ops.openExclusive(file);
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new EvaluationRefusal([`${path.basename(file)} already exists; evidence is never overwritten`]);
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new EvaluationRefusal(["an output file already exists; evidence is never overwritten"]);
     throw e;
   }
   let ok = false;
@@ -132,24 +132,64 @@ export function bareNameProblem(name: unknown): string | null {
   return null;
 }
 
-export type SourceRead = { bytes: Buffer; size: number };
+/** What the identity comparison could rely on: a file index (inode / NTFS file ID) with its device, or only size and timestamps. */
+export type IdentityBasis = "file-index" | "size-and-timestamps";
+
+export type SourceRead = { bytes: Buffer; size: number; identity: IdentityBasis };
+
+/** The fields of a stat the identity checks use. Real stats come from the bigint variant, so nothing is rounded. */
+export type StatLike = {
+  isSymbolicLink(): boolean;
+  isFile(): boolean;
+  isDirectory(): boolean;
+  nlink: number | bigint;
+  size: number | bigint;
+  ino?: number | bigint;
+  dev?: number | bigint;
+  mtimeNs?: bigint;
+  ctimeNs?: bigint;
+  birthtimeNs?: bigint;
+  mtimeMs?: number | bigint;
+  ctimeMs?: number | bigint;
+  birthtimeMs?: number | bigint;
+};
 
 export type ReadOps = {
-  lstat: typeof lstatSync;
+  lstat: (p: string) => StatLike;
   realpath: (p: string) => string;
   open: (p: string) => number;
-  fstat: typeof fstatSync;
+  fstat: (fd: number) => StatLike;
   readAll: (fd: number) => Buffer;
   close: (fd: number) => void;
 };
-const realRead: ReadOps = {
-  lstat: lstatSync,
+export const realRead: ReadOps = {
+  lstat: (p) => lstatSync(p, { bigint: true }),
   realpath: (p) => realpathSync.native(p),
   open: (p) => openSync(p, "r"),
-  fstat: fstatSync,
+  fstat: (fd) => fstatSync(fd, { bigint: true }),
   readAll: (fd) => readFileSync(fd),
   close: (fd) => closeSync(fd),
 };
+
+// The repository targets below ES2020, where the trailing-n bigint literal syntax is rejected; BigInt(...) is not.
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
+const nonZero = (v: number | bigint | undefined) => v !== undefined && BigInt(v) !== ZERO;
+const hasIndex = (s: StatLike) => nonZero(s.ino);
+const str = (v: unknown) => (v === undefined ? "-" : String(v));
+
+/**
+ * Compares two observations of what must be ONE file. Compared where the platform supplies them: size, the file
+ * index and device (only when non-zero: a zero index means "not provided" and is never treated as an identity),
+ * and the modification, change and creation times (nanosecond when available). If one observation has a file
+ * index and the other does not, that is itself a mismatch.
+ */
+export function sameFile(a: StatLike, b: StatLike): { same: boolean; basis: IdentityBasis } {
+  const indexed = hasIndex(a) || hasIndex(b);
+  if (indexed && (!hasIndex(a) || !hasIndex(b) || str(a.ino) !== str(b.ino) || str(a.dev) !== str(b.dev))) return { same: false, basis: "file-index" };
+  const t = (s: StatLike) => [str(s.size), str(s.mtimeNs ?? s.mtimeMs), str(s.ctimeNs ?? s.ctimeMs), str(s.birthtimeNs ?? s.birthtimeMs)].join("|");
+  return { same: t(a) === t(b), basis: indexed ? "file-index" : "size-and-timestamps" };
+}
 
 const samePath = (a: string, b: string) => (process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b);
 
@@ -163,14 +203,88 @@ export function checkSourceDir(dir: string, ops: ReadOps = realRead): string {
   }
   if (st.isSymbolicLink()) throw new EvaluationRefusal(["the source directory is a link or junction; name the real directory"]);
   if (!st.isDirectory()) throw new EvaluationRefusal(["the source path is not a directory"]);
-  return ops.realpath(dir);
+  return realpathOf(ops, dir);
+}
+
+/** realpath with the OS error text removed (it contains the path). */
+function realpathOf(ops: ReadOps, p: string): string {
+  try {
+    return ops.realpath(p);
+  } catch {
+    throw new EvaluationRefusal(["a source path could not be resolved (it may have been moved or deleted)"]);
+  }
+}
+
+const UNREADABLE = "a file could not be read (it may have been moved, deleted or made inaccessible); nothing was read";
+const CHANGED ="a file changed while it was being read, or was replaced by another file (its identity did not hold); try again once nothing else is touching it";
+
+/**
+ * The one way bytes are read from a path: bound to the OPENED HANDLE, not to the name.
+ *   1. The caller lstat-ed the path (`before`): a regular, non-link file.
+ *   2. Open it and fstat the handle: it must be the same file as (1) (file index and device where the platform
+ *      provides them, size, mtime, ctime, birth time).
+ *   3. Read ONLY through the handle: no path-based read and no second open.
+ *   4. fstat the handle again and lstat the path again: both must still be that same file, and the byte count
+ *      must equal the size.
+ * A same-size, same-mtime regular file swapped in between (1) and (2), or swapped in and back around the read, is
+ * refused wherever the platform supplies a file index or a change/birth time that differs. Where it supplies
+ * neither, only size and mtime remain and that residual risk is stated in the notes. Messages are generic: they
+ * never contain a name or a path.
+ */
+function readBound(full: string, maxBytes: number, before: StatLike, ops: ReadOps): SourceRead {
+  // Every operating-system failure below becomes the same generic refusal: Node's own errors carry the full path
+  // and an errno, which may identify a person, so nothing from them is ever shown.
+  let fd: number;
+  try {
+    fd = ops.open(full);
+  } catch {
+    throw new EvaluationRefusal([UNREADABLE]);
+  }
+  const guarded = <T>(step: () => T): T => {
+    try {
+      return step();
+    } catch {
+      throw new EvaluationRefusal([UNREADABLE]);
+    }
+  };
+  let bytes!: Buffer;
+  let opened!: StatLike;
+  let finished!: StatLike;
+  let failure: EvaluationRefusal | null = null;
+  try {
+    opened = guarded(() => ops.fstat(fd));
+    if (!opened.isFile() || !sameFile(before, opened).same) throw new EvaluationRefusal([CHANGED]);
+    if (BigInt(opened.size) > BigInt(maxBytes)) throw new EvaluationRefusal([`a file is larger than ${maxBytes} bytes`]);
+    bytes = guarded(() => ops.readAll(fd));
+    finished = guarded(() => ops.fstat(fd));
+  } catch (e) {
+    failure = e instanceof EvaluationRefusal ? e : new EvaluationRefusal([UNREADABLE]);
+  }
+  // The handle is always closed. A failure already in flight is the strongest and is the one reported; a close
+  // failure on its own fails closed (the read cannot be trusted), with the same generic text.
+  let closeFailed = false;
+  try {
+    ops.close(fd);
+  } catch {
+    closeFailed = true;
+  }
+  if (failure) throw failure;
+  if (closeFailed) throw new EvaluationRefusal([UNREADABLE]);
+  let after: StatLike;
+  try {
+    after = ops.lstat(full);
+  } catch {
+    throw new EvaluationRefusal(["a file disappeared while it was read"]);
+  }
+  if (after.isSymbolicLink() || !after.isFile()) throw new EvaluationRefusal([CHANGED]);
+  if (!sameFile(opened, finished).same || !sameFile(opened, after).same || BigInt(bytes.length) !== BigInt(opened.size)) throw new EvaluationRefusal([CHANGED]);
+  return { bytes, size: bytes.length, identity: hasIndex(opened) ? "file-index" : "size-and-timestamps" };
 }
 
 /**
  * Reads one file from `dir` for import. Refused: a name that is not bare, a missing file, a symbolic link or
- * junction (lstat), a non-regular file, a file with several hard links, a real path outside the directory,
- * an oversized file, and a file whose size or modification time changed while it was read.
- * The refusal text never contains the operator's file name or path (they may identify a person).
+ * junction (lstat), a non-regular file, a file with several hard links, a real path outside the directory, an
+ * oversized file, and any file whose identity cannot be held from before the open to after the read (readBound).
  */
 export function readSourceFile(dir: string, name: string, maxBytes: number, ops: ReadOps = realRead): SourceRead {
   const bad = bareNameProblem(name);
@@ -185,40 +299,31 @@ export function readSourceFile(dir: string, name: string, maxBytes: number, ops:
   }
   if (before.isSymbolicLink()) throw new EvaluationRefusal(["a listed source file is a symbolic link or junction; links are never followed"]);
   if (!before.isFile()) throw new EvaluationRefusal(["a listed source entry is not a regular file"]);
-  if (before.nlink > 1) throw new EvaluationRefusal(["a listed source file has several hard links; copy it to a plain file first"]);
-  if (before.size > maxBytes) throw new EvaluationRefusal([`a listed source file is larger than ${maxBytes} bytes`]);
-  const real = ops.realpath(full);
+  if (BigInt(before.nlink) > ONE) throw new EvaluationRefusal(["a listed source file has several hard links; copy it to a plain file first"]);
+  if (BigInt(before.size) > BigInt(maxBytes)) throw new EvaluationRefusal([`a listed source file is larger than ${maxBytes} bytes`]);
+  const real = realpathOf(ops, full);
   const rel = path.relative(root, real);
   if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel) || !samePath(path.dirname(real), root)) throw new EvaluationRefusal(["a listed source file resolves outside the source directory"]);
-  const fd = ops.open(full);
-  let bytes: Buffer;
-  let during;
-  try {
-    during = ops.fstat(fd);
-    bytes = ops.readAll(fd);
-  } finally {
-    ops.close(fd);
-  }
-  let after;
-  try {
-    after = ops.lstat(full);
-  } catch {
-    throw new EvaluationRefusal(["a source file disappeared while it was read"]);
-  }
-  const stable = (s: { size: number; mtimeMs: number }) => s.size === before.size && s.mtimeMs === before.mtimeMs;
-  if (!stable(during) || !stable(after) || bytes.length !== before.size || after.isSymbolicLink())
-    throw new EvaluationRefusal(["a source file changed while it was being read; import it again once it is not being written"]);
-  return { bytes, size: bytes.length };
+  return readBound(full, maxBytes, before, ops);
 }
 
-/** Reads a small regular file from the intake workspace without following a link. */
-export function readWorkspaceFile(file: string, ops: ReadOps = realRead): Buffer {
-  let st;
+/** Largest workspace file read in one piece (images are at most 40 MB; records, reviews and plans are far smaller). */
+export const MAX_WORKSPACE_FILE_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Reads a file of the intake workspace or an operator-named evidence file (policy, coverage spec, plan, review,
+ * batch, record, seal, pooled image) through an opened handle with the same identity and stability checks as
+ * readSourceFile. A link, a junction or a non-regular file is refused. Hard links are not refused here (pooled
+ * and evidence files are ours or the operator's own).
+ */
+export function readWorkspaceFile(file: string, ops: ReadOps = realRead, maxBytes = MAX_WORKSPACE_FILE_BYTES): Buffer {
+  let before;
   try {
-    st = ops.lstat(file);
+    before = ops.lstat(file);
   } catch {
-    throw new EvaluationRefusal([`${path.basename(file)} cannot be read`]);
+    throw new EvaluationRefusal(["a workspace or evidence file cannot be read"]);
   }
-  if (st.isSymbolicLink() || !st.isFile()) throw new EvaluationRefusal([`${path.basename(file)} is not a regular file (links are refused)`]);
-  return readFileSync(file);
+  if (before.isSymbolicLink() || !before.isFile()) throw new EvaluationRefusal(["a workspace or evidence file is not a regular file (links are refused)"]);
+  if (BigInt(before.size) > BigInt(maxBytes)) throw new EvaluationRefusal([`a workspace or evidence file is larger than ${maxBytes} bytes`]);
+  return readBound(file, maxBytes, before, ops).bytes;
 }

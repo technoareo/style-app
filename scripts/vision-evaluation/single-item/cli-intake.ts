@@ -44,7 +44,7 @@ function readJson(file: string): unknown {
     return JSON.parse(readWorkspaceFile(file).toString("utf8").replace(/^﻿/, ""));
   } catch (e) {
     if (e instanceof EvaluationRefusal) throw e;
-    throw new EvaluationRefusal([`${file.split(/[\\/]/).pop()} is not valid JSON (damaged files are never repaired)`]);
+    throw new EvaluationRefusal(["an input file is not valid JSON (damaged files are never repaired)"]);
   }
 }
 

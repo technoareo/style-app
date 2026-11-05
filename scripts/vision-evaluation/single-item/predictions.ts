@@ -1,6 +1,7 @@
 import { ID_RE, SHA256_RE, expectKeys, isIsoTimestamp, isNonEmptyString, isNonNegativeFinite, isRecord, oneOf } from "../check";
 import { boxProblems } from "../geometry";
 import type { Box } from "../types";
+import { validateRunBinding, type RunBinding } from "./run-binding";
 import { UNCERTAIN_KEYS, type UncertainKey } from "../../../src/domain/analysis";
 import {
   FITS,
@@ -81,6 +82,13 @@ export type SingleRunInfo = {
   timeoutMs: number | null;
   imageHashSource: "recorded-by-run" | "asserted-by-operator";
   notes: string;
+  /**
+   * Set only when the cases were adapted from a COMPLETE benchmark-runner directory
+   * (single-run-qwen, then single-adapt-qwen --run-dir). Absent or null: the records
+   * came from somewhere else (an operator's own wrapper, an incomplete run) and the
+   * report can never be launch evidence.
+   */
+  runBinding?: RunBinding | null;
 };
 
 export type SinglePredictionReport = {
@@ -171,8 +179,9 @@ export function validateSinglePredictionReport(doc: unknown): { report: SinglePr
   const run = doc.run;
   if (!isRecord(run)) problems.push("predictions.run: must be an object");
   else {
-    expectKeys(run, RUN_KEYS, "run", problems);
+    expectKeys(Object.fromEntries(Object.entries(run).filter(([k]) => k !== "runBinding")), RUN_KEYS, "run", problems);
     for (const key of ["model", "modelVersion", "adapter", "notes"] as const) if (!isNonEmptyString(run[key])) problems.push(`run.${key}: must be a non-empty string`);
+    if (run.runBinding !== undefined && run.runBinding !== null) validateRunBinding(run.runBinding, "run.runBinding", problems);
     if (run.analysisMode !== "single") problems.push('run.analysisMode: must be "single"');
     if (run.startedAt !== null && !isIsoTimestamp(run.startedAt)) problems.push("run.startedAt: must be null or an ISO timestamp with a time zone");
     if (run.timeoutMs !== null && !isNonNegativeFinite(run.timeoutMs)) problems.push("run.timeoutMs: must be null or a non-negative number");

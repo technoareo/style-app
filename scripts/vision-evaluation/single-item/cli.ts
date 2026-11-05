@@ -2,10 +2,12 @@ import { closeSync, existsSync, openSync, readFileSync, readdirSync, unlinkSync,
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { EvaluationRefusal } from "../evaluate";
-import { inspectImageBytes, sha256Hex } from "../image";
+import { sha256Hex } from "../image";
 import { toSingleCase, singleRunInfo, validateAnalyzePhotoRecord, type AnalyzePhotoRecord } from "./adapter";
 import { validateGoldFile, type GoldFile } from "./gold";
-import { integrityProblems, strataProblems, type ImageResolver, type ManifestInput } from "./integrity";
+import { integrityProblems, strataProblems, type ManifestInput } from "./integrity";
+import { RunInterrupted, imagesFrom, predictionsFromRun, readCompleteRun, runBenchmark, verifyPredictionsAgainstRun, type RunnerDeps } from "./runner";
+import type { VerifiedRun } from "./run-binding";
 import { validateFreezeReceipt, validateSingleManifest, type FreezeReceipt } from "./manifest";
 import { approvePolicy, policyContentSha256, validatePolicy, type LaunchPolicy } from "./policy";
 import { validateSinglePredictionReport, type SinglePredictionReport } from "./predictions";
@@ -125,18 +127,6 @@ export function writeAllOrNothing(files: Array<{ file: string; value: unknown }>
 const list = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 const text = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
-function imagesFrom(dir: string): ImageResolver {
-  return (fixture) => {
-    const file = path.join(dir, fixture.file);
-    if (!existsSync(file)) return null;
-    try {
-      const bytes = readFileSync(file);
-      return { sha256: sha256Hex(bytes), dimensions: inspectImageBytes(bytes) };
-    } catch {
-      return null;
-    }
-  };
-}
 
 function loadManifest(file: string): ManifestInput {
   const { value, sha256 } = readJson(file);
@@ -276,7 +266,38 @@ function validate(values: Values, io: CliIo): void {
   io.log(JSON.stringify({ ok: true, manifests: b.manifests.map((m) => ({ split: m.manifest.split, fixtures: m.manifest.fixtures.length })), strataChecked: Boolean(policyFile) }, null, 2));
 }
 
+/** Adapts a COMPLETE benchmark-runner directory: the only way to get predictions that can be launch evidence. */
+function adaptRunDir(values: Values, io: CliIo): void {
+  const imagesDir = text(values["images-dir"]);
+  const runDir = text(values["run-dir"]);
+  if (text(values.record) || text(values["records-dir"]) || !imagesDir || !runDir) throw new UsageError("single-adapt-qwen --run-dir takes no --record/--records-dir, and needs --manifest, --images-dir and --out");
+  const out = newOutput(values.out);
+  const manifests = list(values.manifest).map(loadManifest);
+  if (manifests.length === 0) throw new UsageError("--manifest is required");
+  const state = readCompleteRun(runDir); // refuses an incomplete, damaged or edited run
+  const problems: string[] = [];
+  for (const bound of state.receipt.manifests) {
+    const given = manifests.find((m) => m.manifest.split === bound.split);
+    if (!given) problems.push(`the ${bound.split} manifest the run was made against was not supplied`);
+    else if (given.fileSha256 !== bound.fileSha256) problems.push(`the ${bound.split} manifest file differs from the one the run was made against`);
+  }
+  for (const m of manifests) if (!state.receipt.manifests.some((b) => b.split === m.manifest.split)) problems.push(`a ${m.manifest.split} manifest was supplied that the run did not use`);
+  const resolver = imagesFrom(imagesDir);
+  for (const m of manifests)
+    for (const f of m.manifest.fixtures) {
+      const facts = resolver(f);
+      if (!facts || facts.sha256 !== f.sha256) problems.push(`image for "${f.id}" is absent or differs from the immutable manifest hash`);
+    }
+  if (problems.length > 0) throw new EvaluationRefusal(problems);
+  const report = predictionsFromRun(state);
+  const cases = report.cases;
+  writeNew(out, report);
+  const bad = cases.filter((c) => c.status !== "completed").length;
+  io.log(`wrote ${out}: ${cases.length} case(s) from run ${state.receipt.runId}, ${bad} not completed${state.receipt.developmentOnly ? ". DEVELOPMENT-ONLY run: it can never be launch evidence" : ""}. The model confidence is not used as correctness.`);
+}
+
 function adaptQwen(values: Values, io: CliIo): void {
+  if (text(values["run-dir"])) return adaptRunDir(values, io);
   const imagesDir = text(values["images-dir"]);
   const recordFile = text(values.record);
   const recordsDir = text(values["records-dir"]);
@@ -313,7 +334,7 @@ function adaptQwen(values: Values, io: CliIo): void {
   const report: SinglePredictionReport = { schemaVersion: 1, kind: "single-item-predictions", run, cases: records.map(toSingleCase).sort((a, b) => (a.fixtureId < b.fixtureId ? -1 : 1)) };
   writeNew(out, report);
   const bad = report.cases.filter((c) => c.status !== "completed").length;
-  io.log(`wrote ${out}: ${report.cases.length} case(s), ${bad} not completed. The model's confidence is not used as correctness.`);
+  io.log(`wrote ${out}: ${report.cases.length} case(s), ${bad} not completed. These records are NOT bound to a benchmark-runner run, so the report can never be launch evidence (use single-run-qwen, then --run-dir). The model's confidence is not used as correctness.`);
 }
 
 function score(values: Values, io: CliIo): void {
@@ -326,11 +347,20 @@ function score(values: Values, io: CliIo): void {
   const { value, sha256 } = readJson(predictionsFile);
   const { report: predictions, problems } = validateSinglePredictionReport(value);
   if (!predictions) throw new EvaluationRefusal(problems.map((p) => `${predictionsFile}: ${p}`));
+  // A run binding typed into a predictions file proves nothing. When predictions claim one, the completed run
+  // DIRECTORY must be supplied; it is re-opened, validated and the predictions re-derived from it.
+  const runDir = text(values["run-dir"]);
+  let verifiedRun: VerifiedRun | null = null;
+  if (predictions.run.runBinding) {
+    if (!runDir) throw new EvaluationRefusal(["the predictions carry a run binding; --run-dir (the completed runner directory) is required to verify it. A binding written into a file proves nothing"]);
+    verifiedRun = verifyPredictionsAgainstRun(runDir, predictions, b.manifests);
+  } else if (runDir) throw new EvaluationRefusal(["--run-dir was given but the predictions carry no run binding (they were not adapted from a runner directory)"]);
   const report = evaluateSingle({
     manifests: b.manifests,
     gold: b.gold,
     receipts: b.receipts,
     predictions,
+    verifiedRun,
     images: imagesFrom(imagesDir),
     policy: policy.policy,
     createdAt: io.now().toISOString(),
@@ -340,7 +370,61 @@ function score(values: Values, io: CliIo): void {
   io.log(`wrote ${out}: ${report.cases.length} case(s). Launch gate: ${report.gate.verdict}${report.gate.preconditions.length ? ` (${report.gate.preconditions.length} precondition(s) unmet)` : ""}. This is not a launch-readiness claim.`);
 }
 
-export const SINGLE_COMMANDS = ["single-template", "single-freeze", "single-validate", "single-adapt-qwen", "single-score", "single-approve"] as const;
+export const SINGLE_COMMANDS = ["single-template", "single-freeze", "single-validate", "single-adapt-qwen", "single-score", "single-approve", "single-run-qwen"] as const;
+
+/**
+ * single-run-qwen: runs the app real analysis over a frozen benchmark. Async (it calls the model), so it
+ * has its own entry; makeDeps is injectable for tests and defaults to the app modules.
+ */
+export async function runSingleRunCli(argv: string[], io: CliIo = defaultIo, makeDeps?: () => Promise<RunnerDeps>): Promise<number> {
+  try {
+    const { values } = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: false,
+      strict: true,
+      options: {
+        manifest: { type: "string", multiple: true },
+        receipt: { type: "string", multiple: true },
+        "images-dir": { type: "string" },
+        "run-dir": { type: "string" },
+        "allow-dirty-development": { type: "boolean" },
+        "model-version": { type: "string" },
+      },
+    });
+    const v: Values = values;
+    const imagesDir = text(v["images-dir"]);
+    const runDir = text(v["run-dir"]);
+    if (argv[0] !== "single-run-qwen" || !imagesDir || !runDir || list(v.manifest).length === 0)
+      throw new UsageError("usage: single-run-qwen --manifest M... [--receipt R...] --images-dir D --run-dir NEW_OR_RESUMABLE [--allow-dirty-development] [--model-version V]");
+    const deps = makeDeps ? await makeDeps() : await (await import("./runner-real")).realRunnerDeps((l) => io.log(l));
+    const result = await runBenchmark(
+      {
+        manifestFiles: list(v.manifest),
+        receiptFiles: list(v.receipt),
+        imagesDir,
+        runDir,
+        allowDirtyDevelopment: v["allow-dirty-development"] === true,
+        expectedModelVersion: text(v["model-version"]),
+      },
+      { ...deps, log: (l) => io.log(l) },
+    );
+    io.log(
+      `run ${result.runId} complete: ${result.total} fixture(s) (${result.alreadyDone} from an earlier session, ${result.ran} now); outcomes ok ${result.outcomes.ok}, timeout ${result.outcomes.timeout}, unavailable ${result.outcomes.unavailable}, unverified ${result.outcomes.unverified}. Next: single-adapt-qwen --run-dir. This is evidence plumbing, not a launch-readiness claim${result.developmentOnly ? "; DEVELOPMENT ONLY, never launch evidence" : ""}.`,
+    );
+    return 0;
+  } catch (e) {
+    if (e instanceof EvaluationRefusal) {
+      io.error(e.message);
+      return 2;
+    }
+    if (e instanceof RunInterrupted) {
+      io.error("interrupted; evidence written so far is kept. Resume with the same command and --run-dir");
+      return 130;
+    }
+    io.error(e instanceof Error ? e.message : String(e));
+    return 1;
+  }
+}
 
 /** Returns the exit code: 0 done, 2 refused, 1 usage or other error. */
 export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
@@ -364,6 +448,9 @@ export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
         out: { type: "string" },
         "out-manifest": { type: "string" },
         "out-receipt": { type: "string" },
+        "run-dir": { type: "string" },
+        "allow-dirty-development": { type: "boolean" },
+        "model-version": { type: "string" },
         "approved-by": { type: "string" },
         note: { type: "string" },
       },
@@ -375,6 +462,7 @@ export function runSingleCli(argv: string[], io: CliIo = defaultIo): number {
     else if (command === "single-adapt-qwen") adaptQwen(v, io);
     else if (command === "single-score") score(v, io);
     else if (command === "single-approve") approve(v, io);
+    else if (command === "single-run-qwen") throw new UsageError("single-run-qwen is asynchronous: call runSingleRunCli (run.ts does)");
     else throw new UsageError(`usage: ${SINGLE_COMMANDS.join(" | ")} (see scripts/vision-evaluation/README.md)`);
     return 0;
   } catch (e) {

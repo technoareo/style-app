@@ -62,6 +62,10 @@ This verification uses a disposable local account and public evaluation photos. 
 
 Runtime dependency auditing reports no known vulnerabilities. Development tooling currently includes an unpatched upstream `braces` stack-exhaustion advisory; do not process untrusted lint patterns. Containers exclude development dependencies.
 
+## Measuring recognition (build 025)
+
+The repository holds the machinery to measure the supported easy single-item photo workflow honestly, but no benchmark photos, labels or results, so no accuracy claim is made. `npm run vision:single -- single-run-qwen --manifest ... --receipt ... --images-dir ... --run-dir ...` runs the app's own `normalizePhoto` and `analyzePhoto` (mode single, your configured Ollama model) over a frozen, rights-cleared benchmark, after a preflight that refuses before any inference; `single-adapt-qwen --run-dir` and `single-score` then score a complete run against human labels under an approved policy. Image folders and run evidence stay out of git (`benchmark-images/`, `benchmark-runs/`). See `scripts/vision-evaluation/README.md` and `docs/reviews/implementation-025-notes.md`. The app is not launch-ready on this basis: that needs a representative, licensed or consented real-photo benchmark to be acquired, labelled, frozen, run and to pass the approved policy.
+
 ## Public deployment
 
 The chosen launch target is one self-hosted Linux server with Node, SQLite, private photos, Ollama and Caddy HTTPS. Software has no paid AI API requirement; server resources, a domain and mail service still require provisioning. Follow [DEPLOYMENT.md](docs/DEPLOYMENT.md). Docker is not installed in the current workspace, so the container package has not yet been executed. A successful local build is not a public deployment test.

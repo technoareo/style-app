@@ -17,4 +17,8 @@ playwright-report/
 test-results/
 
 test-results-*/
+
+# Single-item benchmark: licensed photos and run evidence stay out of git (build 025)
+benchmark-images/
+benchmark-runs/
 !.env.compose.example

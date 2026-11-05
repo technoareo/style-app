@@ -2,6 +2,7 @@ import { EvaluationRefusal } from "../evaluate";
 import { iou } from "../geometry";
 import type { Box, Split } from "../types";
 import type { GoldFile, GoldItem, GoldLabel } from "./gold";
+import { UNEXPECTED_PREFIX, type RunBinding, type VerifiedRun } from "./run-binding";
 import { LEAKAGE_KEYS, integrityProblems, strataCounts, strataProblems, type IntegrityInput } from "./integrity";
 import type { SingleFixture, SingleManifest } from "./manifest";
 import { PRODUCTION_CHECKS, policyContentSha256, policyDocumentSha256, validatePolicy, type GateRule, type LaunchPolicy, type MetricId, type PolicyChecks } from "./policy";
@@ -31,6 +32,8 @@ export type CaseResult = {
   rejectionReason: SingleFixture["rejectionReason"];
   predictionStatus: CaseStatus | "missing";
   disposition: Disposition;
+  /** The runner recorded this case for a fault of its own or of the environment, not a model outcome (type only, no details). */
+  runnerUnexpected: boolean;
   /** Rejection photos only: an item came back without the notice that fits the rejection reason. null for in-scope photos. */
   unsafeAccept: boolean | null;
   /** The app attached a multiple-items or crop-unverified notice. */
@@ -157,6 +160,7 @@ export function scoreCase(
     rejectionReason: fixture.rejectionReason,
     predictionStatus: (prediction?.status ?? "missing") as CaseStatus | "missing",
     disposition: disposition(prediction),
+    runnerUnexpected: prediction?.status !== "completed" && Boolean(prediction?.error?.startsWith(UNEXPECTED_PREFIX)),
     unsafeAccept: fixture.stratum === "rejection" ? unsafeAccept(disposition(prediction), fixture.rejectionReason) : null,
     warned: prediction?.status === "completed" && (prediction.multipleItemsWarning || prediction.cropUnverifiedWarning),
     shoePairNotice: prediction?.status === "completed" && prediction.shoePairNotice,
@@ -267,7 +271,7 @@ export type SplitReport = {
   attributes: Record<Attribute, AttributeReport>;
   visibleMaterialRecall: Metric;
   suggestions: { seasons: Metric; occasions: Metric; note: string };
-  reliability: { cases: number; failed: number; timeout: number; invalid: number; unverified: number; missing: number; failureRate: Metric };
+  reliability: { cases: number; runnerUnexpected: number; failed: number; timeout: number; invalid: number; unverified: number; missing: number; failureRate: Metric };
   latency: { n: number; missing: number; p50Ms: number | null; p95Ms: number | null; maxMs: number | null };
   metrics: Record<MetricId, Metric>;
 };
@@ -375,7 +379,7 @@ export function aggregateSplit(
     attributes,
     visibleMaterialRecall,
     suggestions: { seasons: metrics["suggestions.seasons.meanJaccard"], occasions: metrics["suggestions.occasions.meanJaccard"], note: suggestionNote },
-    reliability: { cases: all, failed: count("failed"), timeout: count("timeout"), invalid: count("invalid"), unverified: count("unverified"), missing: count("missing"), failureRate },
+    reliability: { cases: all, runnerUnexpected: results.filter((r) => r.runnerUnexpected).length, failed: count("failed"), timeout: count("timeout"), invalid: count("invalid"), unverified: count("unverified"), missing: count("missing"), failureRate },
     latency,
     metrics,
   };
@@ -402,6 +406,16 @@ export type GateCheck = {
 export const RELAXED_PRECONDITION =
   "the policy was validated with relaxed sample-size checks (synthetic use only); no launch verdict is given, read the per-check statuses";
 
+/** Held-out predictions are launch evidence only when they come from a complete, clean, non-development runner directory. */
+export function runBindingProblems(binding: RunBinding | null): string[] {
+  if (!binding)
+    return ["the held-out predictions are not bound to a complete benchmark-runner run (records from an operator wrapper or an incomplete run cannot be launch evidence); use single-run-qwen, then single-adapt-qwen --run-dir"];
+  const out: string[] = [];
+  if (binding.developmentOnly) out.push("the run used the development-only override (dirty worktree allowed); it can never be launch evidence");
+  if (binding.gitDirty) out.push("the run was made from a worktree with uncommitted changes");
+  return out;
+}
+
 export type GateReport = { verdict: GateStatus; preconditions: string[]; checks: GateCheck[] };
 
 function evaluateRule(rule: GateRule, m: Metric | undefined): GateCheck {
@@ -422,11 +436,25 @@ function evaluateRule(rule: GateRule, m: Metric | undefined): GateCheck {
  * is then not valid evidence. Otherwise any failing gate rule is FAIL, any gate
  * rule without enough data is NOT_EVALUATED, and only all-passing is PASS.
  */
-export function launchGate(policy: LaunchPolicy, heldout: SplitReport | null, manifest: SingleManifest | undefined, gold: GoldFile | undefined, relaxedSampleChecks = false): GateReport {
+export function launchGate(
+  policy: LaunchPolicy,
+  heldout: SplitReport | null,
+  manifest: SingleManifest | undefined,
+  gold: GoldFile | undefined,
+  relaxedSampleChecks = false,
+  binding: RunBinding | null = null,
+  verifiedRun: VerifiedRun | null = null,
+): GateReport {
   const preconditions: string[] = [];
   if (relaxedSampleChecks) preconditions.push(RELAXED_PRECONDITION);
   if (!policy.approval) preconditions.push(`policy ${policy.id}@${policy.version} has no approval record; it is a proposal, so no launch decision can be made from it`);
   if (!heldout) preconditions.push("no held-out predictions were scored");
+  else {
+    preconditions.push(...runBindingProblems(binding));
+    if (binding && !verifiedRun) preconditions.push("the run binding was not verified against a completed run directory");
+    if (heldout.reliability.runnerUnexpected > 0)
+      preconditions.push(`${heldout.reliability.runnerUnexpected} held-out case(s) were recorded for an unexpected runner or environment fault (not a model outcome); fix the cause and score a new run directory`);
+  }
   preconditions.push(...strataProblems(manifest, gold, policy));
   const checks = policy.rules.map((r) => evaluateRule(r, heldout?.metrics[r.metric]));
   const gates = checks.filter((c) => c.kind === "gate");
@@ -474,6 +502,8 @@ export type SingleReport = {
     validation: "production" | "relaxed-sample-checks";
   };
   /** What the cross-file checks covered. A held-out score is refused unless both splits were checked together. */
+  /** Whether the predictions were re-derived from a complete, clean runner directory at scoring time (null: no run binding, so unbound). */
+  runVerification: (VerifiedRun & { verified: true }) | null;
   integrity: { splitsChecked: Split[]; crossSplitLeakageChecked: boolean; leakageKeys: readonly string[]; developmentFixtures: number; heldoutFixtures: number };
   inputDigests: SingleEvaluationInput["inputDigests"];
   run: NonNullable<IntegrityInput["predictions"]>["run"];
@@ -520,6 +550,7 @@ export function evaluateSingle(input: SingleEvaluationInput): SingleReport {
       documentSha256: policyDocumentSha256(input.policy),
       validation: checks.relaxedSampleChecks ? "relaxed-sample-checks" : "production",
     },
+    runVerification: input.verifiedRun ? { ...input.verifiedRun, verified: true } : null,
     integrity: {
       splitsChecked: input.manifests.map((m) => m.manifest.split).sort() as Split[],
       crossSplitLeakageChecked: input.manifests.length === 2,
@@ -530,7 +561,7 @@ export function evaluateSingle(input: SingleEvaluationInput): SingleReport {
     inputDigests: input.inputDigests,
     run: input.predictions.run,
     splits,
-    gate: launchGate(input.policy, splits.heldout, heldoutManifest, goldBySplit.get("heldout"), checks.relaxedSampleChecks),
+    gate: launchGate(input.policy, splits.heldout, heldoutManifest, goldBySplit.get("heldout"), checks.relaxedSampleChecks, input.predictions.run.runBinding ?? null, input.verifiedRun ?? null),
     cases: results,
     statements: checks.relaxedSampleChecks
       ? [...SINGLE_REPORT_STATEMENTS, "The policy was validated with relaxed sample-size checks (synthetic use only); this report is not launch evidence."]

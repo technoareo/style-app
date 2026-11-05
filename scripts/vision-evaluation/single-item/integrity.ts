@@ -5,6 +5,7 @@ import type { GoldFile, GoldLabel } from "./gold";
 import type { FreezeReceipt, SingleFixture, SingleManifest } from "./manifest";
 import type { LaunchPolicy } from "./policy";
 import type { SinglePredictionReport } from "./predictions";
+import { casesDigest, type VerifiedRun } from "./run-binding";
 import { GOLD_CATEGORIES } from "./vocab";
 
 /**
@@ -27,9 +28,18 @@ export type IntegrityInput = {
   gold: GoldFile[];
   receipts: FreezeReceipt[];
   predictions: SinglePredictionReport | null;
+  /**
+   * Set only by verifyPredictionsAgainstRun: the predictions were re-derived from a complete, clean runner
+   * directory re-opened at scoring time. A runBinding without it is a claim nobody checked and is refused.
+   */
+  verifiedRun?: VerifiedRun | null;
   images: ImageResolver;
-  /** "freeze" checks only the manifests (and cross-split leakage); labels, receipts and runs come later. Default "score". */
-  stage?: "freeze" | "score";
+  /**
+   * "freeze": the manifests and cross-split leakage only. "run": the same plus the freeze receipts, i.e.
+   * everything that must hold BEFORE any model sees an image (no labels or predictions yet).
+   * "score" (default): everything.
+   */
+  stage?: "freeze" | "run" | "score";
 };
 
 /** What is compared across splits. Reported so a reader can see what was and was not checked. */
@@ -102,6 +112,7 @@ export function integrityProblems(input: IntegrityInput): string[] {
   // --- held-out contamination
   const heldout = bySplit.get("heldout");
   const freezing = input.stage === "freeze";
+  const beforeLabels = input.stage === "freeze" || input.stage === "run";
   if (heldout) {
     for (const f of heldout.manifest.fixtures) {
       if (f.priorInference) out.push(`fixture "${f.id}": a held-out image that a model has already seen`);
@@ -124,7 +135,7 @@ export function integrityProblems(input: IntegrityInput): string[] {
 
   // --- gold: one label per fixture, same bytes, same decision, completed
   const goldBySplit = new Map<Split, GoldFile>();
-  if (freezing) return [...new Set(out)];
+  if (beforeLabels) return [...new Set(out)];
   for (const g of input.gold) {
     if (goldBySplit.has(g.split)) out.push(`two gold files for the ${g.split} split`);
     goldBySplit.set(g.split, g);
@@ -167,6 +178,28 @@ export function integrityProblems(input: IntegrityInput): string[] {
       }
       scored.add(hit.split);
       if (c.imageSha256.toLowerCase() !== hit.f.sha256) out.push(`prediction for "${c.fixtureId}" was made for a different image (hash mismatch)`);
+    }
+    const binding = preds.run.runBinding ?? null;
+    const verified = input.verifiedRun ?? null;
+    if (!binding && verified) out.push("a verified run was supplied but the predictions carry no run binding");
+    if (binding) {
+      if (!verified) out.push("the predictions carry a run binding that was not verified against a completed run directory (pass --run-dir); a binding written into the file proves nothing");
+      else if (
+        verified.runId !== binding.runId ||
+        verified.inputsDigest !== binding.inputsDigest ||
+        verified.completionReceiptSha256 !== binding.completionReceiptSha256 ||
+        verified.requestSha256 !== binding.requestSha256 ||
+        verified.modelVersion !== binding.modelVersion
+      )
+        out.push("the verified run is not the run the predictions' binding names");
+      for (const { manifest, fileSha256 } of input.manifests) {
+        const bound = binding.manifests.find((m) => m.split === manifest.split);
+        if (!bound) out.push(`the run binding does not name the ${manifest.split} manifest that is being scored`);
+        else if (fileSha256 === null) out.push(`the ${manifest.split} manifest file digest is unknown, so the run binding cannot be checked`);
+        else if (bound.fileSha256 !== fileSha256) out.push(`the run was made against a different ${manifest.split} manifest file than the one supplied`);
+      }
+      for (const b of binding.manifests) if (!bySplit.has(b.split)) out.push(`the run binding names a ${b.split} manifest that was not supplied`);
+      if (binding.casesSha256 !== casesDigest(preds.cases)) out.push("the predictions differ from what was adapted from the run (edited or replaced after the run)");
     }
     if (scored.has("heldout")) {
       const run = preds.run;

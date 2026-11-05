@@ -18,6 +18,7 @@ import { SINGLE_COMMANDS, runSingleCli, writeAllOrNothing } from "../scripts/vis
 import { validateGoldFile, type GoldFile, type GoldLabel } from "../scripts/vision-evaluation/single-item/gold";
 import { integrityProblems, strataProblems, type IntegrityInput } from "../scripts/vision-evaluation/single-item/integrity";
 import { validateSingleManifest, type FreezeReceipt, type SingleFixture, type SingleManifest } from "../scripts/vision-evaluation/single-item/manifest";
+import { casesDigest, type RunBinding, type VerifiedRun } from "../scripts/vision-evaluation/single-item/run-binding";
 import { DEFAULT_POLICY, METRIC_IDS, METRIC_SPECS, POLICY_FLOORS, REQUIRED_GATE_METRICS, approvePolicy, canonicalJson, policyContentSha256, validatePolicy, type LaunchPolicy, type PolicyChecks } from "../scripts/vision-evaluation/single-item/policy";
 import { validateSinglePredictionReport, type SinglePrediction, type SinglePredictionCase, type SinglePredictionReport } from "../scripts/vision-evaluation/single-item/predictions";
 import { RELAXED_PRECONDITION, evaluateSingle, percentile, wilson, type SingleReport } from "../scripts/vision-evaluation/single-item/score";
@@ -292,6 +293,35 @@ function perfectCases(specs: Spec[], start = 1000): SinglePredictionCase[] {
   });
 }
 
+/** What a complete, clean runner directory would bind (the runner itself is tested in singleItemRunner025.test.ts). */
+function syntheticBinding(): RunBinding {
+  return {
+    runId: "run-synthetic",
+    inputsDigest: HEX("1"),
+    runReceiptSha256: HEX("2"),
+    completionReceiptSha256: HEX("3"),
+    gitCommit: "a".repeat(40),
+    gitDirty: false,
+    developmentOnly: false,
+    runnerId: "test-runner",
+    model: "synthetic-model",
+    modelVersion: "v0",
+    promptSha256: HEX("5"),
+    requestSha256: HEX("6"),
+    manifests: [
+      { split: "development", fileSha256: HEX("d") },
+      { split: "heldout", fileSha256: HEX("a") },
+    ],
+    receipts: [],
+    casesSha256: HEX("0"),
+  };
+}
+
+/** What verifyPredictionsAgainstRun would return for the synthetic binding (the verifier itself is tested in singleItemRunner025.test.ts). */
+function syntheticVerified(): VerifiedRun {
+  return { runId: "run-synthetic", inputsDigest: HEX("1"), completionReceiptSha256: HEX("3"), requestSha256: HEX("6"), modelVersion: "v0" };
+}
+
 function runInfo(over: Partial<SinglePredictionReport["run"]> = {}): SinglePredictionReport["run"] {
   return {
     model: "synthetic-model",
@@ -303,10 +333,16 @@ function runInfo(over: Partial<SinglePredictionReport["run"]> = {}): SinglePredi
     timeoutMs: 180000,
     imageHashSource: "recorded-by-run",
     notes: "synthetic",
+    runBinding: syntheticBinding(),
     ...over,
   };
 }
-const reportOf = (cases: SinglePredictionCase[], run = runInfo()): SinglePredictionReport => ({ schemaVersion: 1, kind: "single-item-predictions", run, cases });
+const reportOf = (cases: SinglePredictionCase[], run = runInfo()): SinglePredictionReport => ({
+  schemaVersion: 1,
+  kind: "single-item-predictions",
+  run: run.runBinding ? { ...run, runBinding: { ...run.runBinding, casesSha256: casesDigest(cases) } } : run,
+  cases,
+});
 
 function input(w: World, cases: SinglePredictionCase[], policy = testPolicy(), run = runInfo()) {
   return {
@@ -316,6 +352,7 @@ function input(w: World, cases: SinglePredictionCase[], policy = testPolicy(), r
     predictions: reportOf(cases, run),
     images: resolverOf(w.images),
     policy: rebind(policy),
+    verifiedRun: syntheticVerified(),
     policyChecks: RELAXED,
     createdAt: "2026-10-21T00:00:00Z",
     inputDigests: [],
@@ -346,7 +383,7 @@ function verdictOf(r: SingleReport): "PASS" | "FAIL" | "NOT_EVALUATED" {
 }
 
 function problemsOf(w: World, cases: SinglePredictionCase[] | null = null, run = runInfo()): string[] {
-  return integrityProblems({ manifests: w.manifests, gold: w.gold, receipts: w.receipts, predictions: cases ? reportOf(cases, run) : null, images: resolverOf(w.images) });
+  return integrityProblems({ manifests: w.manifests, gold: w.gold, receipts: w.receipts, predictions: cases ? reportOf(cases, run) : null, verifiedRun: run.runBinding ? syntheticVerified() : null, images: resolverOf(w.images) });
 }
 
 function refusal(fn: () => unknown): string {

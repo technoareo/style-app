@@ -27,7 +27,11 @@ export const QWEN_SINGLE_ADAPTER_ID = "qwen-single-item-analyze-photo-024";
 
 export type AnalyzePhotoOutcome = "ok" | "timeout" | "unavailable" | "unverified";
 
-/** The record an operator's wrapper saves around one analyzePhoto() call. */
+/**
+ * The record saved around one analyzePhoto() call. Since build 025 the benchmark runner
+ * (runner.ts, single-run-qwen) writes these; loose records from an operator's own wrapper
+ * still adapt, but without a run binding they can never be launch evidence.
+ */
 export type AnalyzePhotoRecord = {
   schemaVersion: 1;
   kind: "analyze-photo-record";

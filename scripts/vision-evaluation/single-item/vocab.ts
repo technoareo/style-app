@@ -87,8 +87,37 @@ export const ALLOWED_LICENSES: Readonly<Record<string, readonly string[]>> = {
  * collection, because a source the harness cannot name is a source whose licence
  * statement it cannot judge. A new source is added here, in code, with review.
  */
-export const SOURCE_COLLECTIONS = ["wikimedia-commons", "open-images", "self-owned-with-release"] as const;
+export const SOURCE_COLLECTIONS = ["wikimedia-commons", "open-images", "self-owned-with-release", "self-captured", "contributor-consent"] as const;
 export type SourceCollection = (typeof SOURCE_COLLECTIONS)[number];
+
+/**
+ * Collections whose rights evidence is PRIVATE (build 026): a photo the operator took, or one a contributor
+ * consented to give. There is no public page or licence to cite, so the manifest carries a pseudonymous
+ * rights-holder reference instead of a name and no URLs or licence; the evidence itself stays in the private
+ * intake workspace. The collections above this line keep their build 024 rule: https pages and an allow-listed licence.
+ */
+export const PRIVATE_SOURCE_COLLECTIONS = ["self-captured", "contributor-consent"] as const;
+export const isPrivateCollection = (c: unknown): boolean => (PRIVATE_SOURCE_COLLECTIONS as readonly unknown[]).includes(c);
+/** What the manifest shows for a private rights holder: never a name. */
+export const RIGHTS_HOLDER_REF_RE = /^rh-[a-f0-9]{12}$/;
+
+// ---------------------------------------------------------------- intake (build 026)
+
+/** How a photo came into the benchmark. Closed: "unknown" and "found on the web" are not sources. */
+export const RIGHTS_SOURCE_TYPES = ["self-captured", "contributor-consent", "open-license"] as const;
+export type RightsSourceType = (typeof RIGHTS_SOURCE_TYPES)[number];
+
+/** Capture conditions, declared by the person who imported the photo (nothing is defaulted). */
+export const BACKGROUNDS = ["plain", "textured", "cluttered"] as const;
+export const LIGHTINGS = ["daylight", "indoor_artificial", "low_light", "mixed"] as const;
+export const CAMERAS = ["phone", "dedicated_camera", "other_device"] as const;
+export const ITEM_SIZES = ["small", "medium", "large"] as const;
+export const WEARABLE_TYPES = ["worn", "mannequin", "unworn"] as const;
+export type Background = (typeof BACKGROUNDS)[number];
+export type Lighting = (typeof LIGHTINGS)[number];
+export type Camera = (typeof CAMERAS)[number];
+export type ItemSize = (typeof ITEM_SIZES)[number];
+export type WearableType = (typeof WEARABLE_TYPES)[number];
 
 const BLOCKED_LICENSE_WORDS = /(^|[^a-z])(nc|nd|noncommercial|non-commercial|noderivs|no-derivatives|unknown|proprietary|reserved)([^a-z]|$)/i;
 

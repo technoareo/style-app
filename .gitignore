@@ -21,4 +21,11 @@ test-results-*/
 # Single-item benchmark: licensed photos and run evidence stay out of git (build 025)
 benchmark-images/
 benchmark-runs/
+# Rights-cleared photo intake (build 026): photos, rights evidence, releases, reviewer files and receipts are private
+benchmark-intake/
+benchmark-releases/
+benchmark-frozen/
+**/reviewer-notes*
+**/*.rights.json
+**/*.release.*
 !.env.compose.example

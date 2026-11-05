@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY } from "./policy";
+import { defaultCoverageSpec } from "./sampling";
 
 /**
  * Blank templates for the single-item workflow. They are deliberately INVALID
@@ -101,7 +102,49 @@ export const recordTemplate = () => ({
 /** The proposed policy, unsigned. Copy it, change what the owner decides, then add an approval record. */
 export const policyTemplate = () => structuredClone(DEFAULT_POLICY);
 
+/** One intake-batch entry per photo. Every rights and capture decision is a placeholder, so it fails validation until a person decides it. */
+export const intakeBatchTemplate = () => ({
+  schemaVersion: 1,
+  kind: "single-item-intake-batch",
+  benchmarkId: "single-item-v1",
+  entries: [
+    {
+      file: TODO("bare-file-name-in-the-source-dir.jpg"),
+      rights: {
+        sourceType: TODO("self-captured|contributor-consent|open-license"),
+        rightsHolder: TODO("private-name-of-photographer-or-owner"),
+        acquiredAt: TODO("iso-date"),
+        evaluationPermission: null,
+        redistributionAllowed: null,
+        individuallyVerified: null,
+        verifiedBy: TODO("op-pseudonym"),
+        verifiedAt: TODO("iso-date"),
+        consent: null,
+        openLicense: null,
+      },
+      capture: {
+        sceneType: TODO("flat_lay|hanging|mannequin|worn|surface_or_floor|product_shot|other"),
+        background: TODO("plain|textured|cluttered"),
+        lighting: TODO("daylight|indoor_artificial|low_light|mixed"),
+        camera: TODO("phone|dedicated_camera|other_device"),
+        personsPresent: null,
+        modelRelease: null,
+      },
+      sourceShootId: TODO("one-id-per-photo-session"),
+      garmentId: TODO("one-id-per-physical-garment"),
+      stratum: TODO("in_scope|rejection"),
+      rejectionReason: null,
+      priorInference: null,
+    },
+  ],
+});
+
+/** A PROPOSED coverage spec derived from the default policy; the seed must be written down by a person. */
+export const coverageTemplate = () => defaultCoverageSpec();
+
 export const templates = {
+  "intake-batch": intakeBatchTemplate,
+  coverage: coverageTemplate,
   manifest: manifestTemplate,
   gold: goldTemplate,
   record: recordTemplate,

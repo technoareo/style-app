@@ -12,9 +12,11 @@ import {
 import { SPLITS, type Dimensions, type Split } from "../types";
 import {
   REJECTION_REASONS,
+  RIGHTS_HOLDER_REF_RE,
   SCENE_TYPES,
   SOURCE_COLLECTIONS,
   STRATA,
+  isPrivateCollection,
   licenseProblems,
   type RejectionReason,
   type SceneType,
@@ -35,12 +37,14 @@ export type LicenseEvidence = { id: string; version: string; url: string };
 
 export type RightsEvidence = {
   sourceCollection: SourceCollection;
-  /** The page a person opened to check the file and its licence. */
-  sourcePageUrl: string;
-  /** The file URL the bytes were downloaded from. */
-  originalUrl: string;
+  /** The page a person opened to check the file and its licence. null only for a private collection (self-captured, contributor-consent). */
+  sourcePageUrl: string | null;
+  /** The file URL the bytes were downloaded from. null only for a private collection. */
+  originalUrl: string | null;
+  /** The author. For a private collection this is a pseudonymous rights-holder reference (rh-...), never a name. */
   creator: string;
-  license: LicenseEvidence;
+  /** null only for a private collection, whose permission is the consent/release recorded in the private intake workspace. */
+  license: LicenseEvidence | null;
   retrievedAt: string;
   attribution: string;
   /** What was done to the downloaded file. An empty list means the bytes are exactly the original. */
@@ -161,8 +165,18 @@ export function rightsProblems(v: unknown, at: string, sha256: string | null): {
   expectKeys(v, RIGHTS_KEYS, at, out);
   if (!oneOf(SOURCE_COLLECTIONS, v.sourceCollection))
     out.push(`${at}.sourceCollection: must be one of ${SOURCE_COLLECTIONS.join(", ")}`);
-  httpsUrlProblem(v.sourcePageUrl, `${at}.sourcePageUrl`, out);
-  httpsUrlProblem(v.originalUrl, `${at}.originalUrl`, out);
+  const priv = isPrivateCollection(v.sourceCollection);
+  if (priv) {
+    // Private rights evidence lives in the intake workspace, never in a manifest: no URL, no licence, no name.
+    if (v.sourcePageUrl !== null) out.push(`${at}.sourcePageUrl: must be null for a ${String(v.sourceCollection)} photo`);
+    if (v.originalUrl !== null) out.push(`${at}.originalUrl: must be null for a ${String(v.sourceCollection)} photo`);
+    if (v.license !== null) out.push(`${at}.license: must be null for a ${String(v.sourceCollection)} photo (its permission is the consent or release held in the intake workspace)`);
+    if (typeof v.creator !== "string" || !RIGHTS_HOLDER_REF_RE.test(v.creator))
+      out.push(`${at}.creator: a ${String(v.sourceCollection)} photo carries a pseudonymous rights-holder reference (rh-<12 hex>), never a name`);
+  } else {
+    httpsUrlProblem(v.sourcePageUrl, `${at}.sourcePageUrl`, out);
+    httpsUrlProblem(v.originalUrl, `${at}.originalUrl`, out);
+  }
   for (const key of ["sourceCollection", "sourcePageUrl", "originalUrl", "creator", "attribution"] as const) {
     const value = v[key];
     if (typeof value === "string" && BLOCKED_SOURCE.test(value))
@@ -174,7 +188,9 @@ export function rightsProblems(v: unknown, at: string, sha256: string | null): {
   if (!isIsoDateOrTimestamp(v.retrievedAt)) out.push(`${at}.retrievedAt: must be an ISO date or timestamp`);
   if (!isIsoDateOrTimestamp(v.verifiedAt)) out.push(`${at}.verifiedAt: must be an ISO date or timestamp`);
   let license: LicenseEvidence | null = null;
-  if (!isRecord(v.license)) out.push(`${at}.license: must be an object`);
+  if (priv) {
+    /* checked above: null */
+  } else if (!isRecord(v.license)) out.push(`${at}.license: must be an object`);
   else {
     expectKeys(v.license, LICENSE_KEYS, `${at}.license`, out);
     for (const p of licenseProblems(v.license.id, v.license.version)) out.push(`${at}.license: ${p}`);
@@ -205,10 +221,10 @@ export function rightsProblems(v: unknown, at: string, sha256: string | null): {
   return {
     rights: {
       sourceCollection: v.sourceCollection as SourceCollection,
-      sourcePageUrl: v.sourcePageUrl as string,
-      originalUrl: v.originalUrl as string,
+      sourcePageUrl: priv ? null : (v.sourcePageUrl as string),
+      originalUrl: priv ? null : (v.originalUrl as string),
       creator: v.creator as string,
-      license: license as LicenseEvidence,
+      license: priv ? null : (license as LicenseEvidence),
       retrievedAt: v.retrievedAt as string,
       attribution: v.attribution as string,
       modifications: modifications as string[],

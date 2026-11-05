@@ -53,7 +53,7 @@ Run with `npm run vision:single -- <command>` or `tsx scripts/vision-evaluation/
 | Command | What it does |
 |---|---|
 | `inspect <image>...` | (build 014) sha256 and stored width/height/EXIF orientation of JPEG/PNG files. |
-| `single-template --kind manifest, gold, record or policy --out NEW` | Writes a blank template. Manifest, gold and record templates are invalid until people fill them in. |
+| `single-template --kind manifest, gold, record, policy, intake-batch or coverage --out NEW` | Writes a blank template. Manifest, gold and record templates are invalid until people fill them in. |
 | `single-freeze --manifest M --images-dir D --out-manifest NEW --out-receipt NEW [--against M...]` | Validates rights, hashes, dimensions and leakage, sets `frozenAt` to now and writes the frozen manifest plus a receipt holding its exact sha256. **A held-out freeze needs `--against` the development manifest** (leakage cannot be checked otherwise) and the two outputs must be different new paths. Both files are written or neither is. Run it **before any model sees an image**. A frozen manifest is never refrozen. |
 | `single-validate --manifest M... --gold G... [--receipt R...] --images-dir D [--policy P]` | All integrity checks, no predictions. With `--policy`, also fails (exit 2) if the held-out strata are below the policy minimums. |
 | `single-run-qwen --manifest M... [--receipt R...] --images-dir D --run-dir NEW [--allow-dirty-development] [--model-version V]` | **Runs the app's real analysis over a frozen benchmark** (build 025): see *The benchmark runner* below. Needs Ollama and the configured model; nothing else in this folder does. |
@@ -124,3 +124,48 @@ Per fixture the runner hashes the exact bytes (the record keeps the frozen origi
 5. `single-adapt-qwen --run-dir`, then `single-score` with a policy the owner approved. Keep every output; nothing is overwritten.
 
 The older loose-records path (`--record` / `--records-dir` with a wrapper of your own) still works for development, but its predictions carry no run binding and the gate treats them as **not launch evidence**.
+
+---
+
+# Rights-cleared photo intake and gold labels (build 026)
+
+Build 026 is the front half of the single-item benchmark: **collecting rights-cleared real photos, labelling them with two independent people, choosing the split with explicit coverage, and freezing it.** It produces the manifests, gold files and freeze receipts that `single-validate`, `single-run-qwen` and `single-score` already consume. Crowded and multi-item photos stay out of scope. **It measures nothing**: no model is run, no accuracy is computed, and a READY report here is not a launch decision. The repository contains no photos; everything below happens on a private, git-ignored workspace (`benchmark-intake/`).
+
+**What may be imported.** Only files the operator supplies (JPEG, PNG or WebP, up to 40 MB, shortest side at least 224 px). Nothing is downloaded and no public fashion dataset is read or depended on: DeepFashion is non-commercial only, ModaNet is CC BY-NC, and Fashionpedia does not own its image copyrights, so all three are refused by name wherever they appear in rights evidence. Every photo needs its own rights evidence, checked by a person:
+
+| Field | Rule |
+|---|---|
+| `sourceType` | `self-captured`, `contributor-consent` or `open-license`. Nothing else: "unknown", "public-web", "scraped", "other" are refused. |
+| `rightsHolder` | The author or holder. **Private**: stored only in the intake record, never in a report, a manifest of a private source, or an error message (manifests carry a pseudonymous `rh-...` reference). |
+| `acquiredAt` | ISO date, 1995 or later, not in the future. |
+| `evaluationPermission` | Must be `true` (permission to evaluate a model on the photo). |
+| `redistributionAllowed` | Recorded (`true`/`false`), never assumed. An allow-listed open licence cannot say `false`. |
+| `individuallyVerified`, `verifiedBy`, `verifiedAt` | A person checked THIS photo; `verifiedBy` is a pseudonym (`op-...`). |
+| `consent` | `contributor-consent` only: a consent reference and date. |
+| `openLicense` | `open-license` only: collection (`wikimedia-commons` or `open-images`), source page and file URL (https), an allow-listed licence (CC0, PDM, CC BY, CC BY-SA at known versions; every NC/ND licence refused) and attribution. |
+
+**People.** A photo with a person (`personsPresent`, which a `worn` scene implies) is refused unless `modelRelease` is present: a release reference, its date, and `coversEvaluation: true`. Reviewers also flag `personVisible`; a person a reviewer sees that the import did not declare excludes the photo.
+
+**What the importer refuses, writing nothing.** Executables and disguised files (content is sniffed, the name does not decide), an extension that does not match the content, bytes after the end of the image (a hidden payload), truncated or undecodable or animated images, symbolic links and junctions, hard-linked files, names with separators, `..`, drive letters, `:streams`, trailing dots/spaces or Windows device names, a real path outside the source directory, a file whose size or modification time changes while it is read, a photo that claims prior inference, an existing output (nothing is overwritten), the same bytes twice, and a **near-duplicate** (perceptual hash, also mirrored, plus a colour grid) that does not declare the same shoot and garment as the photo it resembles. A batch is all or nothing: every file is examined before anything is copied, and if a write fails the files that one call created are removed. Original file names are not stored. Each record keeps the exact sha256, dimensions, EXIF orientation, a perceptual signature, the batch digest and a provenance receipt (source hash, copied hash, stable read).
+
+**Labels.** `single-label-template` writes a blank review per reviewer (a different image order each). A review records, per image: the exact image hash, start and finish times, `personVisible`, the outcome (`single_item`, `reject` with a reason, or `unsure`), and for an item its category, colour, pattern, localisation box (normalized, EXIF-rotated display orientation), fit, material, seasons and occasions, with `unknown` allowed where the photo does not show a value. Reviewers are pseudonyms (`rv-...`; an email, a name or a model-like id is refused). **Held-out labels need two reviews** by different reviewers in different sessions; boxes agree at IoU 0.75. If they disagree, a **third** person adjudicates only the disagreements (never an agreement) and must finish after both. The result is an ordinary `single-item-gold` file the unchanged validator accepts. One reviewer posing as two, a shared session, a verbatim copy, identical full-precision boxes, identical notes or identical timestamps are refused.
+
+**Sampling and freeze.** `single-sample` assigns reviewed photos to development or held-out from a coverage spec and a seed a person wrote down. Shoots, garments and near-duplicates are union-grouped and never split. The spec must be at least as strict as the launch policy (in-scope and rejection totals, every category) and may require minimums for colour, pattern, background, lighting, camera, item size and wearable type. Item size comes from the gold box; wearable type from the scene. Every shortfall is reported as `have of need`. `single-intake-freeze` re-derives the plan, refuses a stale or edited one and any deficit, and writes `development` and `heldout` manifests, gold files, freeze receipts and separate image folders into a NEW directory, then seals the workspace (`seal.json`): afterwards nothing sharing a shoot, garment or near-duplicate with a held-out photo can be imported, and a second freeze is refused.
+
+| Command | What it does |
+|---|---|
+| `single-template --kind intake-batch` / `--kind coverage --out NEW` | Placeholder templates that fail validation until people decide. |
+| `single-intake-init --workspace NEW --benchmark-id ID` | Creates the private workspace (never reused). |
+| `single-intake-import --workspace W --batch FILE --source-dir DIR --operator op-xxxxxx` | Validates and imports one batch, all or nothing. |
+| `single-label-template --workspace W --reviewer rv-xxxxxx [--adjudicates rv-a,rv-b] --out NEW` | Blank review (or adjudication of disagreements only). |
+| `single-label-submit --workspace W --review FILE` | Validates and stores a review; a reviewer id and a session are used once. |
+| `single-label-verify --workspace W --reviewers rv-a,rv-b [--adjudicator rv-c] [--development-single-review]` | Counts final labels, agreements, adjudications, exclusions; exit 2 on any independence problem. |
+| `single-sample --workspace W --coverage FILE --policy FILE --reviewers ... [--adjudicator ...] --out NEW` | Writes the deterministic plan and prints every deficit. |
+| `single-intake-freeze --workspace W --plan FILE --coverage FILE --policy FILE --reviewers ... --out-dir NEW` | Freezes and seals. |
+| `single-intake-report --workspace W [--coverage FILE --policy FILE --reviewers ...] --out NEW` | Privacy-safe READY / NOT READY for collection and freeze only. |
+
+**The report** has counts and generic blockers only: no holder, reviewer, operator, file name, URL, release reference or image id, and an explicit statement that no accuracy is measured.
+
+**Manual steps no tool can do.** Obtain or capture the photos and keep the proof (consent forms, signed releases, licence pages) somewhere private; fill the batch honestly; use real pseudonyms and keep the name-to-pseudonym list elsewhere; have genuinely different people review without conferring; choose the coverage minimums and the seed; approve the launch policy; then run `single-run-qwen` and `single-score` (above).
+
+**Limits, stated plainly.** Rights evidence is attestation: the tool does not fetch URLs, read releases or confirm a licence is what it claims. It cannot prove two pseudonyms are two people or that reviewers did not talk; copy detection is a heuristic. There is no face detection: a person nobody declared and no reviewer flagged would pass. Near-duplicate detection misses heavy crops, edits and different shots of one garment (the shoot and garment groups cover those if declared honestly). The workspace is unsigned: someone who controls the machine can rewrite records and the seal consistently. A crash can leave a pool file without its record or a half-built freeze directory (reported or refused, deleted by hand); rollback covers ordinary failures only. Sealing is procedural: the tool refuses imports and refreezing but the files are on disk. The default coverage numbers and the item-size thresholds are the builder's proposal, not standards. Greedy selection is deterministic, not optimal, and reports shortfalls rather than hiding them. Decoding untrusted images uses libvips (via sharp), limited to 80 megapixels, on operator-supplied files only.

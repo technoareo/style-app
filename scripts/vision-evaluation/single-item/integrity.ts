@@ -74,7 +74,7 @@ export function integrityProblems(input: IntegrityInput): string[] {
         continue;
       }
       if (facts.sha256 !== f.sha256) out.push(`fixture "${f.id}": image bytes differ from the immutable manifest hash (hash mismatch)`);
-      if (!facts.dimensions) out.push(`fixture "${f.id}": image dimensions could not be measured (JPEG or PNG headers only)`);
+      if (!facts.dimensions) out.push(`fixture "${f.id}": image dimensions could not be measured (JPEG, PNG or WebP headers only)`);
       else if (
         facts.dimensions.width !== f.dimensions.width ||
         facts.dimensions.height !== f.dimensions.height ||

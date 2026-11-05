@@ -80,7 +80,7 @@ const ANNOTATOR_KEYS = ["id", "kind"] as const;
 const STATUSES = ["single_human", "double_human_adjudicated"] as const;
 
 /** Text that suggests a model or a script produced the label. Conservative on purpose: a person can rename. */
-const MODEL_LIKE = /(^|[^a-z])(qwen|llm|gpt|claude|gemini|llama|ollama|model|ai|bot|auto|script|vlm)([^a-z]|$)/i;
+export const MODEL_LIKE = /(^|[^a-z])(qwen|llm|gpt|claude|gemini|llama|ollama|model|ai|bot|auto|script|vlm)([^a-z]|$)/i;
 
 function subsetProblems<T extends string>(list: readonly T[], value: unknown, at: string, max: number, out: string[]): T[] {
   if (!Array.isArray(value)) {

@@ -26,6 +26,8 @@ COPY --from=build --chown=style:style /app/scripts/init-auth.ts ./scripts/init-a
 COPY --from=build --chown=style:style /app/scripts/backup-database.ts ./scripts/backup-database.ts
 COPY --from=build --chown=style:style /app/scripts/restore-database.ts ./scripts/restore-database.ts
 COPY --from=build --chown=style:style /app/scripts/export-deletion-ledger.ts ./scripts/export-deletion-ledger.ts
+COPY --from=build --chown=style:style /app/scripts/backup-encrypted.ts ./scripts/backup-encrypted.ts
+COPY --from=build --chown=style:style /app/scripts/restore-encrypted.ts ./scripts/restore-encrypted.ts
 COPY --from=build --chown=style:style /app/tsconfig.json ./tsconfig.json
 USER style
 EXPOSE 3000

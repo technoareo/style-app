@@ -34,6 +34,8 @@ export type SavedLook = {
   createdAt: string;
   items: Garment[];
   occasion: string;
+  /** The season the user chose when the look was made. Absent = no season was chosen. */
+  season?: "spring" | "summer" | "autumn" | "winter";
 };
 
 /** Everything stored for one local profile. */

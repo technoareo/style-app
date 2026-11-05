@@ -66,6 +66,15 @@ test("earlier protections of the Caddyfile are intact", () => {
   assert.match(text, /\{\$STYLE_DOMAIN\}\s*\{/);
 });
 
+test("security headers are set deferred (replacing the app's own copy), so a header both sides set reaches the client once", () => {
+  const text = read("deploy/Caddyfile").replace(/^\s*#.*$/gm, "");
+  const block = blockBody(text, /\n  header\s*\{/) ?? "";
+  for (const name of ["Strict-Transport-Security", "X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Permissions-Policy"]) {
+    assert.match(block, new RegExp("^\\s*>" + name + " ", "m"), name + " is deferred");
+  }
+  assert.doesNotMatch(block, /^\s*[A-Za-z]/m, "no undeferred header line");
+});
+
 test("error interception closes the connection and copies the response once, without an explicit header copy", () => {
   const text = read("deploy/Caddyfile");
   // Static text only. An explicit copy_response_headers duplicated every

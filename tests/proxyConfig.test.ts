@@ -530,7 +530,7 @@ test("the app fails closed on a leftover .env.production value, and the services
   assert.match(script, /^if \[ -n "\$STYLE_BODY_READ_TIMEOUT_MS" \]; then echo "STYLE_BODY_READ_TIMEOUT_MS is set in \.env\.production[^"]*" >&2; exit 1; fi; case /);
   assert.match(
     script,
-    /export STYLE_BODY_READ_TIMEOUT_MS; \.\/node_modules\/\.bin\/tsx scripts\/init-auth\.ts && node server\.js$/,
+    /export STYLE_BODY_READ_TIMEOUT_MS; \.\/node_modules\/\.bin\/tsx scripts\/init-auth\.ts && exec node server\.js$/,
   );
   // Fail closed: worker, mailer and proxy start only after the app is healthy,
   // and the app never gets that far when its command exits.
@@ -603,7 +603,7 @@ test("the proxy command derives ceil(ms/1000)+2 and refuses every malformed valu
 
 test("the app command applies the same check before it starts anything (needs sh)", (t) => {
   if (!hasSh) return t.skip("no sh on this host");
-  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && node server.js", "echo STARTED");
+  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && exec node server.js", "echo STARTED");
   assert.ok(script.endsWith("echo STARTED"));
   // Reports the value the application would read, so a wrong hand-off is seen.
   const probe = script.replace(/echo STARTED$/, 'echo "STARTED=$STYLE_BODY_READ_TIMEOUT_MS"');
@@ -624,7 +624,7 @@ test("the app command applies the same check before it starts anything (needs sh
 
 test("a leftover STYLE_BODY_READ_TIMEOUT_MS from .env.production stops the app before it starts (needs sh)", (t) => {
   if (!hasSh) return t.skip("no sh on this host");
-  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && node server.js", "echo STARTED");
+  const script = commandScript("app").replace("./node_modules/.bin/tsx scripts/init-auth.ts && exec node server.js", "echo STARTED");
   for (const leftover of ["60000", "20000", "abc", "0", " "]) {
     const r = runScript(script, { STYLE_BODY_READ_TIMEOUT_MS: leftover, STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: "20000" });
     assert.equal(r.status, 1, JSON.stringify(leftover));

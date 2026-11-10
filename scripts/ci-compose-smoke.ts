@@ -16,6 +16,7 @@ import {
   HTTPS_CLIENT_ALPN,
   LOCK_HOLDER_SOURCE,
   LOCK_READY_MARKER,
+  PID1_CMDLINE_COMMAND,
   PROC_ENV_SOURCE,
   PROXY_ENV_COMMAND,
   REFUSAL,
@@ -48,6 +49,9 @@ import {
   smokeNames,
   stalledWindowMs,
   overrideProblems,
+  pid1IsNextServer,
+  stopArgs,
+  stopProblems,
   upArgs,
   type SmokeNames,
 } from "./ci-compose-smoke-plan";
@@ -77,6 +81,10 @@ import {
  *     Retry-After (a held database write lock). A stalled upload gets the app's
  *     own 408 before the proxy cap, then the connection closes.
  *  3. RAISED 30000: recreate, same proofs (32 s, stalled upload at 30 s).
+ *     Build 029: on the still-running raised stack, PID 1 of the app container
+ *     is the Next server (not a shell), and a plain `docker compose stop app`
+ *     (the shipped default grace period, no --timeout) finishes in under 7 s
+ *     with an exit code other than 137 (SIGKILL).
  *  4. FAIL CLOSED: invalid values (and a stale .env.production value, and an
  *     empty domain) make the shipped start commands exit 1 with their message;
  *     through `up`, the proxy never starts when the app refuses.
@@ -738,6 +746,19 @@ async function realScenario(ctx: SmokeContext): Promise<void> {
   ctx.step("a stalled upload at the raised value (takes about 30 s)");
   await proveStalledUpload(RAISED);
   await captureLogs(ctx, "raised");
+
+  ctx.step("the shipped app container stops promptly: PID 1 is the Next server and `compose stop app` does not wait for SIGKILL");
+  const pid1 = (await exec("app", PID1_CMDLINE_COMMAND)).stdout;
+  // The command line only (a program name and its arguments), never the environment, so nothing secret is read here.
+  expect(pid1IsNextServer(pid1), "PID 1 of the app container is not the Next server; a shell as PID 1 would not forward SIGTERM");
+  ctx.ok("PID 1 of the app container is the Next server (exec replaced the start shell)");
+  const stopStarted = Date.now();
+  await ctx.docker(stopArgs(project, dir, "app"), { timeoutMs: 90_000 });
+  const stopMs = Date.now() - stopStarted;
+  const stopped = parsePs((await ctx.docker(psArgs(project, dir))).stdout).find((p) => p.Service === "app");
+  const stopIssues = stopProblems({ elapsedMs: stopMs, exitCode: stopped?.ExitCode ?? null, state: stopped?.State ?? null });
+  expect(stopIssues.length === 0, `the app container did not stop promptly: ${stopIssues.join("; ")}`);
+  ctx.ok(`docker compose stop app finished in ${stopMs} ms with exit code ${stopped?.ExitCode} (default grace period, no SIGKILL)`);
   ctx.http?.close();
   ctx.http = null;
   await down();

@@ -476,7 +476,8 @@ test("process-environment probe: finds the real next-server by its process title
     return JSON.parse(r.stdout.trim()) as { found: number; value: string | null };
   };
   try {
-    // The container as it really is: PID 1 is the start shell (the variable is exported AFTER it started, so it is not in
+    // The container as it was BEFORE build 029 (the shipped command now ends `exec node server.js`, so PID 1 is the server itself);
+    // the probe must still never count a shell: PID 1 here is the start shell (the variable is exported AFTER it started, so it is not in
     // its environment), the server is the child whose title Next set to "next-server (v15.5.27)" (padding after it is NULs).
     proc("1", ["sh", "-c", "export X; ./node_modules/.bin/tsx scripts/init-auth.ts && node server.js"], ["PATH=/bin"]);
     proc("27", ["next-server (v15.5.27)", "", ""], ["xt-server=clobbered", "AUTH_SECRET=supersecretvalue1234567890", "STYLE_BODY_READ_TIMEOUT_MS=30000"]);

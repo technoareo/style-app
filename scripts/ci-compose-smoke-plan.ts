@@ -417,8 +417,9 @@ export const LOCK_READY_MARKER = "LOCKED";
  * another file, and the probe never match; two real servers give found 2.
  *
  * The variable is looked for in the process's own environment, not the compose
- * configuration, because the start command exports it after PID 1 (a shell)
- * started. Prints only the one value, never the rest of the environment (it
+ * configuration, because the start command exports it before `exec node
+ * server.js` replaces the shell (so PID 1 is the server since build 029; before
+ * that PID 1 was the start shell and this variable was set only in its child). Prints only the one value, never the rest of the environment (it
  * holds AUTH_SECRET). argv: NAME SCRIPT [PROC_ROOT [SELF_PID]].
  */
 export const PROC_ENV_SOURCE = [
@@ -445,3 +446,45 @@ export const PROXY_ENV_COMMAND = [
 ];
 
 export const CADDY_SERVERS_COMMAND = ["wget", "-qO-", "http://127.0.0.1:2019/config/apps/http/servers"];
+
+// --- Build 029: the shipped app container must stop promptly -------------------------------
+//
+// The app start command used to end `&& node server.js`, so a shell stayed PID 1; it does not forward SIGTERM, and
+// `docker stop` waited out Docker's default 10 s and then sent SIGKILL (exit code 137). The command now ends
+// `&& exec node server.js`. The smoke test proves it on the running container: PID 1 is the Next server, and a
+// plain `docker compose stop app` (NO --timeout, so the shipped/default grace applies) finishes well inside the
+// default grace period and not by SIGKILL.
+
+/** Docker's default stop grace period, which the app service does not override. */
+export const DOCKER_DEFAULT_STOP_GRACE_MS = 10_000;
+/** A prompt stop: clearly under the default grace period (a killed-after-grace stop takes at least 10 s). */
+export const PROMPT_STOP_LIMIT_MS = 7_000;
+/** Exit code of a container killed with SIGKILL after the stop timeout (128 + 9). */
+export const SIGKILL_EXIT_CODE = 137;
+
+/** `docker compose stop <service>` with the shipped timeout: deliberately no `--timeout`. */
+export const stopArgs = (project: string, dir: string, service: string): string[] => composeArgs(project, dir, ["stop", service]);
+
+/** Prints the command line of the container's PID 1 (NUL-separated). Reads only that one file; no environment. */
+export const PID1_CMDLINE_COMMAND = ["cat", "/proc/1/cmdline"];
+
+/**
+ * Whether PID 1's command line is the Next server itself and not a shell wrapping it: the process title Next sets
+ * ("next-server (v..."; Linux may keep only the part that fits the original argument block), or, before the title
+ * is applied, exactly `<path>/node server.js`. A shell (`sh -c ...`), a launcher, or any other program is false.
+ */
+export function pid1IsNextServer(cmdline: string): boolean {
+  const args = cmdline.split("\0").filter(Boolean);
+  if (args.length === 0) return false;
+  if (/^next-server \(v/.test(args[0])) return true;
+  return args.length === 2 && /(^|\/)node$/.test(args[0]) && args[1] === "server.js";
+}
+
+/** Reasons a measured stop does not count as prompt. Empty means it did. */
+export function stopProblems(r: { elapsedMs: number; exitCode: number | null; state: string | null }): string[] {
+  const out: string[] = [];
+  if (r.state !== "exited") out.push(`the container is "${r.state ?? "missing"}" after the stop, expected "exited"`);
+  if (r.exitCode === SIGKILL_EXIT_CODE) out.push(`exit code ${SIGKILL_EXIT_CODE}: the container was killed with SIGKILL after the stop timeout instead of handling SIGTERM`);
+  if (!(r.elapsedMs < PROMPT_STOP_LIMIT_MS)) out.push(`the stop took ${r.elapsedMs} ms; a prompt stop is under ${PROMPT_STOP_LIMIT_MS} ms (Docker's default grace period is ${DOCKER_DEFAULT_STOP_GRACE_MS} ms)`);
+  return out;
+}

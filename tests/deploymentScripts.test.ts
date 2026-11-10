@@ -26,6 +26,24 @@ export function scriptsReferenced(text: string, lineFilter?: RegExp): string[] {
   return [...found].sort();
 }
 
+/** A YAML file without its full-line comments: a comment runs nothing, so a script named in one is not a container command. */
+export function stripYamlComments(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+}
+
+/**
+ * The scripts that actually run INSIDE the runtime container: those in compose.yaml's executable lines (service
+ * commands and healthchecks, not comments) and those in the guide on explicit `docker compose exec|run` lines.
+ * Host-side commands in the guide (for example the CI smoke test's `npm run ci:compose-smoke`, run from a checkout
+ * on a Docker host) are not on such lines and are deliberately out of scope: the CI tools are not in the image.
+ */
+export function containerScriptsReferenced(composeYaml: string, guide: string): string[] {
+  return [...new Set([...scriptsReferenced(stripYamlComments(composeYaml)), ...scriptsReferenced(guide, /docker compose (exec|run)\b/)])].sort();
+}
+
 /** Files and folders the Dockerfile's final (runtime) stage copies from the build. */
 export function runtimeCopies(dockerfile: string): { files: string[]; dirs: string[] } {
   const stages = dockerfile.split(/^FROM /m).slice(1);
@@ -74,13 +92,9 @@ const readScriptFromDisk = (file: string) =>
   existsSync(path.join(root, file)) ? read(file) : null;
 
 test("every operator script that compose.yaml or the deployment guide runs in the container is copied into the runtime image", () => {
-  const referenced = [
-    ...new Set([
-      ...scriptsReferenced(read("compose.yaml")),
-      // Only the container commands of the guide; host-side tools are not in scope.
-      ...scriptsReferenced(read("docs/DEPLOYMENT.md"), /docker compose (exec|run)\b/),
-    ]),
-  ].sort();
+  // Only what runs in the container: compose.yaml's executable lines and the guide's `docker compose exec|run` lines.
+  const referenced = containerScriptsReferenced(read("compose.yaml"), read("docs/DEPLOYMENT.md"));
+  assert.ok(referenced.every((s) => !s.startsWith("scripts/ci-")), "CI orchestration is never an in-container script");
   // The set must include the ones this check exists for, so an extraction bug cannot pass vacuously.
   for (const expected of [
     "scripts/init-auth.ts",
@@ -112,6 +126,39 @@ test("the encrypted backup and restore commands (build 021) are copied explicitl
     assert.ok(existsSync(path.join(root, "src/server", module + ".ts")), module);
   // The documented commands name the two scripts, so the generic check above covers them.
   assert.ok(scriptsReferenced(read("docs/DEPLOYMENT.md"), /docker compose (exec|run)\b/).includes("scripts/restore-encrypted.ts"));
+});
+
+test("host-side commands and comments are ignored, but a real in-container script that is not packaged is still caught", () => {
+  const compose = [
+    "services:",
+    "  app:",
+    "    # exercised by scripts/ci-compose-smoke.ts in CI (a comment: runs nothing)",
+    '    command: ["./node_modules/.bin/tsx", "scripts/in-container.ts"]',
+    "  tool:",
+    '    command: ["node", "scripts/unpackaged-tool.ts"]',
+  ].join("\n");
+  const guide = [
+    "Run the smoke test on a Docker host: `docker build -t style-studio:ci . && npm run ci:compose-smoke` (scripts/ci-compose-smoke.ts).",
+    "Inside the container: `docker compose exec app ./node_modules/.bin/tsx scripts/operator-job.ts`",
+    "Or one-off: `docker compose run --rm app node scripts/missing-job.ts`",
+    "Not a container command: `docker compose config` then see scripts/host-only.ts",
+  ].join("\n");
+  const referenced = containerScriptsReferenced(compose, guide);
+  assert.deepEqual(referenced, ["scripts/in-container.ts", "scripts/missing-job.ts", "scripts/operator-job.ts", "scripts/unpackaged-tool.ts"]);
+  assert.ok(!referenced.some((s) => /ci-compose-smoke|host-only/.test(s)), "the host-side smoke command, the comment and a non-exec line are ignored");
+  // the image copies only some of them; the others are reported, and the CI tool is never demanded
+  const copies = { files: ["scripts/in-container.ts", "scripts/operator-job.ts"], dirs: ["src/server"] };
+  const sources: Record<string, string> = { "scripts/in-container.ts": "", "scripts/operator-job.ts": "", "scripts/unpackaged-tool.ts": "" };
+  const problems = packagingProblems(referenced, copies, (f) => sources[f] ?? null).join("\n");
+  assert.match(problems, /scripts\/unpackaged-tool\.ts is run by a deployment command but the runtime image does not COPY it/);
+  assert.match(problems, /scripts\/missing-job\.ts is referenced by a deployment command but does not exist/);
+  assert.doesNotMatch(problems, /ci-compose-smoke|host-only/);
+  // a script named ONLY in a comment is not a command, but the same script on a `docker compose exec` line is
+  assert.deepEqual(containerScriptsReferenced("# scripts/only-comment.ts", ""), []);
+  assert.deepEqual(containerScriptsReferenced("", "`docker compose exec app node scripts/only-comment.ts`"), ["scripts/only-comment.ts"]);
+  // the real files: the smoke test is documented as a host-side command and is not an in-container script
+  assert.match(read("docs/DEPLOYMENT.md"), /npm run ci:compose-smoke/);
+  assert.ok(!containerScriptsReferenced(read("compose.yaml"), read("docs/DEPLOYMENT.md")).includes("scripts/ci-compose-smoke.ts"));
 });
 
 test("the checker reports an unpackaged script, a missing script and an import that leaves the image", () => {

@@ -52,7 +52,7 @@ jobs:
             node:24-bookworm-slim node /mock.mjs
           common="--network style-ci -v $data:/data -e STYLE_DATA_DIR=/data -e OLLAMA_URL=http://mock-ollama:11434 -e APP_URL=http://127.0.0.1:3000"
           docker run -d --name app $common -p 127.0.0.1:3000:3000 style-studio:ci \
-            sh -c "./node_modules/.bin/tsx scripts/init-auth.ts && node server.js"
+            sh -c "./node_modules/.bin/tsx scripts/init-auth.ts && exec node server.js"
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1; then break; fi
             sleep 2

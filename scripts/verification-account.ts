@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { getReadyAuth } from "../src/server/auth";
 import { waitForMail } from "../tests/helpers/mailCapture";
-export async function verificationAccount() {
+/**
+ * A brand-new disposable account (unique random e-mail and password every call, never reused and never written
+ * to evidence). `appOrigin` is where the browser will present the session cookie; it defaults to local port 3000.
+ */
+export async function verificationAccount(appOrigin = "http://127.0.0.1:3000") {
   if (process.env.STYLE_PUBLIC_DEPLOYMENT === "true" || process.env.SMTP_URL)
     throw new Error(
       "Verification fixtures require local development mail capture.",
@@ -35,8 +39,9 @@ export async function verificationAccount() {
       return {
         name: pair.slice(0, index),
         value: pair.slice(index + 1),
-        url: "http://127.0.0.1:3000",
+        url: appOrigin,
         httpOnly: true,
+        secure: appOrigin.startsWith("https:"),
         sameSite: "Lax" as const,
       };
     }),

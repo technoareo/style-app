@@ -55,10 +55,11 @@ npm audit --omit=dev
 Tests cover outfit rules, real authentication, verification, account isolation, private photo access, optimistic conflicts, password reset and session revocation, deletion, durable queue ownership, individual quotas, cancellation and lease recovery. Browser tests cover desktop and mobile wardrobe workflows plus self-service signup and cross-browser syncing. Controlled model responses test interaction; the real model is checked separately:
 
 ```powershell
+$env:APP_URL = "http://127.0.0.1:3000"   # optional; the default, set it when the app runs elsewhere
 npx tsx scripts/verify-browser-vision.ts
 ```
 
-This verification uses a disposable local account and public evaluation photos. It is not a calibrated recognition benchmark. The older synchronous `verify-vision`, `verify-multiple` and `verify-empty-vision` scripts predate the queue and must be updated before reuse. They are not current release evidence.
+It needs the app, the analysis worker, Ollama with your configured vision model and local development mail capture. It creates a brand-new disposable account each run, uploads one public photo, waits for the real model (up to `VERIFY_ANALYSIS_TIMEOUT_MS`, default 250000), and fails within seconds with the product's own alert if the analysis job fails. Every run writes new files under `VERIFY_EVIDENCE_DIR` (default `docs/verification/live`) and never overwrites earlier ones: a JSON record (pass/fail, elapsed time, configured model name, the model digest reported by local Ollama when available, the vision request hashes, completed checks, and on failure the failed step and the visible alert) plus screenshots. The record holds no credentials, images or data paths. It is a flow check on one photo, not a calibrated recognition benchmark, and says nothing about accuracy; crowded photos are out of scope. The older synchronous `verify-vision`, `verify-multiple` and `verify-empty-vision` scripts predate the queue and must be updated before reuse. They are not current release evidence.
 
 Runtime dependency auditing reports no known vulnerabilities. Development tooling currently includes an unpatched upstream `braces` stack-exhaustion advisory; do not process untrusted lint patterns. Containers exclude development dependencies.
 

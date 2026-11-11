@@ -1,6 +1,6 @@
 # Implementation 033: Linux CI backup failure, an upstream Node.js bug, and a bounded workaround
 
-Status: the bounded workaround is implemented and **validated locally by root on Windows** (see "Root's validation of the final tree"). **Linux CI on the final commit is still pending**, and the **final independent Claude review is pending**. The builder ran no commands; every result below was produced by root. The product is not launch-ready; nothing here changes the external launch gates.
+Status: the bounded workaround is implemented, **validated locally by root on Windows**, and **green on Linux CI for commit ab3500f9ea71f9f73ee67fe74eb829280c8b51bf** (see "Final Linux CI evidence"). The final independent Claude re-review, returned after the post-review test hardening, is **READY TO COMMIT BUILD 033**. The builder ran no commands; every result below was produced by root or by CI. The product is not launch-ready; nothing here changes the external launch gates.
 
 ## CI evidence
 
@@ -83,11 +83,29 @@ Root's results on the local Windows tree with the hardening in place:
 
 Not covered by these results: the POSIX `0600` mode assertion is skipped on Windows (it records `null` there), so it first executes on Linux CI. The earlier evidence (56-run focused set, 11/11 file, 763-test full run, build, and the Node v24.20.0 reproduction) is kept above as historical.
 
-## Still pending
+## Final Linux CI evidence
 
-1. **Linux CI on the final commit.** It must prove (a) the Build 032 live launch-route smoke through app/Caddy, and (b) that the Build 033 workaround prevents the earlier failure on Node v24.22.2 in `tests/encryptedBackup021.test.ts`. One green run is evidence, not proof; re-run the job several times.
-2. **Final independent re-review** of the Build 033 tree including the post-review test hardening: pending.
-3. Local Windows results do not substitute for the Linux result, because the original failure was Linux/Node v24.22.2 specific in CI.
+GitHub Actions run **43029214040**, commit **ab3500f9ea71f9f73ee67fe74eb829280c8b51bf** (the first Linux run of the final commit; as reported by root):
+
+- **`build` job 130551606023: completed success.** It passed `npm ci`, the runtime dependency audit, typecheck, lint, the full `npm test` (including the previously failing `tests/encryptedBackup021.test.ts` path and the Build 033 POSIX `0600` mode assertion, which only executes off Windows), the production build, packaging verification, standalone verification, Chromium installation, and the full E2E browser tests.
+- **`docker` job 130554687632: completed success.** It passed `npm ci` and the audit, the image build, startup of the mock model, app, AI worker and mail worker, the container smoke test, the encrypted backup transfer and fresh restore drill, the cleanup sweep, the Compose + Caddy smoke test (including the Build 032 launch-information routes through the app and the proxy), the log and redaction scans, and final cleanup.
+- No failure annotations; the only annotations were non-failing runner/action notices.
+
+Root's authoritative inspection of the `build` job log (130551606023) confirms it ran on **Node v24.22.2**, the affected version, and that the log contains **no** `copyAttempts`, `BackupCopyResetError` or "not an error" marker.
+
+What this establishes: this run is green and **resolves the CI blocker that motivated Build 033** (the `encryptedBackup021` failure on Node v24.22.2 in run 42989064388): on the affected Node version the failure did not recur and the suite passed. It also supplies the Linux proof that the Build 032 live launch-route smoke passes through app and Caddy.
+
+What it does not establish:
+- **It does not prove the retry path fired.** With no `copyAttempts`, `BackupCopyResetError` or "not an error" marker in the log, the overlap probably did not occur in this run (the upstream bug is timing-dependent), so the green result may owe nothing to the workaround. The retry contract (retry only the exact signature, bounded attempts and waits, per-attempt cleanup, fail closed, no retry of anything else, reset and sleep failures) is proven by the **deterministic fault-injection tests**, not by this run. The upstream failure itself was reproduced separately by root on Node v24.20.0.
+- **One green run does not prove the absence of all intermittency.** The upstream bug is timing-dependent and the workaround is bounded (6 attempts, 3.1 s), so a persistent overlap would still fail closed; later runs should be watched. The upcoming docs-only evidence commit will trigger a **second CI run**, which adds one more observation.
+
+## Review status
+
+The final independent Claude re-review, performed after the post-review test hardening, returned **READY TO COMMIT BUILD 033**.
+
+## Remaining
+
+Only what is outside this build: keep watching CI across subsequent runs, and remove the workaround once the deployed Node includes d630b5d (see "Removal"). The external launch gates below are unchanged.
 
 ## Remaining gates
 

@@ -7,6 +7,14 @@ services:
       STYLE_PUBLIC_DEPLOYMENT: "true"
       STYLE_DATA_DIR: /data
       OLLAMA_URL: http://ollama:11434
+      # Build 032 launch information: STYLE_PRIVACY_URL, STYLE_TERMS_URL and
+      # STYLE_SUPPORT_URL are set in .env.production (this service's env_file),
+      # NOT here and NOT as Compose ${...} entries: an `environment:` entry with an
+      # empty default would silently override the .env.production value. Under
+      # STYLE_PUBLIC_DEPLOYMENT=true the app does not become ready (health stays
+      # { "ready": false }) unless all three are valid public https destinations
+      # (support may be a mailto: address); see docs/DEPLOYMENT.md. Only the app
+      # reads them; the worker and mailer ignore them.
       # Starting values, NOT measured capacity (no load test has sized them).
       # Override in .env.production (STYLE_* names are in docs/DEPLOYMENT.md).
       NODE_OPTIONS: --max-old-space-size=768

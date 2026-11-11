@@ -1177,6 +1177,26 @@ footer .text-link {
   padding: 14px;
   border-radius: 8px;
 }
+.launch-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+.launch-links a,
+.photo-privacy-link a {
+  color: inherit;
+  text-decoration: underline;
+}
+.photo-privacy-link {
+  display: block;
+  margin: 4px 0 8px;
+}
+footer .launch-links {
+  margin-top: 0;
+}
 .auth-options {
   display: flex;
   gap: 20px;

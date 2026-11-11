@@ -9,6 +9,7 @@ import { SavedView } from "../components/SavedView";
 import { Sidebar, type Tab } from "../components/Sidebar";
 import { TodayView } from "../components/TodayView";
 import { WardrobeView } from "../components/WardrobeView";
+import { LaunchInfoLinks } from "../components/LaunchInfoLinks";
 import { UploadDialog } from "../components/UploadDialog";
 import { AnalysisBanner } from "../components/AnalysisBanner";
 import { useAnalysisJobs } from "../hooks/useAnalysisJobs";
@@ -204,6 +205,7 @@ function WardrobeApp({
               }}
             />
           </label>
+          <LaunchInfoLinks />
         </footer>
       </section>
       {store.toast && (

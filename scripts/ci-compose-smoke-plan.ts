@@ -81,6 +81,52 @@ export function projectEnvFile(o: { domain?: string | null; bodyTimeout?: string
   );
 }
 
+/**
+ * Build 032 launch information for the smoke app. A public deployment is not ready without it, and the app
+ * refuses `.localhost` destinations (the smoke site itself is `.localhost`), so these are on example.com, which is
+ * reserved for documentation. The app only REDIRECTS to them (or, for the mailto: support address, shows a contact
+ * page), so no request is ever made to them and the smoke test needs no network access for this.
+ */
+export const SMOKE_LAUNCH = {
+  privacy: "https://style-ci.example.com/privacy",
+  terms: "https://style-ci.example.com/terms",
+  support: "mailto:support@style-ci.example.com",
+} as const;
+
+export const SMOKE_LAUNCH_LINES = [
+  `STYLE_PRIVACY_URL=${SMOKE_LAUNCH.privacy}`,
+  `STYLE_TERMS_URL=${SMOKE_LAUNCH.terms}`,
+  `STYLE_SUPPORT_URL=${SMOKE_LAUNCH.support}`,
+] as const;
+
+/**
+ * What a live /privacy, /terms or /support answer must look like in the smoke test (direct or through the proxy).
+ * Pure: it only inspects an answer already received and never fetches or follows any destination. /privacy and
+ * /terms: 307 to exactly the configured https URL, no body, no-store. /support (a mailto: address): 200 contact
+ * page with one plain mailto link and NO Location, no-store, noindex.
+ */
+export function launchRouteProblems(path: "/privacy" | "/terms" | "/support", r: { status: number; rawHeaders: readonly string[]; body: string }): string[] {
+  const h = headerMap(r.rawHeaders);
+  const one = (name: string) => (h.get(name)?.length === 1 ? h.get(name)?.[0] : undefined);
+  const out: string[] = [];
+  if (!/no-store/.test(one("cache-control") ?? "")) out.push(`${path}: Cache-Control is not no-store`);
+  if (path === "/support") {
+    const address = SMOKE_LAUNCH.support.slice("mailto:".length);
+    if (r.status !== 200) out.push(`${path}: status ${r.status}, expected the 200 contact page`);
+    if (h.has("location")) out.push(`${path}: a redirect to a mailto: address (browsers may refuse it); expected the contact page`);
+    if (!/^text\/html/.test(one("content-type") ?? "")) out.push(`${path}: not an HTML page`);
+    if (!/noindex/.test(one("x-robots-tag") ?? "")) out.push(`${path}: not marked noindex`);
+    if ((r.body.match(/<a /g) ?? []).length !== 1 || !r.body.includes(`<a href="mailto:${address}">${address}</a>`)) out.push(`${path}: the page does not hold exactly one plain mailto link to the configured address`);
+    if (/https?:\/\//i.test(r.body)) out.push(`${path}: the contact page links somewhere over http(s)`);
+  } else {
+    const expected = SMOKE_LAUNCH[path === "/privacy" ? "privacy" : "terms"];
+    if (r.status !== 307) out.push(`${path}: status ${r.status}, expected 307`);
+    if (one("location") !== expected) out.push(`${path}: Location is not the configured destination`);
+    if (r.body !== "") out.push(`${path}: the redirect has a body`);
+  }
+  return out;
+}
+
 /** `.env.production` for the app. The secret is random per run; SMTP is a placeholder nothing connects to. */
 export function appEnvFile(o: { authSecret: string; extraLines?: string[] }): string {
   if (o.authSecret.length < 32) throw new Error("AUTH_SECRET must be at least 32 characters.");
@@ -90,6 +136,7 @@ export function appEnvFile(o: { authSecret: string; extraLines?: string[] }): st
       `APP_URL=${SMOKE_APP_URL}`,
       "SMTP_URL=smtp://127.0.0.1:2525",
       `MAIL_FROM=Style Studio <no-reply@${SMOKE_DOMAIN}>`,
+      ...SMOKE_LAUNCH_LINES, // build 032, see SMOKE_LAUNCH
       `STYLE_AUTH_LOCK_MS=${AUTH_LOCK_MS}`,
       ...(o.extraLines ?? []),
     ].join("\n") + "\n"

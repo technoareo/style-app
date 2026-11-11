@@ -4,6 +4,7 @@ import path from "node:path";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { ensureDatabaseReady, getAuthDatabase, getDataDir } from "./database";
 import { createImmediateSqliteDialect } from "./authDialect";
+import { assertLaunchInfoConfigured } from "./launchInfo";
 import { assertMailConfigured } from "./mail";
 import { queuePasswordResetEmail, queueVerificationEmail } from "./mailOutbox";
 
@@ -103,6 +104,10 @@ async function build(): Promise<{
   const appUrl = resolveAppUrl(publicDeployment);
   const secret = resolveSecret(publicDeployment);
   if (publicDeployment) assertMailConfigured();
+  // Build 032: a public deployment is not ready without a privacy notice, terms and a support contact (fixed
+  // message, names only the variables; nothing about the configured values). /api/health reports it as the
+  // same fixed { ready: false } as every other readiness failure.
+  assertLaunchInfoConfigured();
 
   const options: BetterAuthOptions = {
     baseURL: appUrl,

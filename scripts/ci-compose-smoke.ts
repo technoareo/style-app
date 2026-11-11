@@ -30,6 +30,7 @@ import {
   caddyTimeoutFacts,
   caddyTimeoutProblems,
   compareHeaders,
+  launchRouteProblems,
   composeArgs,
   composeSupportsOverride,
   configArgs,
@@ -689,6 +690,17 @@ async function realScenario(ctx: SmokeContext): Promise<void> {
     expect(r.status !== 200 && !r.body.includes("accountsHoldingUpload"), `${p} exposed the counters (status ${r.status})`);
   }
   ctx.ok("/api/health/uploads (and slash, sub-path, query) is 404; case, percent-encoded and double-slash variants are not served");
+
+  ctx.step("launch information (build 032): /privacy and /terms redirect as configured, /support is the mailto contact page; no destination is ever followed");
+  for (const route of ["/privacy", "/terms", "/support"] as const) {
+    const live = await direct({ method: "GET", path: route });
+    const throughProxy = await http().request({ method: "GET", path: route });
+    for (const [where, answer] of [["direct", live], ["through the proxy", throughProxy]] as const) {
+      const problems = launchRouteProblems(route, answer);
+      expect(problems.length === 0, `${route} ${where}: ${problems.join("; ")}`);
+    }
+  }
+  ctx.ok("/privacy and /terms answered 307 to the configured https destinations and /support answered the 200 mailto contact page, direct and through the proxy; the destinations were read from the response and never requested");
 
   ctx.step("direct app answers versus proxied answers: status, body, headers, Connection: close");
   const oversized = `{"email":"a@example.test","password":"${"x".repeat(40_000)}"}`;

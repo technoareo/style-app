@@ -1,6 +1,6 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -8,7 +8,7 @@ RUN npm run build
 
 FROM node:24-bookworm-slim AS dependencies
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci --omit=dev
 
 FROM node:24-bookworm-slim AS runtime

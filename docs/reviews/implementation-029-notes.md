@@ -27,12 +27,12 @@ Only the last statement of the `app` command: `... && exec node server.js`.
 
 ## The CI smoke test (`scripts/ci-compose-smoke.ts`, `scripts/ci-compose-smoke-plan.ts`)
 
-After the raised-value checks, on the still-running stack: read `/proc/1/cmdline` of the app container (the command line only, never the environment, so nothing secret is read) and require that PID 1 is the Next server; then time `docker compose stop app` **without** `--timeout`, so the shipped default grace applies; then require the container to be `exited`, with exit code other than 137, in under 7 s. The override, the faithful-compose allowlist and the secret scan are untouched. **This new check has not run:** the builder had no Docker. Its first result will be the next GitHub Actions run of the Docker job.
+After the raised-value checks, on the still-running stack: read `/proc/1/cmdline` of the app container (the command line only, never the environment, so nothing secret is read) and require that PID 1 is the Next server; then time `docker compose stop app` **without** `--timeout`, so the shipped default grace applies; then require the container to be `exited`, with exit code other than 137, in under 7 s. The override, the faithful-compose allowlist and the secret scan are untouched. **Result (added in build 030):** the check passed in GitHub Actions run 42828271674 (commit 640a69d; `build` and `docker` jobs succeeded): PID 1 of the app container is the Next server; `docker compose stop app` took 188 ms, exit code 0, under Docker's default grace period, no SIGKILL (figures as reported by root; the builder had no Docker and did not read the logs). It is one stop of an idle server on a CI runner, not an operator host.
 
 ## Evidence and what is not claimed
 
 - Historical CI evidence for the smoke test is GitHub Actions run 41401896088 (commit e91b01c, build 023). The maintainer reported run 42755324291 (build 028) as the current run; the builder has not seen its logs, cites it only as reported, and notes it predates the stop check, so it holds no result for it.
-- Not claimed: any run on an operator host, any public domain or publicly trusted certificate, a measured stop time (until CI runs the new check), SIGTERM behaviour of the real Next server (only stand-ins were used locally), or launch readiness.
+- Not claimed: any run on an operator host, any public domain or publicly trusted certificate, a stop time under load or on an operator host (the 188 ms figure above is one idle stop in CI), SIGTERM behaviour of the real Next server in the builder's own tests (only stand-ins were used locally; CI observed the real one), or launch readiness.
 
 ## Regression found by root's full run, and its fix
 

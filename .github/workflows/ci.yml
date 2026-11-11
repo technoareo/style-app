@@ -13,6 +13,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Build 030. Any known vulnerability in a RUNTIME dependency (npm audit
+      # --omit=dev, default level, so low and up) fails the job. The runtime
+      # Docker image installs its node_modules from this same package-lock.json
+      # (Dockerfile `dependencies` stage: npm ci --omit=dev) and the standalone
+      # bundle is traced from the build stage's npm ci of the same lock, so
+      # auditing the lock protects what ships. No continue-on-error, no
+      # --audit-level, no `|| true`: do not add one.
+      - name: Audit runtime dependencies (fails on any vulnerability)
+        run: npm audit --omit=dev
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -40,6 +49,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Build 030: the same gate in the job that builds the runtime image, before
+      # it is built (this job does not need the build job's result to be audited).
+      - name: Audit runtime dependencies (fails on any vulnerability)
+        run: npm audit --omit=dev
       - run: docker build -t style-studio:ci .
       - name: Start mock model, app, AI worker and mail worker
         run: |

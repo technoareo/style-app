@@ -19,8 +19,10 @@ import {
 /**
  * Build 029: the app container's start command ends `exec node server.js`, so the server (not a shell) is PID 1 and
  * receives SIGTERM from `docker stop`. These tests pin the exact command order and run the real command text in a
- * POSIX shell with stand-ins for init-auth and the server. They run no Docker; the Docker proof is the new stop
- * check in scripts/ci-compose-smoke.ts, which has not run yet.
+ * POSIX shell with stand-ins for init-auth and the server. They run no Docker; the Docker proof is the stop check in
+ * scripts/ci-compose-smoke.ts, which passed in GitHub Actions run 42828271674 (commit 640a69d): PID 1 of the app
+ * container was the Next server and `docker compose stop app` took 188 ms with exit code 0 under Docker's default
+ * grace period, no SIGKILL (figures as reported by root). That is a CI runner, not an operator host.
  */
 
 const root = process.cwd();
@@ -238,14 +240,18 @@ test("the smoke scenario measures the stop on the app service and keeps its secr
 
 // ------------------------------------------------------------------ documentation
 
-test("the operator guide records the fix and the unrun state of the new CI check, without overclaiming", () => {
+test("the operator guide records the fix and the verified CI stop result (run 42828271674), without claiming an operator host", () => {
   const guide = read("docs/DEPLOYMENT.md");
   assert.match(guide, /Build 029 fixes it/);
   assert.match(guide, /exec node server\.js/);
   assert.doesNotMatch(guide, /One thing it does not fix/, "the stale known-issue sentence is gone");
-  assert.match(guide, /has not run yet/i, "the new CI check is not claimed as run");
+  // Build 030: the stop check has run in CI; the guide records the reported figures and still claims nothing about an operator host.
+  assert.doesNotMatch(guide, /has not run yet/i, "the stale 'not run' sentence is gone");
+  assert.match(guide, /42828271674/);
+  assert.match(guide, /188 ms with exit code 0/);
+  assert.match(guide, /no SIGKILL/);
   assert.match(guide, /42755324291/);
-  assert.match(guide, /not run on an operator host|nothing here has run on an operator host/i);
+  assert.match(guide, /not on an operator host, a public domain or a real SMTP relay/i);
   assert.ok(existsSync(path.join(root, "docs/reviews/implementation-029-notes.md")));
   const notes = read("docs/reviews/implementation-029-notes.md");
   assert.match(notes, /not launch-ready/i);

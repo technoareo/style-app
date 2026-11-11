@@ -1,6 +1,6 @@
 # Implementation 031: consumer-facing truthfulness corrections
 
-Status: implemented and validated by root on Windows (see Validation; the builder ran nothing); **uncommitted** (no commit, no push); no new Linux CI run yet. The product is **not launch-ready**; the external gates at the end are untouched by this build.
+Status: implemented; validated by root on Windows and by a successful Linux CI run of the committed tree (see Validation; the builder ran nothing and did not read the CI logs). The product is **not launch-ready**; the external gates at the end are untouched by this build.
 
 ## Product decision this build enforces
 
@@ -27,7 +27,9 @@ Source assertions on whitespace-normalised, comment-stripped text, not snapshots
 
 ## Validation
 
-The builder could not run any command in its sessions; **every result below was produced by root on a Windows workspace and is recorded as reported.** There has been **no new Linux CI run** for this build yet; nothing here claims one.
+The builder could not run any command in its sessions; **every result below was produced by root and is recorded as reported.** The first group was run by root on a Windows workspace; the Linux CI result follows it.
+
+### Windows (root)
 
 - Focused consumer-copy + single-item (`analysisMode018`) + vision-cap tests: **36/36 pass**, after the over-broad backup regular expression in the consumer test was corrected (it had matched the required negated disclaimer "we do not promise that every backup is encrypted...").
 - Final consumer-copy tests (`tests/consumerCopy031.test.ts`): **8/8 pass**.
@@ -36,7 +38,11 @@ The builder could not run any command in its sessions; **every result below was 
 - First full Playwright run: **63 pass, 1 expected mobile-auth skip, 2 failures** (desktop and mobile `tests/e2e/singleItem018.spec.ts`): the permanent upload banner reused the transient review phrase "AI suggests", which that spec asserts has count 0 once a suggestion is accepted or cleared.
 - Fix: the banner now reads "Local AI proposes its details, and you review and correct them." without weakening the existing review-flow assertion. The targeted desktop/mobile single-item spec file then passed **14/14**.
 - Final complete Playwright run: **65 pass, 1 expected mobile-auth skip, 0 fail.**
-- Housekeeping: `docs/verification/desktop.png` and `docs/verification/mobile.png` were rewritten as incidental Playwright side effects. They are not Build 031 evidence and are not cited here; they are to be restored to HEAD (`git checkout -- docs/verification/desktop.png docs/verification/mobile.png`) and must not be committed with this build.
+- Housekeeping: `docs/verification/desktop.png` and `docs/verification/mobile.png` were rewritten as incidental Playwright side effects. They are not Build 031 evidence and are not cited here. Root restored both to HEAD, and they were not committed as Build 031 evidence (they are absent from the diff).
+
+### Linux CI (GitHub Actions, as reported by root; the builder did not read the logs)
+
+Workflow run **42956230760** completed successfully for Build 031 commit **`171db2e76c69a9bb977557253ab1cdb8a3b544c6`**: both the Linux `build` job and the dependent `docker` job passed. Narrowly, this proves that **this exact committed tree passed the repository's Linux build workflow and its Docker / live-container workflow** (including the `npm audit --omit=dev` gate and the strict install policy from Build 030, which the same workflow runs). It does not add to or replace the Windows results above, and it does not turn any gate below into a pass. Its limits are those of the workflow: a GitHub-hosted runner, the CI **mock model** (no real vision model, so no recognition result and no accuracy), and **no real SMTP relay** (mail is locally captured).
 
 ## Remaining external launch gates (unchanged by this build)
 

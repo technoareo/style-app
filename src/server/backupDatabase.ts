@@ -103,6 +103,18 @@ export type BackupIo = {
    * then uses the check-then-rename fallback under the backup lock.
    */
   linkFile: (existing: string, target: string) => void;
+  /**
+   * The raw online copy of the live database into the (empty, owner-only) partial file: ONLY the node:sqlite
+   * `backup()` call. A seam so tests can inject the exact upstream failure (see {@link isUpstreamBackupBusyBug}).
+   */
+  copyRaw: (source: DatabaseSync, target: string) => Promise<unknown>;
+  /** The wait between copy attempts (a seam so tests do not wait). */
+  sleep: (ms: number) => Promise<void>;
+  /**
+   * Removes the partial and its sidecars and returns the names still there. Used to reset the partial between copy
+   * attempts and to clean up after a failure; a seam so tests can inject a cleanup that fails.
+   */
+  removePartial: (dir: string, partialName: string) => string[];
 };
 
 const REAL_IO: BackupIo = {
@@ -110,6 +122,9 @@ const REAL_IO: BackupIo = {
   syncDirectory,
   unlinkPartial: unlinkSync,
   linkFile: linkSync,
+  copyRaw: (source, target) => backup(source, target, { rate: BACKUP_PAGES_PER_STEP }),
+  sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  removePartial,
 };
 
 /**
@@ -145,15 +160,170 @@ export type BackupOptions = {
   io?: Partial<BackupIo>;
 };
 
+/**
+ * Fixed, non-sensitive facts about WHERE and HOW a backup failed (build 033). It holds no message text, path,
+ * user data or secret: only the last stage reached, the error's class and its fixed code fields, and two booleans
+ * about the live source connection. It exists because a SQLite failure can surface with the bare text
+ * "not an error" (errcode 0), which says nothing about its cause; the next failure then names the stage.
+ */
+export type BackupDiagnostic = {
+  /**
+   * The last stage reached; the failure happened after it and before the next one ("before-copy": nothing was copied
+   * yet). A stage is marked reached BEFORE the `onStage` hook runs, so a failure thrown by the hook for a stage is
+   * reported as that stage.
+   */
+  stage: BackupStage | "before-copy";
+  errorName: string;
+  /** Node's `code` (for example ERR_SQLITE_ERROR) or a system errno name, when there is one. */
+  errorCode: string | null;
+  /** SQLite's numeric code on the error, when Node supplied one (0 means "no error code was set on the connection"). */
+  sqliteErrcode: number | null;
+  /** SQLite's fixed description of that code (sqlite3_errstr), not the free-text message. */
+  sqliteErrstr: string | null;
+  /** Whether the live source connection still had an open write transaction when the failure was handled (SQLite reports SQLITE_LOCKED for a backup step taken while the source connection is writing). */
+  sourceInTransaction: boolean | null;
+  sourceOpen: boolean | null;
+  /** How many times the raw online copy was attempted (1 unless the upstream Node bug was retried, see copyRawWithRetry). */
+  copyAttempts: number;
+};
+
 /** A backup failed; `leftovers` names any unsanitised file that could NOT be removed. */
 export class BackupFailure extends Error {
   constructor(
     message: string,
     readonly leftovers: string[],
     readonly reason: unknown,
+    readonly diagnostic: BackupDiagnostic | null = null,
   ) {
     super(message);
     this.name = "BackupFailure";
+  }
+}
+
+/**
+ * Reads one property of an arbitrary thrown value without ever throwing. A thrown object may be a Proxy or have a
+ * getter that throws or returns something odd for `name`, `code`, `errcode` or `errstr`; each read is contained on its
+ * own, so one hostile property cannot hide the others, and nothing here can mask the failure being reported.
+ */
+function safeRead(value: unknown, key: string): unknown {
+  try {
+    if (value === null || (typeof value !== "object" && typeof value !== "function")) return undefined;
+    return (value as Record<string, unknown>)[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** Short plain text only (letters, digits, space, _ . : -); anything else, or a non-string, is dropped. */
+const shortText = (v: unknown): string | null => {
+  try {
+    return typeof v === "string" && v.length <= 64 && /^[A-Za-z0-9_ .:-]+$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+};
+
+/** A SQLite result code: a safe integer from 0 to 65535 (extended codes included); NaN, Infinity, fractions, negatives and huge values are dropped. */
+const sqliteCode = (v: unknown): number | null => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 && v <= 0xffff ? v : null);
+
+/**
+ * The exact signature of the upstream Node.js bug (nodejs/node#66760, fixed on main by #66769, commit d630b5d, not in
+ * v24.22.2): when `sqlite3_backup_step()` FIRST returns SQLITE_BUSY or SQLITE_LOCKED because the source connection
+ * overlaps a write transaction, `backup()` fails with `code === "ERR_SQLITE_ERROR"` and numeric `errcode === 0`
+ * (message "not an error"). Classified by BOTH fields only, never by message text; anything else (any other code, any
+ * other errcode, a non-error value, a system error, a throwing getter) is NOT this bug and is never retried.
+ */
+export function isUpstreamBackupBusyBug(error: unknown): boolean {
+  return safeRead(error, "code") === "ERR_SQLITE_ERROR" && sqliteCode(safeRead(error, "errcode")) === 0;
+}
+
+function describeFailure(
+  error: unknown,
+  source: DatabaseSync,
+  stage: BackupDiagnostic["stage"],
+  copyAttempts: number,
+): BackupDiagnostic {
+  const flag = (read: () => unknown): boolean | null => {
+    try {
+      const v = read();
+      return typeof v === "boolean" ? v : null;
+    } catch {
+      return null;
+    }
+  };
+  // Never throws: every read is contained, and the whole function falls back to an empty diagnostic.
+  try {
+    return {
+      stage,
+      errorName: shortText(safeRead(error, "name")) ?? "unknown",
+      errorCode: shortText(safeRead(error, "code")),
+      sqliteErrcode: sqliteCode(safeRead(error, "errcode")),
+      sqliteErrstr: shortText(safeRead(error, "errstr")),
+      sourceInTransaction: flag(() => source.isTransaction),
+      sourceOpen: flag(() => (source as unknown as { isOpen?: unknown }).isOpen),
+      copyAttempts,
+    };
+  } catch {
+    return { stage, errorName: "unknown", errorCode: null, sqliteErrcode: null, sqliteErrstr: null, sourceInTransaction: null, sourceOpen: null, copyAttempts };
+  }
+}
+
+/**
+ * Attempts of the raw online copy, and the waits between them (build 033). Node versions without the fix for
+ * nodejs/node#66760 (including v24.22.2) fail a backup with the bare `ERR_SQLITE_ERROR`/errcode 0 error when the
+ * source connection overlaps a write transaction at the first step; the overlap is a short write, so retrying the
+ * copy after it ends succeeds. At most 6 attempts, waits 100, 200, 400, 800 and 1600 ms (3.1 s in all): far
+ * longer than the app's write transactions, far shorter than the 30 s backup lock wait, and it ends in a failure,
+ * never an endless loop. Only the exact upstream signature is retried.
+ */
+export const COPY_MAX_ATTEMPTS = 6;
+export const COPY_RETRY_DELAYS_MS = [100, 200, 400, 800, 1600] as const;
+
+/**
+ * The partial copy could not be removed before a retry, so the retry was not attempted. `original` is the exact
+ * upstream-signature error that triggered the retry (kept as the cause); the message is fixed and holds no path.
+ */
+export class BackupCopyResetError extends Error {
+  constructor(readonly original: unknown) {
+    super("The partial copy could not be reset for a retry.");
+    this.name = "BackupCopyResetError";
+  }
+}
+
+/**
+ * The raw copy with the bounded workaround. ONLY the `copyRaw` call is retried. Before each retry the partial and its
+ * sidecars are removed and an empty owner-only partial is created again (exclusively), so a retry never appends to,
+ * reuses or inherits bytes of an earlier attempt, and the unsanitised copy is never created with wider permissions.
+ * If the reset itself fails the backup fails closed. Nothing is published here: sanitising, verification and
+ * publication run only after the copy has succeeded, exactly as before.
+ */
+async function copyRawWithRetry(
+  source: DatabaseSync,
+  dir: string,
+  partialName: string,
+  io: BackupIo,
+  progress: { attempts: number },
+): Promise<void> {
+  const partialPath = path.join(dir, partialName);
+  for (let attempt = 1; ; attempt++) {
+    progress.attempts = attempt;
+    let failure: unknown;
+    try {
+      await io.copyRaw(source, partialPath);
+      return;
+    } catch (error) {
+      if (!isUpstreamBackupBusyBug(error) || attempt >= COPY_MAX_ATTEMPTS) throw error;
+      failure = error;
+    }
+    let stillThere = 1;
+    try {
+      stillThere = io.removePartial(dir, partialName).length;
+    } catch {
+      // Treated as "could not be reset": fail closed below.
+    }
+    if (stillThere > 0) throw new BackupCopyResetError(failure);
+    closeSync(openSync(partialPath, "wx", 0o600));
+    await io.sleep(COPY_RETRY_DELAYS_MS[attempt - 1]);
   }
 }
 
@@ -369,7 +539,11 @@ export async function createBackup(
     // Always a thunk: the property is read only inside the lock's guard.
     onBusy: () => options.onLockWait?.(),
   });
+  // The last stage reached, for the failure diagnostic only (it never changes what happens).
+  let reached: BackupDiagnostic["stage"] = "before-copy";
+  const progress = { attempts: 0 };
   const stage = async (s: BackupStage) => {
+    reached = s;
     await options.onStage?.(s);
   };
   let partialName = "";
@@ -388,7 +562,7 @@ export async function createBackup(
       // Marks the moment the SQLite copy begins (directory, lock and sweep
       // work is not copying); tests/backupLarge.test.ts measures from here.
       await stage("copy-started");
-      await backup(source, partialPath, { rate: BACKUP_PAGES_PER_STEP });
+      await copyRawWithRetry(source, dir, partialName, io, progress);
       await stage("raw-copied");
       const copy = new DatabaseSync(partialPath);
       try {
@@ -440,7 +614,7 @@ export async function createBackup(
         );
       return { file: published.name, leftovers, durable, warnings };
     } catch (error) {
-      const left = partialName ? removePartial(dir, partialName) : [];
+      const left = partialName ? io.removePartial(dir, partialName) : [];
       partialName = "";
       throw new BackupFailure(
         left.length
@@ -448,6 +622,7 @@ export async function createBackup(
           : "Backup failed.",
         [...leftovers, ...left],
         error,
+        describeFailure(error, source, reached, progress.attempts),
       );
     }
   } finally {

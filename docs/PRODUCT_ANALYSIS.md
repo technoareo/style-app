@@ -37,7 +37,7 @@ One clear garment against a plain background is the recommended starting point. 
 3. JPEG/PNG/WebP validation, size and pixel limits, rotation, resizing, metadata stripping, local consent and cancellation.
 4. Editable detections, evidence, crop adjustment, discard, and mandatory confirmation before adding. Exact normalized-photo duplicates are rejected; near-duplicate recognition is not implemented.
 5. Clothing editor for visible attributes, category, optional brand/size, dress code, warmth and availability. Manual entry remains available when analysis fails.
-6. Complete outfit construction from reviewed available items with category slots, color/pattern heuristics, event selection and a manually entered temperature. Formal outfits require confirmed formal pieces. Hot-weather exclusions use confirmed warmth; unknowns carry a warning.
+6. Complete outfit construction from reviewed available items with category slots, color/pattern heuristics, event selection and a manually entered temperature. Formal outfits require confirmed formal pieces. Hot-weather exclusions use confirmed warmth; unknowns carry a warning. Confirmed seasons and occasions rank pieces (explicit mismatches last, untagged neutral) and never exclude them; related occasion tags are neutral-to-positive, a layer never changes the main outfit’s verdict, and saved looks keep the chosen season.
 7. Another combination, saved outfit snapshots, local profiles, persistent IndexedDB storage, backup export and validated restore into a separate profile.
 8. Mobile and desktop layouts, focus-trapped dialogs, keyboard dismissal, readable errors and explicit recovery paths.
 

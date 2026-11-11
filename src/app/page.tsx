@@ -9,6 +9,7 @@ import { SavedView } from "../components/SavedView";
 import { Sidebar, type Tab } from "../components/Sidebar";
 import { TodayView } from "../components/TodayView";
 import { WardrobeView } from "../components/WardrobeView";
+import { LaunchInfoLinks } from "../components/LaunchInfoLinks";
 import { UploadDialog } from "../components/UploadDialog";
 import { AnalysisBanner } from "../components/AnalysisBanner";
 import { useAnalysisJobs } from "../hooks/useAnalysisJobs";
@@ -50,6 +51,7 @@ function WardrobeApp({
   const analysisJobs = useAnalysisJobs(uploadOpen, user.id);
   const [context, setContext] = useState<StyleContext>({
     occasion: "everyday",
+    season: "any",
     temperature: 25,
     variation: 0,
   });
@@ -155,7 +157,14 @@ function WardrobeApp({
             context={context}
             onContext={setContext}
             onSave={() =>
-              store.saveLook(result.items, result.message, context.occasion)
+              store.saveLook(
+                result.items,
+                result.message,
+                context.occasion,
+                context.season && context.season !== "any"
+                  ? context.season
+                  : undefined,
+              )
             }
             onAddPhotos={() => setUploadOpen(true)}
             onSample={store.loadSample}
@@ -196,6 +205,7 @@ function WardrobeApp({
               }}
             />
           </label>
+          <LaunchInfoLinks />
         </footer>
       </section>
       {store.toast && (

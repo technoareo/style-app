@@ -24,6 +24,7 @@ import {
 } from "../services/analysisClient";
 import { Dialog } from "./Dialog";
 import { GarmentThumb } from "./GarmentThumb";
+import { PhotoPrivacyLink } from "./LaunchInfoLinks";
 import {
   confidenceLabel,
   ItemAttributes,
@@ -704,6 +705,7 @@ export function UploadDialog({
         />
         Allow the server to analyze this photo.
       </label>
+      <PhotoPrivacyLink />
       <label className="upload-picker">
         Choose a clothing photo
         <input

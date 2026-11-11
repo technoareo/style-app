@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { limits } from "./limits";
 import {
@@ -96,14 +97,14 @@ function visionModelOrNull(): string | null {
 const UNAVAILABLE_MESSAGE =
   "Photo analysis is temporarily unavailable. Your wardrobe was not changed.";
 export const TOO_SLOW_MESSAGE =
-  "This photo took too long to analyze. Try a clearer photo of one to three items with space between them.";
+  "This photo took too long to analyze. Try a clearer photo with one clothing item clearly visible.";
 /**
  * The answer hit the output bound and was cut off. A token bound does not prove
  * the photo holds too many items (verbose items can reach it too), so the
  * message names no cause.
  */
 export const ANSWER_CUT_MESSAGE =
-  "The analysis was cut short before it finished. Try a clearer photo of one to three items with space between them.";
+  "The analysis was cut short before it finished. Try a clearer photo with one clothing item clearly visible.";
 /**
  * Output bound for one answer: six items at about 85 tokens each plus the
  * warning, with room to spare. A grammar-limited answer never reaches it; if a
@@ -118,6 +119,53 @@ const MAX_OUTPUT_TOKENS = 1100;
  * so latency is not meant to grow; a three-entry answer plus the warning fits.
  */
 const MAX_SINGLE_OUTPUT_TOKENS = 900;
+
+/** The text sent to the model: the SAME function builds the request and the evaluation identity below. */
+const promptFor = (single: boolean) => (single ? SINGLE_ITEM_PROMPT : VISION_PROMPT) + PROMPT_SUFFIX;
+const chatOptionsFor = (single: boolean) => ({
+  temperature: 0,
+  num_ctx: 4096,
+  num_predict: single ? MAX_SINGLE_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS,
+});
+/** Pixel handling around the model: normalizePhoto (1600 px, JPEG 85) then the model copy (768 px, JPEG 80). */
+const IMAGE_PROCESSING = {
+  normalize: { maxSide: 1600, jpegQuality: 85 },
+  modelCopy: { maxSide: 768, jpegQuality: 80 },
+} as const;
+
+const sha256Text = (text: string) => createHash("sha256").update(text).digest("hex");
+
+/**
+ * An exact, hashable description of what a request to the vision model consists
+ * of for a mode: the prompt text, the output schema, the sampling options and
+ * the image processing. Built from the same values analyzePhoto sends, so an
+ * evaluation can record what it really ran instead of copying strings. It does
+ * not contain the model name or version (see configuredVisionModel and the
+ * runtime's own digest) and it reads no secret or environment value.
+ */
+export function visionRequestIdentity(mode: AnalysisMode): {
+  mode: AnalysisMode;
+  promptSha256: string;
+  formatSha256: string;
+  options: ReturnType<typeof chatOptionsFor>;
+  imageProcessing: typeof IMAGE_PROCESSING;
+  requestSha256: string;
+} {
+  const single = mode === "single";
+  const prompt = promptFor(single);
+  const format = single ? singleVisionOutputSchema : visionOutputSchema;
+  const options = chatOptionsFor(single);
+  const promptSha256 = sha256Text(prompt);
+  const formatSha256 = sha256Text(JSON.stringify(format));
+  return {
+    mode,
+    promptSha256,
+    formatSha256,
+    options,
+    imageProcessing: IMAGE_PROCESSING,
+    requestSha256: sha256Text(JSON.stringify({ mode, promptSha256, formatSha256, options, imageProcessing: IMAGE_PROCESSING, think: false, stream: true })),
+  };
+}
 /** A chat answer larger than this is refused instead of buffered. */
 const MAX_ANSWER_CHARS = 2_000_000;
 
@@ -315,7 +363,7 @@ async function readChatAnswer(
  * Base URL of the local Ollama server. Server-only, trusted configuration —
  * never accepted from a request. Defaults to Ollama's standard local port.
  */
-function ollamaUrl(): string {
+export function ollamaUrl(): string {
   return process.env.OLLAMA_URL?.trim() || "http://127.0.0.1:11434";
 }
 
@@ -357,8 +405,8 @@ export async function normalizePhoto(
   try {
     return await sharp(bytes, { limitInputPixels: maxPixels })
       .rotate()
-      .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize(IMAGE_PROCESSING.normalize.maxSide, IMAGE_PROCESSING.normalize.maxSide, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: IMAGE_PROCESSING.normalize.jpegQuality })
       .toBuffer();
   } catch {
     throw new VisionError(
@@ -386,8 +434,8 @@ export async function analyzePhoto(
   // no request is sent to Ollama.
   if (!model) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
   const visionImage = await sharp(normalized)
-    .resize(768, 768, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 80 })
+    .resize(IMAGE_PROCESSING.modelCopy.maxSide, IMAGE_PROCESSING.modelCopy.maxSide, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: IMAGE_PROCESSING.modelCopy.jpegQuality })
     .toBuffer();
 
   // One explicit deadline for the whole inference. Reaching it while the caller
@@ -414,17 +462,12 @@ export async function analyzePhoto(
         stream: true,
         format: single ? singleVisionOutputSchema : visionOutputSchema,
         think: false,
-        options: {
-          temperature: 0,
-          num_ctx: 4096,
-          num_predict: single ? MAX_SINGLE_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS,
-        },
+        options: chatOptionsFor(single),
         messages: [
           {
             role: "user",
             images: [visionImage.toString("base64")],
-            content:
-              (single ? SINGLE_ITEM_PROMPT : VISION_PROMPT) + PROMPT_SUFFIX,
+            content: promptFor(single),
           },
         ],
       }),

@@ -7,7 +7,8 @@
  *
  *   BASE_URL=http://127.0.0.1:3000 STYLE_DATA_DIR=/path/to/bind-mount tsx scripts/ci-docker-smoke.ts
  *
- * Not yet run on a Docker host by the author.
+ * First passed in GitHub Actions run 41401896088 (commit e91b01c). That is CI
+ * evidence only, not a rehearsal on an operator host.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";

@@ -31,6 +31,7 @@ export function SavedView({
                 <p>
                   {new Date(look.createdAt).toLocaleDateString()} ·{" "}
                   {look.occasion}
+                  {look.season ? ` · ${look.season}` : ""}
                 </p>
               </div>
               <button

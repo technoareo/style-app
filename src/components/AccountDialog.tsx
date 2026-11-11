@@ -104,10 +104,12 @@ export function AccountDialog({
           live service. It is not a secure wipe of the server&apos;s storage:
           deleted data can remain in unused database space until it is
           overwritten, and in server backups made before you deleted, which are
-          kept for up to 7 days by default. Backups are not encrypted by the
-          app itself. We keep a pseudonymous deletion record (an internal ID
-          and date, not your name or email) so a restored backup cannot bring
-          the account back.
+          kept for up to 7 days by default. The operator can create encrypted
+          backup packages, and plain local backups may also exist; we do not
+          promise that every backup is encrypted, stored away from the server
+          or tested by restoring it. We keep a pseudonymous deletion record (an
+          internal ID and date, not your name or email) so a restored backup
+          cannot bring the account back.
         </p>
         <label>
           Password

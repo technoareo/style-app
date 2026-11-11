@@ -29,14 +29,14 @@ export function WardrobeView({
       </div>
       <div className="upload-banner">
         <div>
-          <b>Upload photos of your clothes</b>
+          <b>Upload a photo of each clothing item</b>
           <p>
-            One item or several in a photo. Local AI finds visible pieces and
-            suggests their details for you to review.
+            Use exactly one clothing item per photo. Local AI proposes its
+            details, and you review and correct them.
           </p>
           <small>
-            JPEG, PNG or WebP · Up to 6 MB · Photograph items fully visible in
-            good light.
+            JPEG, PNG or WebP · Up to 6 MB · One item, fully visible, in good
+            light.
           </small>
         </div>
         <button className="primary" onClick={onUpload}>

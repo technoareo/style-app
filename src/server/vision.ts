@@ -97,14 +97,14 @@ function visionModelOrNull(): string | null {
 const UNAVAILABLE_MESSAGE =
   "Photo analysis is temporarily unavailable. Your wardrobe was not changed.";
 export const TOO_SLOW_MESSAGE =
-  "This photo took too long to analyze. Try a clearer photo of one to three items with space between them.";
+  "This photo took too long to analyze. Try a clearer photo with one clothing item clearly visible.";
 /**
  * The answer hit the output bound and was cut off. A token bound does not prove
  * the photo holds too many items (verbose items can reach it too), so the
  * message names no cause.
  */
 export const ANSWER_CUT_MESSAGE =
-  "The analysis was cut short before it finished. Try a clearer photo of one to three items with space between them.";
+  "The analysis was cut short before it finished. Try a clearer photo with one clothing item clearly visible.";
 /**
  * Output bound for one answer: six items at about 85 tokens each plus the
  * warning, with room to spare. A grammar-limited answer never reaches it; if a

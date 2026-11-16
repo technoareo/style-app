@@ -6,6 +6,7 @@ import { ensureDatabaseReady, getAuthDatabase, getDataDir } from "./database";
 import { createImmediateSqliteDialect } from "./authDialect";
 import { assertLaunchInfoConfigured } from "./launchInfo";
 import { assertMailConfigured } from "./mail";
+import { schedulePhysicalCleanup } from "./physicalCleanup";
 import { queuePasswordResetEmail, queueVerificationEmail } from "./mailOutbox";
 
 type AuthInstance = ReturnType<typeof betterAuth>;
@@ -224,6 +225,9 @@ export function getReadyAuth(): Promise<AuthInstance> {
     readyPromise = (async () => {
       const { auth, options } = await getBuilt();
       await ensureDatabaseReady(options);
+      // Build 034: finish any deletion cleanup a crashed or busy earlier run
+      // left owed (durable mark in the database). Never awaited, never throws.
+      schedulePhysicalCleanup(1_000);
       return auth;
     })().catch((error) => {
       readyPromise = null;

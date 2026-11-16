@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { getMigrations } from "better-auth/db/migration";
 import type { BetterAuthOptions } from "better-auth";
 import lockfile from "proper-lockfile";
+import { tableExists } from "./sensitiveTables";
 import { holdPresence, type PresenceHold } from "./processPresence";
 import { retryBusy } from "./sqliteRetry";
 import { acquireWriteGate } from "./writeGate";
@@ -90,10 +91,46 @@ function releasePresenceIfIdle(): void {
   hold.release();
 }
 
+/** Raised when a live connection cannot be proven to have secure_delete=ON. */
+export class SecureDeleteError extends Error {
+  constructor() {
+    super("The database connection could not enable secure_delete.");
+    this.name = "SecureDeleteError";
+  }
+}
+
+/**
+ * Build 034: `PRAGMA secure_delete` is per connection and defaults to OFF, so
+ * every live connection turns it on and READS IT BACK (a build compiled with a
+ * different default, or a refused pragma, must not pass silently). 1 = ON; 2 =
+ * FAST does not zero-fill everything and is rejected. Never throws.
+ */
+export function secureDeleteActive(db: DatabaseSync): boolean {
+  try {
+    const row = db.prepare("PRAGMA secure_delete").get() as
+      | { secure_delete?: number }
+      | undefined;
+    return row?.secure_delete === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when every connection this process has open reports secure_delete=ON.
+ * A pure read (no connection is opened), so /api/health may call it any time.
+ */
+export function secureDeleteVerified(): boolean {
+  return [database, authDatabase].every(
+    (db) => db === null || !db.isOpen || secureDeleteActive(db),
+  );
+}
+
 function openConnection(timeoutMs: number): DatabaseSync {
   ensurePresence();
+  let db: DatabaseSync | null = null;
   try {
-    return new DatabaseSync(path.join(getDataDir(), "app.db"), {
+    db = new DatabaseSync(path.join(getDataDir(), "app.db"), {
       // Explicit despite matching the node:sqlite default: a schema with
       // ON DELETE CASCADE relies on this being on for every connection.
       enableForeignKeyConstraints: true,
@@ -101,7 +138,11 @@ function openConnection(timeoutMs: number): DatabaseSync {
       // immediately failing with SQLITE_BUSY.
       timeout: timeoutMs,
     });
+    db.exec("PRAGMA secure_delete = ON");
+    if (!secureDeleteActive(db)) throw new SecureDeleteError();
+    return db;
   } catch (error) {
+    if (db) closeTracked(db);
     releasePresenceIfIdle();
     throw error;
   }
@@ -123,6 +164,11 @@ export function getDatabase(): DatabaseSync {
   // WAL.
   database = openConnection(50);
   return database;
+}
+
+/** Whether the shared main connection is currently open (never opens one). */
+export function mainConnectionOpen(): boolean {
+  return database !== null && database.isOpen;
 }
 
 /**
@@ -359,6 +405,7 @@ CREATE INDEX IF NOT EXISTS photo_assets_user_id_idx ON photo_assets(user_id);
 `;
 
 export const QUEUE_METADATA_MIGRATION = "007-queue-metadata";
+export const PHYSICAL_CLEANUP_MIGRATION = "034-physical-cleanup";
 
 function columnExists(
   db: DatabaseSync,
@@ -412,6 +459,69 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
   ).run(QUEUE_METADATA_MIGRATION, Date.now());
   migrateMailOutbox(db);
   migrateAnalysisMode(db);
+  migratePhysicalCleanup(db);
+}
+
+/**
+ * Build 034: the durable "physical cleanup owed" mark and the replacement of the
+ * deletion trigger. Additive: one single-row table, no existing row rewritten.
+ *
+ * `CREATE TRIGGER IF NOT EXISTS` (APPLICATION_SCHEMA) never upgrades a trigger a
+ * current database already has, so the trigger is dropped and recreated here,
+ * inside the caller's BEGIN IMMEDIATE (atomic: there is never a moment without a
+ * ledger trigger). The new trigger, in the SAME statement that deletes the user:
+ *   1. records the tombstone in account_deletions (unchanged),
+ *   2. deletes the user's `verification` rows. Better Auth does not: it keys
+ *      them by token/identifier, so reset and delete-account tokens (value =
+ *      user id) and tokens addressed to the user's e-mail outlived the account,
+ *   3. bumps physical_cleanup.requested (see physicalCleanup.ts).
+ * Step 2 is only emitted when the table exists (Better Auth creates it first).
+ *
+ * `legacy_deletions` is the number of deletions already recorded when this
+ * migration first ran: those happened without secure_delete or WAL truncation
+ * and may leave residue in free pages (see docs/DEPLOYMENT.md).
+ */
+function migratePhysicalCleanup(db: DatabaseSync): void {
+  // Needs Better Auth's `user` table and the ledger table (APPLICATION_SCHEMA).
+  // Without them there is nothing to attach to: not recorded, so it re-runs.
+  if (!tableExists(db, "user") || !tableExists(db, "account_deletions")) return;
+  db.exec(`
+CREATE TABLE IF NOT EXISTS physical_cleanup (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  requested INTEGER NOT NULL DEFAULT 0,
+  completed INTEGER NOT NULL DEFAULT 0,
+  pending_since INTEGER,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at INTEGER,
+  last_success_at INTEGER,
+  last_failure_code TEXT,
+  legacy_deletions INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+`);
+  db.prepare(
+    "INSERT OR IGNORE INTO physical_cleanup(id,legacy_deletions,created_at) VALUES(1,(SELECT COUNT(*) FROM account_deletions),?)",
+  ).run(Date.now());
+  const verification = tableExists(db, "verification")
+    ? "DELETE FROM verification WHERE value = OLD.id OR identifier = OLD.email;"
+    : "";
+  db.exec(`
+DROP TRIGGER IF EXISTS user_deletion_ledger;
+CREATE TRIGGER user_deletion_ledger
+AFTER DELETE ON user
+BEGIN
+  INSERT OR REPLACE INTO account_deletions(user_id, deleted_at)
+  VALUES (OLD.id, CAST(strftime('%s','now') AS INTEGER) * 1000);
+  ${verification}
+  UPDATE physical_cleanup
+     SET requested = requested + 1,
+         pending_since = COALESCE(pending_since, CAST(strftime('%s','now') AS INTEGER) * 1000)
+   WHERE id = 1;
+END;
+`);
+  db.prepare(
+    "INSERT OR IGNORE INTO schema_migrations(id, applied_at) VALUES(?, ?)",
+  ).run(PHYSICAL_CLEANUP_MIGRATION, Date.now());
 }
 
 export const ANALYSIS_MODE_MIGRATION = "018-analysis-mode";
@@ -487,7 +597,7 @@ CREATE TABLE IF NOT EXISTS mail_worker_state (
  * write lock just to learn there is nothing to do. Any doubt (including a
  * read error) returns false and the locked, idempotent migration runs.
  */
-function applicationMigrationApplied(db: DatabaseSync): boolean {
+export function applicationMigrationApplied(db: DatabaseSync): boolean {
   try {
     const recorded = db
       .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
@@ -503,6 +613,29 @@ function applicationMigrationApplied(db: DatabaseSync): boolean {
           )
           .get(name),
       );
+    const cleanupRecorded = db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(PHYSICAL_CLEANUP_MIGRATION);
+    // The trigger must be the build 034 one AND, when the verification table
+    // exists, must delete the person's verification rows: a trigger written
+    // before that table existed (a partial or direct earlier migration) is not
+    // current and is rebuilt by the locked migration. The single counter row
+    // must exist too (a missing row makes every deletion silently owe nothing).
+    const triggerSql = (
+      db
+        .prepare(
+          "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='user_deletion_ledger'",
+        )
+        .get() as { sql: string } | undefined
+    )?.sql;
+    const triggerCurrent =
+      typeof triggerSql === "string" &&
+      triggerSql.includes("physical_cleanup") &&
+      (!tableExists(db, "verification") ||
+        triggerSql.includes("DELETE FROM verification"));
+    const counterRow = db
+      .prepare("SELECT 1 AS ok FROM physical_cleanup WHERE id=1")
+      .get();
     const modeRecorded = db
       .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
       .get(ANALYSIS_MODE_MIGRATION);
@@ -510,6 +643,10 @@ function applicationMigrationApplied(db: DatabaseSync): boolean {
       Boolean(recorded) &&
       Boolean(mailRecorded) &&
       Boolean(modeRecorded) &&
+      Boolean(cleanupRecorded) &&
+      triggerCurrent &&
+      tablePresent("physical_cleanup") &&
+      Boolean(counterRow) &&
       columnExists(db, "analysis_jobs", "analysis_mode") &&
       tablePresent("mail_outbox") &&
       tablePresent("mail_worker_state") &&

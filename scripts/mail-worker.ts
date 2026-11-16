@@ -11,6 +11,7 @@ import {
   touchMailHeartbeat,
 } from "../src/server/mailOutbox";
 import { assertMailConfigured } from "../src/server/mail";
+import { runPhysicalCleanup } from "../src/server/physicalCleanup";
 
 /**
  * Supervised account-mail worker. A separate process from the web app and from
@@ -97,6 +98,23 @@ async function ledgerTick(progress: () => void): Promise<void> {
   progress();
 }
 
+/**
+ * Build 034: durable sweep for deleted-data cleanup (src/server/physicalCleanup.ts).
+ * The database carries a mark for every committed account deletion whose WAL
+ * truncation is not yet proven; this is the retry that does not depend on the
+ * web process having survived. About once a minute; a no-op (one small read)
+ * when nothing is owed. Bounded, never throws, fixed-text logging only.
+ */
+const CLEANUP_TICK_MS = 60_000;
+let lastCleanupTick = 0;
+async function cleanupTick(progress: () => void): Promise<void> {
+  if (shutdown.signal.aborted || Date.now() - lastCleanupTick < CLEANUP_TICK_MS) return;
+  lastCleanupTick = Date.now();
+  progress();
+  await runPhysicalCleanup({ budgetMs: 4_000 });
+  progress();
+}
+
 async function check(): Promise<number> {
   getDatabase();
   const age = mailHeartbeatAgeMs();
@@ -143,6 +161,7 @@ async function main(): Promise<void> {
         heartbeat.progress();
       }
       await ledgerTick(heartbeat.progress);
+      await cleanupTick(heartbeat.progress);
       if (!worked) await idle(POLL_MS);
     }
   } finally {

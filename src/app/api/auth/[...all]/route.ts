@@ -3,6 +3,7 @@ import { getReadyAuth } from "../../../../server/auth";
 import { readBoundedBody } from "../../../../server/boundedBody";
 import { runWithContention } from "../../../../server/contention";
 import { limits } from "../../../../server/limits";
+import { schedulePhysicalCleanup } from "../../../../server/physicalCleanup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,8 +43,32 @@ function fixedJson(status: number, error: string): Response {
   });
 }
 
-function withSafety(fn: (request: Request) => Promise<Response>) {
+/**
+ * Build 034: a delete-user or delete-user/callback request may have committed
+ * the deletion whatever the response says (a busy 503, a 5xx after the commit, a
+ * redirect), so a cleanup run is scheduled for EVERY response to those paths,
+ * including the early returns inside the handler. It is a no-op when nothing is
+ * owed, runs after the response, is never awaited and never changes it; the
+ * durable mark in the database is what makes a missed run retryable.
+ */
+function withCleanup(handler: (request: Request) => Promise<Response>) {
   return async (request: Request): Promise<Response> => {
+    let isDelete = false;
+    try {
+      isDelete = /\/delete-user(\/callback)?$/.test(new URL(request.url).pathname);
+    } catch {
+      // An unparsable URL is not a delete request.
+    }
+    try {
+      return await handler(request);
+    } finally {
+      if (isDelete) schedulePhysicalCleanup();
+    }
+  };
+}
+
+function withSafety(fn: (request: Request) => Promise<Response>) {
+  return withCleanup(async (request: Request): Promise<Response> => {
     let response: Response;
     try {
       if (request.body && !["GET", "HEAD"].includes(request.method)) {
@@ -90,7 +115,7 @@ function withSafety(fn: (request: Request) => Promise<Response>) {
       statusText: response.statusText,
       headers,
     });
-  };
+  });
 }
 
 export const GET = withSafety(delegate.GET);

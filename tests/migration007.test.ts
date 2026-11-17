@@ -107,6 +107,7 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
       "ALTER TABLE analysis_jobs DROP COLUMN finished_at;" +
       "ALTER TABLE analysis_jobs DROP COLUMN refunded;" +
       "ALTER TABLE analysis_jobs DROP COLUMN failure_kind;" +
+      "ALTER TABLE analysis_jobs DROP COLUMN usage_day;" +
       "ALTER TABLE usage_daily DROP COLUMN attempts;" +
       "DROP TABLE analysis_timings;" +
       "DROP TABLE schema_migrations;",
@@ -123,7 +124,7 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
 
   const migrated = new DatabaseSync(path.join(directory, "app.db"));
   try {
-    for (const column of ["started_at", "finished_at", "refunded", "failure_kind"])
+    for (const column of ["started_at", "finished_at", "refunded", "failure_kind", "usage_day"])
       assert.ok(columns(migrated, "analysis_jobs").includes(column), column);
     assert.ok(columns(migrated, "usage_daily").includes("attempts"));
     assert.ok(tableExists(migrated, "analysis_timings"));

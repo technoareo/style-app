@@ -124,13 +124,20 @@ function secondsToUtcMidnight(now: number): number {
  * Returns one chargeable analysis to the job's owner, exactly once. The
  * `refunded` marker is flipped by a conditional UPDATE and the allowance only
  * moves when that UPDATE changed a row, so repeated calls (sweep, worker and
- * user racing) cannot refund twice. The abuse counter is untouched. Must be
+ * user racing) cannot refund twice. The refund goes to the day recorded at
+ * charge time (`usage_day`), never a day recomputed from `created_at`, which
+ * would miss the charged row whenever the two straddle UTC midnight. The abuse
+ * counter is untouched. Must be
  * called inside an open write transaction.
  */
 function refundLocked(db: DatabaseSync, jobId: string): boolean {
   const job = db
-    .prepare("SELECT user_id, created_at FROM analysis_jobs WHERE id=?")
-    .get(jobId) as { user_id: string; created_at: number } | undefined;
+    .prepare(
+      "SELECT user_id, created_at, usage_day FROM analysis_jobs WHERE id=?",
+    )
+    .get(jobId) as
+    | { user_id: string; created_at: number; usage_day: string | null }
+    | undefined;
   if (!job) return false;
   const flipped = db
     .prepare("UPDATE analysis_jobs SET refunded=1 WHERE id=? AND refunded=0")
@@ -138,7 +145,7 @@ function refundLocked(db: DatabaseSync, jobId: string): boolean {
   if (Number(flipped.changes) !== 1) return false;
   db.prepare(
     "UPDATE usage_daily SET count = CASE WHEN count > 0 THEN count - 1 ELSE 0 END WHERE user_id=? AND day=?",
-  ).run(job.user_id, dayOf(job.created_at));
+  ).run(job.user_id, job.usage_day ?? dayOf(job.created_at));
   return true;
 }
 
@@ -452,8 +459,8 @@ export function enqueueAnalysisJob(userId: string, photo: Buffer): JobView {
     checkAdmission(db, userId, now);
     const id = randomUUID();
     db.prepare(
-      "INSERT INTO analysis_jobs(id,user_id,status,input_image,created_at,expires_at,attempts,analysis_mode) VALUES(?,?,'queued',?,?,?,0,?)",
-    ).run(id, userId, photo, now, now + QUEUE_EXPIRE_MS, mode);
+      "INSERT INTO analysis_jobs(id,user_id,status,input_image,created_at,expires_at,attempts,analysis_mode,usage_day) VALUES(?,?,'queued',?,?,?,0,?,?)",
+    ).run(id, userId, photo, now, now + QUEUE_EXPIRE_MS, mode, day);
     db.prepare(
       "INSERT INTO usage_daily(user_id,day,count,attempts) VALUES(?,?,1,1) ON CONFLICT(user_id,day) DO UPDATE SET count=count+1, attempts=attempts+1",
     ).run(userId, day);

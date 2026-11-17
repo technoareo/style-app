@@ -436,6 +436,9 @@ function columnExists(
  *  analysis_jobs.started_at / finished_at  inference timing (admission ETA)
  *  analysis_jobs.refunded                  one-time quota refund marker
  *  analysis_jobs.failure_kind              'server' | 'model' | 'expired' ...
+ *  analysis_jobs.usage_day                 UTC day whose allowance the job was
+ *                                          charged to (refunds target this, not
+ *                                          a day recomputed from created_at)
  *  usage_daily.attempts                    accepted attempts, never refunded
  *  analysis_timings                        anonymous recent job durations
  */
@@ -451,6 +454,11 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
   add("analysis_jobs", "finished_at", "INTEGER");
   add("analysis_jobs", "refunded", "INTEGER NOT NULL DEFAULT 0");
   add("analysis_jobs", "failure_kind", "TEXT");
+  add("analysis_jobs", "usage_day", "TEXT");
+  // Jobs charged before this column existed were charged on their upload day.
+  db.exec(
+    "UPDATE analysis_jobs SET usage_day = strftime('%Y-%m-%d', created_at / 1000, 'unixepoch') WHERE usage_day IS NULL",
+  );
   add("usage_daily", "attempts", "INTEGER NOT NULL DEFAULT 0");
   // Existing days keep their already-spent allowance as attempts too.
   db.exec("UPDATE usage_daily SET attempts = count WHERE attempts < count");
@@ -685,7 +693,7 @@ export function applicationMigrationApplied(db: DatabaseSync): boolean {
       columnExists(db, "analysis_jobs", "analysis_mode") &&
       tablePresent("mail_outbox") &&
       tablePresent("mail_worker_state") &&
-      ["started_at", "finished_at", "refunded", "failure_kind"].every((c) =>
+      ["started_at", "finished_at", "refunded", "failure_kind", "usage_day"].every((c) =>
         columnExists(db, "analysis_jobs", c),
       ) &&
       columnExists(db, "usage_daily", "attempts") &&

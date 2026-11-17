@@ -1,4 +1,5 @@
-import { Plus, Upload } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { Garment } from "../domain/types";
 import { WardrobeCard } from "./WardrobeCard";
 
@@ -17,14 +18,27 @@ export function WardrobeView({
   onAddBlank,
   onEdit,
 }: Props) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "ready" | "review" | "unavailable">("all");
+  const visible = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return wardrobe.filter((item) => {
+      const matchesText = !normalized || [item.name, item.category, item.color, item.brand]
+        .some((value) => value.toLowerCase().includes(normalized));
+      const matchesFilter = filter === "all" ||
+        (filter === "ready" && item.available !== false && item.reviewed !== false) ||
+        (filter === "review" && item.reviewed === false) ||
+        (filter === "unavailable" && item.available === false);
+      return matchesText && matchesFilter;
+    });
+  }, [filter, query, wardrobe]);
   return (
     <>
       <div className="page-title">
         <span className="eyebrow">{collectionLabel}</span>
-        <h1>My wardrobe</h1>
+        <h1>Your closet</h1>
         <p>
-          Everything you love, all in one place. Brand and size can be added to
-          every piece.
+          {wardrobe.length} {wardrobe.length === 1 ? "piece" : "pieces"}, ready for better everyday decisions.
         </p>
       </div>
       <div className="upload-banner">
@@ -43,10 +57,31 @@ export function WardrobeView({
           <Upload size={16} /> Upload photos
         </button>
       </div>
+      <div className="closet-tools">
+        <label className="closet-search">
+          <Search size={18} aria-hidden="true" />
+          <span className="sr-only">Search closet</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pieces" />
+        </label>
+        <div className="filter-row" aria-label="Filter closet">
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          {(["all", "ready", "review", "unavailable"] as const).map((value) => (
+            <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>
+              {value === "all" ? "All" : value === "review" ? "Needs review" : value[0].toUpperCase() + value.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="wardrobe-grid full-grid">
-        {wardrobe.map((g) => (
+        {visible.map((g) => (
           <WardrobeCard key={g.id} garment={g} onEdit={onEdit} />
         ))}
+        {visible.length === 0 && wardrobe.length > 0 && (
+          <div className="closet-no-results">
+            <b>No pieces match</b>
+            <span>Try another search or clear the filter.</span>
+          </div>
+        )}
         <button className="add-card" onClick={onAddBlank}>
           <Plus />
           <b>Add an item manually</b>

@@ -1,8 +1,15 @@
-import { Heart, LogOut, Shirt, Sparkles, Sun } from "lucide-react";
+import { BarChart3, CalendarDays, LogOut, Plus, Shirt, Sparkles, Sun } from "lucide-react";
 
-export const TABS = ["Today", "My wardrobe", "Saved looks"] as const;
+export const TABS = ["Today", "My wardrobe", "Add", "Plan", "Insights"] as const;
 export type Tab = (typeof TABS)[number];
-const ICONS = [Sun, Shirt, Heart];
+const ICONS = [Sun, Shirt, Plus, CalendarDays, BarChart3];
+const LABELS: Record<Tab, string> = {
+  Today: "Today",
+  "My wardrobe": "Closet",
+  Add: "Add",
+  Plan: "Plan",
+  Insights: "Insights",
+};
 
 type Props = {
   tab: Tab;
@@ -34,10 +41,11 @@ export function Sidebar({
         return (
           <button
             key={x}
-            className={`nav ${tab === x ? "active" : ""}`}
+            className={`nav ${x === "Add" ? "nav-add" : ""} ${tab === x ? "active" : ""}`}
             onClick={() => onTab(x)}
+            aria-current={tab === x ? "page" : undefined}
           >
-            <Icon size={17} /> {x}
+            <Icon size={18} /> <span>{LABELS[x]}</span>
           </button>
         );
       })}

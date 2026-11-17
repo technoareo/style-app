@@ -9,9 +9,15 @@ export function WardrobeCard({
   garment: Garment;
   onEdit: (g: Garment) => void;
 }) {
+  const status = garment.available === false
+    ? "Unavailable"
+    : garment.reviewed === false
+      ? "Needs review"
+      : "Ready";
   return (
     <article className="wardrobe-card">
       <div className="wardrobe-image">
+        <span className={`status-badge status-${status.toLowerCase().replace(" ", "-")}`}>{status}</span>
         <GarmentThumb garment={garment} />
         <button
           className="edit-fab"
@@ -31,14 +37,7 @@ export function WardrobeCard({
           {garment.brand || "Brand not set"}
           {garment.size ? ` · Size ${garment.size}` : " · Size not set"}
         </span>
-        <span>
-          {garment.available === false
-            ? "Unavailable to wear"
-            : garment.reviewed === false
-              ? "Needs review"
-              : "Ready to style"}
-          {["1", "2", "3", "4"].includes(garment.id) ? " · Sample item" : ""}
-        </span>
+        {["1", "2", "3", "4"].includes(garment.id) && <span>Sample item</span>}
       </div>
     </article>
   );

@@ -3,7 +3,7 @@ import { getReadyAuth } from "../../../../server/auth";
 import { readBoundedBody } from "../../../../server/boundedBody";
 import { runWithContention } from "../../../../server/contention";
 import { limits } from "../../../../server/limits";
-import { schedulePhysicalCleanup } from "../../../../server/physicalCleanup";
+import { isDeleteUserPath, schedulePhysicalCleanup } from "../../../../server/physicalCleanup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ function withCleanup(handler: (request: Request) => Promise<Response>) {
   return async (request: Request): Promise<Response> => {
     let isDelete = false;
     try {
-      isDelete = /\/delete-user(\/callback)?$/.test(new URL(request.url).pathname);
+      isDelete = isDeleteUserPath(new URL(request.url).pathname);
     } catch {
       // An unparsable URL is not a delete request.
     }

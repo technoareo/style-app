@@ -1,9 +1,9 @@
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import path from "node:path";
 import {
   closeDatabases,
   getDatabase,
-  getDataDir,
+  resolveDataDir,
   secureDeleteVerified,
 } from "../src/server/database";
 import { readCleanupStatus, runPhysicalCleanup } from "../src/server/physicalCleanup";
@@ -63,6 +63,14 @@ export function parseArgs(args: string[]): Parsed | { error: string } {
   return { run, force, budgetMs: budgetMs ?? DEFAULT_BUDGET_MS };
 }
 
+function databaseFileExists(): boolean {
+  try {
+    return statSync(path.join(resolveDataDir(), "app.db")).isFile();
+  } catch {
+    return false; // absent parent, absent file, or unreadable: all "no database", fixed message
+  }
+}
+
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if ("error" in parsed) {
@@ -70,7 +78,8 @@ async function main(): Promise<void> {
     process.exitCode = 2;
     return;
   }
-  if (!existsSync(path.join(getDataDir(), "app.db"))) {
+  // Pure path resolution + stat: never creates the data directory or a database.
+  if (!databaseFileExists()) {
     console.error("CLEANUP_NO_DATABASE: there is no database in the data directory.");
     process.exitCode = 1;
     return;

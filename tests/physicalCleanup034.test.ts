@@ -6,7 +6,6 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { NextRequest } from "next/server";
 import { waitForMail } from "./helpers/mailCapture";
-import { sleep } from "./helpers/processes";
 
 /**
  * Build 034: physical deletion cleanup. Markers are distinctive byte strings
@@ -27,7 +26,8 @@ const origin = process.env.APP_URL;
 const dbFile = path.join(dataDir, "app.db");
 const walFile = dbFile + "-wal";
 
-const filler = () => randomBytes(30_000); // random: no accidental marker; spans overflow pages
+const PHOTO_FILLER_BYTES = 30_000;
+const filler = () => randomBytes(PHOTO_FILLER_BYTES); // random: no accidental marker; spans overflow pages
 type Markers = Record<
   "savedPhoto" | "queuedPhoto" | "queuedMail" | "token" | "session" | "account",
   string
@@ -40,6 +40,36 @@ const markersFor = (tag: string): Markers => ({
   session: `SESSION-${tag}-0c5e9a17`,
   account: `ACCOUNT-${tag}-9e47c3d1`,
 });
+
+/**
+ * Manual clock for the cleanup scheduler (setCleanupTestHooks): no test waits for
+ * real time. A timer fires only when the test says so, and fireNext() resolves
+ * when the run that timer started has finished.
+ */
+class ManualClock {
+  t = 1_000_000;
+  private next = 1;
+  private timers = new Map<number, { fn: () => unknown; at: number }>();
+  now = () => this.t;
+  setTimeout = (fn: () => unknown, ms: number): unknown => {
+    const id = this.next++;
+    this.timers.set(id, { fn, at: this.t + ms });
+    return id;
+  };
+  clearTimeout = (handle: unknown): void => void this.timers.delete(handle as number);
+  get pending(): number {
+    return this.timers.size;
+  }
+  async fireNext(): Promise<boolean> {
+    const first = [...this.timers.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+    if (!first) return false;
+    this.timers.delete(first[0]);
+    this.t = Math.max(this.t, first[1].at);
+    await first[1].fn();
+    return true;
+  }
+}
+const clock = new ManualClock();
 
 type Db = typeof import("../src/server/database");
 type Cleanup = typeof import("../src/server/physicalCleanup");
@@ -57,10 +87,52 @@ function where(marker: string): string[] {
   return hits;
 }
 const walSize = () => (existsSync(walFile) ? statSync(walFile).size : 0);
-// After a truncating checkpoint the only thing written is the one-row bookkeeping
-// UPDATE (completed = requested): at most a few 4 KiB frames, never the deleted
-// page images (the photos alone are ~30 KB each).
-const TINY_WAL = 3 * (4096 + 24) + 32;
+
+// WAL file format (https://sqlite.org/fileformat2.html#walformat): a 32-byte file
+// header, then frames of a 24-byte frame header plus one database page.
+const WAL_HEADER_BYTES = 32;
+const WAL_FRAME_HEADER_BYTES = 24;
+const walFrames = (): number => {
+  const size = walSize();
+  if (size <= WAL_HEADER_BYTES) return 0;
+  const pageSize = (main.prepare("PRAGMA page_size").get() as { page_size: number }).page_size;
+  return Math.floor((size - WAL_HEADER_BYTES) / (pageSize + WAL_FRAME_HEADER_BYTES));
+};
+/**
+ * INVARIANT: after a truncating checkpoint the WAL holds only the cleanup's own
+ * bookkeeping UPDATE (one small row; in practice 1 to 2 frames), never page
+ * images of deleted data and never unbounded growth. A single leaked planted
+ * photo would need at least floor(PHOTO_FILLER_BYTES / pageSize) overflow frames
+ * on its own, so "fewer frames than that" separates the two without depending
+ * on an exact frame count or page size (the marker-absence checks are the real
+ * residue proof; this is the growth check). It fails with the observed counts.
+ */
+function assertWalHoldsBookkeepingOnly(label: string): void {
+  const pageSize = (main.prepare("PRAGMA page_size").get() as { page_size: number }).page_size;
+  const limit = Math.floor(PHOTO_FILLER_BYTES / pageSize);
+  assert.ok(
+    walFrames() < limit,
+    `${label}: expected only bookkeeping frames in the WAL (fewer than ${limit} frames, the size of one leaked photo), found ${walFrames()} frames in ${walSize()} bytes`,
+  );
+}
+
+/**
+ * Negative control, PER marker kind: after the deletion committed and before any
+ * cleanup, every kind's bytes must still be physically in app.db. This is
+ * deterministic here, not best effort: plant() checkpoints every marker into
+ * app.db, wal_autocheckpoint is 0 on both live connections, and nothing in the
+ * test checkpoints between the deletion and this check, so SQLite has no reason
+ * to touch the old page images (secure_delete only zero-fills the NEW images it
+ * writes to the WAL). A kind that is not here would make its later "absent"
+ * assertion vacuous, so it fails the test by name.
+ */
+function assertEveryMarkerKindStillOnDisk(m: Markers, why: string): void {
+  for (const [kind, marker] of Object.entries(m))
+    assert.ok(
+      where(marker).includes("app.db"),
+      `control (${why}): the ${kind} marker must still be in app.db before the cleanup; it is only in [${where(marker).join(", ")}]`,
+    );
+}
 
 type Account = { id: string; email: string; password: string; cookie: string };
 async function newAccount(label: string): Promise<Account> {
@@ -152,6 +224,10 @@ const countWhere = (table: string, column: string, value: string) =>
 before(async () => {
   database = await import("../src/server/database");
   cleanup = await import("../src/server/physicalCleanup");
+  // Before getReadyAuth(): its start-up sweep timer lands on the manual clock too.
+  // Scheduled runs get a short budget so a deliberately busy database costs
+  // 400 ms, not the 5 s production default; the logic is otherwise unchanged.
+  cleanup.setCleanupTestHooks({ clock, runOptions: { budgetMs: 400 } });
   const { getReadyAuth } = await import("../src/server/auth");
   await getReadyAuth();
   main = database.getDatabase();
@@ -161,6 +237,7 @@ before(async () => {
   keeper = new DatabaseSync(dbFile, { timeout: 5000 });
 });
 after(() => {
+  cleanup.setCleanupTestHooks(null);
   try {
     keeper.close();
   } catch {
@@ -210,15 +287,12 @@ test("markers of a deleted account are physically absent from app.db and app.db-
 
   // Control: logically deleted and zero-filled in the new page images, yet the
   // OLD images stay on disk until a checkpoint overwrites them.
-  assert.ok(
-    Object.values(m).some((marker) => where(marker).length > 0),
-    "control: without the cleanup, deleted bytes are still on disk",
-  );
+  assertEveryMarkerKindStillOnDisk(m, "deleted but not cleaned");
 
   assert.equal(await cleanup.runPhysicalCleanup(), "clean");
   for (const [kind, marker] of Object.entries(m))
     assert.deepEqual(where(marker), [], `${kind} marker absent from app.db and app.db-wal`);
-  assert.ok(walSize() <= TINY_WAL, `the WAL was truncated (now ${walSize()} bytes)`);
+  assertWalHoldsBookkeepingOnly("after cleanup");
   const status = cleanup.readCleanupStatus(main);
   assert.equal(status.pending, false);
   assert.equal(status.completed, status.requested);
@@ -245,10 +319,7 @@ test("a busy database leaves the cleanup owed (never undoes or reports failure o
     assert.equal(status.pending, true);
     assert.equal(status.lastFailureCode, "busy");
     assert.ok(status.attempts >= 1);
-    assert.ok(
-      Object.values(m).some((x) => where(x).length > 0),
-      "bytes remain while it is owed (and the status says so)",
-    );
+    assertEveryMarkerKindStillOnDisk(m, "cleanup owed, database busy");
   } finally {
     reader.exec("ROLLBACK");
     reader.close();
@@ -299,22 +370,20 @@ test("the delete-user route schedules the cleanup, and a cleanup stuck on a busy
     const response = await deleteAccount(who, true);
     assert.equal(response.status, 200, "deletion reported as succeeded");
     assert.equal(userExists(who.id), false);
-    const end = Date.now() + 15_000;
-    while (cleanup.readCleanupStatus(main).lastFailureCode !== "busy") {
-      if (Date.now() > end) assert.fail("the scheduled cleanup never ran");
-      await sleep(100);
-    }
+    assert.ok(cleanup.scheduledCleanupDueInMs()! <= 250, "the response scheduled the cleanup");
+    assert.equal(cleanup.readCleanupStatus(main).pending, true, "nothing has run yet: the timer is ours to fire");
+    await clock.fireNext(); // the scheduled run, against a database another connection holds busy
+    assert.equal(cleanup.readCleanupStatus(main).lastFailureCode, "busy");
     assert.equal(userExists(who.id), false, "the failed cleanup did not resurrect anything");
+    assert.equal(cleanup.scheduledCleanupDueInMs(), 2_000, "the first backoff retry is queued 2 s out");
   } finally {
     reader.exec("ROLLBACK");
     reader.close();
   }
-  // The bounded in-process retry (2 s later) completes it with no operator action.
-  const end = Date.now() + 20_000;
-  while (cleanup.readCleanupStatus(main).pending) {
-    if (Date.now() > end) assert.fail("the retry never completed the cleanup");
-    await sleep(200);
-  }
+  // The queued retry completes it with no operator action.
+  assert.equal(await clock.fireNext(), true);
+  assert.equal(cleanup.readCleanupStatus(main).pending, false);
+  assert.equal(cleanup.scheduledCleanupDueInMs(), null, "a finished cleanup schedules nothing more");
   for (const marker of Object.values(m)) assert.deepEqual(where(marker), []);
 });
 
@@ -334,13 +403,10 @@ function bareDelete(db: DatabaseSync = main): void {
 }
 const realCheckpoint = (db: DatabaseSync) =>
   db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get() as { busy: number; log: number };
+/** Fires every pending scheduled run (by hand), then runs one more to be sure nothing is owed. */
 async function drainTimer(): Promise<void> {
-  cleanup.schedulePhysicalCleanup(0); // flush whatever is waiting
-  const end = Date.now() + 20_000;
-  while (cleanup.scheduledCleanupDueInMs() !== null) {
-    if (Date.now() > end) assert.fail("a scheduled cleanup never fired");
-    await sleep(25);
-  }
+  for (let i = 0; i < 10 && (await clock.fireNext()); i++);
+  assert.equal(clock.pending, 0, "no scheduled run left behind");
   await cleanup.runPhysicalCleanup();
 }
 
@@ -414,11 +480,10 @@ test("a fresh deletion pulls a long pending retry timer forward; a later request
   bareDelete();
   cleanup.schedulePhysicalCleanup(250, 0);
   assert.ok(cleanup.scheduledCleanupDueInMs()! <= 250, "pulled forward");
-  const end = Date.now() + 15_000;
-  while (cleanup.readCleanupStatus(main).pending || cleanup.scheduledCleanupDueInMs() !== null) {
-    if (Date.now() > end) assert.fail("the pulled-forward run never completed");
-    await sleep(50);
-  }
+  assert.equal(clock.pending, 1, "still exactly one timer");
+  assert.equal(await clock.fireNext(), true);
+  assert.equal(cleanup.readCleanupStatus(main).pending, false);
+  assert.equal(cleanup.scheduledCleanupDueInMs(), null);
 });
 
 test("bookkeeping takes the write gate: it can never join a transaction another writer holds open on the main connection", async () => {
@@ -445,28 +510,86 @@ test("bookkeeping takes the write gate: it can never join a transaction another 
   assert.equal(await cleanup.runPhysicalCleanup(), "clean");
 });
 
-test("the route schedules the cleanup for EVERY delete-user and delete-user/callback response, whatever its status", async () => {
+test("isDeleteUserPath matches /delete-user and /delete-user/callback with or without a trailing slash, from the PATH only", () => {
+  for (const yes of [
+    "/api/auth/delete-user",
+    "/api/auth/delete-user/",
+    "/api/auth/delete-user/callback",
+    "/api/auth/delete-user/callback/",
+  ])
+    assert.equal(cleanup.isDeleteUserPath(yes), true, yes);
+  for (const no of [
+    "/api/auth/get-session",
+    "/api/auth/delete-user/other",
+    "/api/auth/delete-users",
+    "/api/auth/xdelete-user/callbackz",
+    "/api/auth/delete-user//",
+    "/api/auth/",
+  ])
+    assert.equal(cleanup.isDeleteUserPath(no), false, no);
+  // Query and fragment are not part of the pathname, so they can neither hide nor fake a match.
+  const path = (u: string) => new URL(u, "http://x.test").pathname;
+  assert.equal(cleanup.isDeleteUserPath(path("/api/auth/delete-user/?a=1#f")), true);
+  assert.equal(cleanup.isDeleteUserPath(path("/api/auth/delete-user/callback?token=a/b")), true);
+  assert.equal(cleanup.isDeleteUserPath(path("/api/auth/get-session?next=/delete-user")), false);
+  assert.equal(cleanup.isDeleteUserPath(path("/api/auth/get-session?x=/delete-user/callback/")), false);
+});
+
+test("the route schedules the cleanup for EVERY delete-user and delete-user/callback response (with or without a trailing slash, any query), whatever its status", async () => {
   await drainTimer();
   const route = await import("../src/app/api/auth/[...all]/route");
-  const post = await route.POST(
-    new NextRequest(origin + "/api/auth/delete-user", {
-      method: "POST",
-      headers: { origin, "content-type": "application/json" },
-      body: JSON.stringify({ password: "nothing" }),
-    }),
-  );
-  assert.ok(post.status >= 400, `signed-out delete is refused (got ${post.status})`);
+  const post = (p: string) =>
+    route.POST(
+      new NextRequest(origin + p, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({ password: "nothing" }),
+      }),
+    );
+  const get = (p: string) => route.GET(new NextRequest(origin + p, { headers: { origin } }));
+
+  const first = await post("/api/auth/delete-user");
+  assert.ok(first.status >= 400, `signed-out delete is refused (got ${first.status})`);
   assert.notEqual(cleanup.scheduledCleanupDueInMs(), null, "scheduled although the response was an error");
   await drainTimer();
-  const get = await route.GET(
-    new NextRequest(origin + "/api/auth/delete-user/callback?token=nope", { headers: { origin } }),
-  );
-  void get;
-  assert.notEqual(cleanup.scheduledCleanupDueInMs(), null, "the callback path is covered too");
+  for (const [label, call] of [
+    ["POST /delete-user/", () => post("/api/auth/delete-user/")],
+    ["POST /delete-user?x=1", () => post("/api/auth/delete-user?x=1")],
+    ["GET /delete-user/callback", () => get("/api/auth/delete-user/callback?token=nope")],
+    ["GET /delete-user/callback/", () => get("/api/auth/delete-user/callback/?token=nope")],
+  ] as const) {
+    await call();
+    assert.notEqual(cleanup.scheduledCleanupDueInMs(), null, `${label} is covered`);
+    await drainTimer();
+  }
+  for (const other of ["/api/auth/get-session", "/api/auth/get-session?next=/delete-user", "/api/auth/get-session?x=/delete-user/callback/"]) {
+    await get(other);
+    assert.equal(cleanup.scheduledCleanupDueInMs(), null, `${other} schedules nothing`);
+  }
+});
+
+test("a checkpoint result is proof only with explicit documented values: log undefined, missing or non-numeric fields are never accepted", async () => {
+  for (const ok of [{ busy: 0, log: 0 }, { busy: 0, log: -1 }]) assert.equal(cleanup.checkpointComplete(ok), true, JSON.stringify(ok));
+  for (const bad of [
+    { busy: 0 },
+    { busy: 0, log: undefined },
+    { busy: 0, log: 2 },
+    { busy: 1, log: 0 },
+    { busy: 1, log: -1 },
+    { busy: 0, log: "0" as unknown as number },
+    { busy: 0, log: null as unknown as number },
+    { busy: undefined as unknown as number, log: 0 },
+  ])
+    assert.equal(cleanup.checkpointComplete(bad), false, JSON.stringify(bad));
   await drainTimer();
-  const other = await route.GET(new NextRequest(origin + "/api/auth/get-session", { headers: { origin } }));
-  void other;
-  assert.equal(cleanup.scheduledCleanupDueInMs(), null, "other auth paths schedule nothing");
+  bareDelete();
+  const outcome = await cleanup.runPhysicalCleanup({
+    budgetMs: 300,
+    checkpoint: () => ({ busy: 0 }), // no log field: SQLite did not tell us the log was reset
+  });
+  assert.equal(outcome, "busy", "not accepted as a clean checkpoint");
+  assert.equal(cleanup.readCleanupStatus(main).pending, true, "still owed");
+  assert.equal(await cleanup.runPhysicalCleanup(), "clean");
 });
 
 test("restart recovery: a deletion committed but never cleaned is still owed after the connections are reopened, and is then finished", async () => {
@@ -489,5 +612,5 @@ test("restart recovery: a deletion committed but never cleaned is still owed aft
   assert.equal(cleanup.readCleanupStatus(main).pending, true, "the owed mark is durable");
   assert.equal(await cleanup.runPhysicalCleanup(), "clean");
   for (const marker of Object.values(m)) assert.deepEqual(where(marker), []);
-  assert.ok(walSize() <= TINY_WAL);
+  assertWalHoldsBookkeepingOnly("after restart recovery");
 });

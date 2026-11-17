@@ -164,3 +164,46 @@ END;`);
   migrate(db, database.migrateApplicationSchema);
   assert.equal(database.applicationMigrationApplied(db), true);
 });
+
+test("a hand-damaged missing physical_cleanup counter row (or whole table) can never be recreated clean: it comes back with a cleanup owed", async () => {
+  const database = await import("../src/server/database");
+  const cleanup = await import("../src/server/physicalCleanup");
+  const db = database.getDatabase();
+  assert.equal(await cleanup.runPhysicalCleanup(), "clean");
+  const ledger = (db.prepare("SELECT COUNT(*) AS n FROM account_deletions").get() as { n: number }).n;
+  assert.ok(ledger >= 3, "the ledger has history (legacy tombstones plus real deletions)");
+
+  // (a) the counter row is gone, migration row and table still there.
+  db.exec("DELETE FROM physical_cleanup");
+  assert.equal(database.applicationMigrationApplied(db), false, "not ready");
+  migrate(db, database.migrateApplicationSchema);
+  let status = cleanup.readCleanupStatus(db);
+  assert.equal(status.migrated, true);
+  assert.equal(status.pending, true, "owed, never silently clean");
+  assert.equal(status.requested, 1);
+  assert.equal(status.completed, 0);
+  assert.ok(status.pendingSinceMs && status.pendingSinceMs > 0);
+  assert.equal(status.legacyDeletions, ledger, "unknowable, so every ledger row is counted as possible legacy residue (upper bound)");
+  // Idempotent: a second migration does not clear or double the debt.
+  migrate(db, database.migrateApplicationSchema);
+  assert.deepEqual(cleanup.readCleanupStatus(db), status);
+  // Only a real, verified checkpoint clears it.
+  assert.equal(await cleanup.runPhysicalCleanup(), "clean");
+  assert.equal(cleanup.readCleanupStatus(db).pending, false);
+
+  // (b) the whole table is gone but the migration row survives: still damage, not a first migration.
+  db.exec("DROP TABLE physical_cleanup");
+  migrate(db, database.migrateApplicationSchema);
+  status = cleanup.readCleanupStatus(db);
+  assert.equal(status.pending, true, "a dropped table with a recorded migration is damage too");
+  assert.equal(status.legacyDeletions, ledger);
+  assert.equal(await cleanup.runPhysicalCleanup(), "clean");
+
+  // (c) contrast: the very first migration (no table, no migration row) owes nothing.
+  db.exec("DROP TABLE physical_cleanup");
+  db.prepare("DELETE FROM schema_migrations WHERE id=?").run(database.PHYSICAL_CLEANUP_MIGRATION);
+  migrate(db, database.migrateApplicationSchema);
+  status = cleanup.readCleanupStatus(db);
+  assert.equal(status.pending, false, "a genuine first migration is clean");
+  assert.equal(status.legacyDeletions, ledger);
+});

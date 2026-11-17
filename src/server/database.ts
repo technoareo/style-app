@@ -15,10 +15,19 @@ import { acquireWriteGate } from "./writeGate";
  * from request input.
  */
 export function getDataDir(): string {
-  const dir =
-    process.env.STYLE_DATA_DIR?.trim() || path.join(process.cwd(), ".data");
+  const dir = resolveDataDir();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
+}
+
+/**
+ * The configured data directory, resolved WITHOUT touching the filesystem (no
+ * mkdir, no stat). Read-only commands (status, inspection) use this so that
+ * pointing them at a path that does not exist creates nothing; everything that
+ * opens or writes uses {@link getDataDir}, which creates the directory.
+ */
+export function resolveDataDir(): string {
+  return process.env.STYLE_DATA_DIR?.trim() || path.join(process.cwd(), ".data");
 }
 
 let database: DatabaseSync | null = null;
@@ -485,6 +494,15 @@ function migratePhysicalCleanup(db: DatabaseSync): void {
   // Needs Better Auth's `user` table and the ledger table (APPLICATION_SCHEMA).
   // Without them there is nothing to attach to: not recorded, so it re-runs.
   if (!tableExists(db, "user") || !tableExists(db, "account_deletions")) return;
+  // Decide BEFORE creating anything whether this is the FIRST 034 migration of
+  // this database. The table is created and the counter row inserted in this
+  // same transaction, so a database that already has the table or the recorded
+  // migration but NO counter row was damaged (hand edit, partial restore, bug).
+  const firstMigration =
+    !tableExists(db, "physical_cleanup") &&
+    !db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(PHYSICAL_CLEANUP_MIGRATION);
   db.exec(`
 CREATE TABLE IF NOT EXISTS physical_cleanup (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -499,9 +517,26 @@ CREATE TABLE IF NOT EXISTS physical_cleanup (
   created_at INTEGER NOT NULL
 );
 `);
-  db.prepare(
-    "INSERT OR IGNORE INTO physical_cleanup(id,legacy_deletions,created_at) VALUES(1,(SELECT COUNT(*) FROM account_deletions),?)",
-  ).run(Date.now());
+  if (!db.prepare("SELECT 1 AS ok FROM physical_cleanup WHERE id=1").get()) {
+    const now = Date.now();
+    if (firstMigration) {
+      // Every ledger row so far predates secure_delete: legacy, nothing owed.
+      db.prepare(
+        "INSERT INTO physical_cleanup(id,legacy_deletions,created_at) VALUES(1,(SELECT COUNT(*) FROM account_deletions),?)",
+      ).run(now);
+    } else {
+      // Damaged: the counters are lost and the ledger (tombstones only) cannot
+      // say which deletions were already cleaned, so the state is unknowable.
+      // Assume the worst and NEVER recreate it clean: one cleanup is owed (a
+      // single truncating checkpoint cleans everything committed so far) and
+      // every ledger row is counted as possible legacy residue (an upper bound
+      // that may over-report, never under-report). A needless extra checkpoint
+      // is the whole cost of being wrong.
+      db.prepare(
+        "INSERT INTO physical_cleanup(id,requested,completed,pending_since,legacy_deletions,created_at) VALUES(1,1,0,?,(SELECT COUNT(*) FROM account_deletions),?)",
+      ).run(now, now);
+    }
+  }
   const verification = tableExists(db, "verification")
     ? "DELETE FROM verification WHERE value = OLD.id OR identifier = OLD.email;"
     : "";

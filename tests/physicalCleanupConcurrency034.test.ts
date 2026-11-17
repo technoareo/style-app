@@ -193,3 +193,36 @@ test("the operator command: strict arguments, no mail or launch configuration ne
     "no user data printed",
   );
 });
+
+test("the operator command's status against a configured path that does not exist creates neither a database nor the data directory", async () => {
+  const { runScript } = await import("./helpers/processes");
+  const { resolveDataDir } = await import("../src/server/database");
+  const root = path.join(dataDir, "absent-parent-" + randomUUID().slice(0, 8));
+  const target = path.join(root, "not", "yet", "there");
+  const env = { APP_URL: "http://127.0.0.1:3000", STYLE_PUBLIC_DEPLOYMENT: "", SMTP_URL: "", STYLE_DATA_DIR: target };
+  assert.equal(existsSync(root), false, "precondition: even the parent is absent");
+
+  const r = await runScript("scripts/cleanup-deleted-data.ts", [], env);
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /^CLEANUP_NO_DATABASE: there is no database in the data directory\.\s*$/);
+  assert.equal(r.stdout, "");
+  assert.ok(!r.stderr.includes(root) && !r.stderr.includes(target), "the fixed message names no path");
+  assert.equal(existsSync(root), false, "no parent directory was created");
+  assert.equal(existsSync(target), false, "no data directory was created");
+
+  // --run is refused the same way (it does not open or create anything either).
+  const run = await runScript("scripts/cleanup-deleted-data.ts", ["--run"], env);
+  assert.equal(run.code, 1);
+  assert.match(run.stderr, /^CLEANUP_NO_DATABASE:/);
+  assert.equal(existsSync(root), false);
+
+  // The pure resolver reads the environment and touches nothing.
+  const saved = process.env.STYLE_DATA_DIR;
+  process.env.STYLE_DATA_DIR = target;
+  try {
+    assert.equal(resolveDataDir(), target);
+  } finally {
+    process.env.STYLE_DATA_DIR = saved;
+  }
+  assert.equal(existsSync(root), false, "resolveDataDir created nothing");
+});

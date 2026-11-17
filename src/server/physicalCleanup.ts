@@ -107,7 +107,7 @@ export function readCleanupStatus(db: DatabaseSync): CleanupStatus {
   };
 }
 
-export type CheckpointResult = { busy: number; log?: number };
+export type CheckpointResult = { busy: number; log?: number | undefined };
 
 export type CleanupOptions = {
   /** Total time this call may spend (default 5 s). */
@@ -139,12 +139,24 @@ function defaultCheckpoint(db: DatabaseSync): CheckpointResult {
 }
 
 /**
- * A truncating checkpoint is complete only when it was not blocked (busy = 0)
- * AND the log was reset (log = 0, or -1 when the database is not in WAL mode).
- * Anything else, including a missing row, is not proof.
+ * A truncating checkpoint is complete only when the result carries EXPLICIT
+ * documented success values: busy = 0 AND log = 0 (the log was reset), or
+ * log = -1, which SQLite documents for a database that is not in WAL mode
+ * (there was no log to truncate). A missing or non-numeric field, a blocked
+ * checkpoint, or log > 0 is not proof; `undefined` is never accepted.
  */
-function checkpointComplete(r: CheckpointResult): boolean {
-  return r.busy === 0 && (r.log === undefined || r.log === 0 || r.log === -1);
+export function checkpointComplete(r: CheckpointResult): boolean {
+  return r.busy === 0 && (r.log === 0 || r.log === -1);
+}
+
+/**
+ * True for the paths whose requests may have committed an account deletion:
+ * `.../delete-user` and `.../delete-user/callback`, each with or without a
+ * trailing slash. Takes a PATHNAME (from `new URL(url).pathname`), so a query
+ * string or fragment can neither hide a match nor fake one.
+ */
+export function isDeleteUserPath(pathname: string): boolean {
+  return /\/delete-user(?:\/callback)?\/?$/.test(pathname);
 }
 
 const MAX_JOINED_RERUNS = 3;
@@ -278,14 +290,45 @@ async function recordFailure(db: DatabaseSync, kind: "busy" | "error"): Promise<
 
 const RETRY_DELAYS_MS = [2_000, 10_000, 60_000, 300_000];
 const TIMER = Symbol.for("style-studio.physicalCleanup.timer");
-type TimerState = { timer: ReturnType<typeof setTimeout>; dueAt: number };
+type TimerHandle = unknown;
+type TimerState = { timer: TimerHandle; dueAt: number };
 const timerState = () =>
   (globalThis as unknown as Record<symbol, TimerState | undefined>)[TIMER];
+
+/**
+ * Test seam. Production never sets it. A test can replace the scheduler's clock
+ * (so no real time has to pass: it fires timers by hand and awaits the run the
+ * timer callback returns) and the options of scheduled runs (a short budget
+ * instead of the 5 s default while another connection holds the database busy).
+ * The scheduling logic itself (single timer, pull-forward, backoff chain) is the
+ * production code either way.
+ */
+export type CleanupClock = {
+  now(): number;
+  setTimeout(fn: () => unknown, ms: number): TimerHandle;
+  clearTimeout(handle: TimerHandle): void;
+};
+const realClock: CleanupClock = {
+  now: () => Date.now(),
+  setTimeout: (fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    timer.unref?.();
+    return timer;
+  },
+  clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+let testHooks: { clock?: CleanupClock; runOptions?: CleanupOptions } | null = null;
+export function setCleanupTestHooks(
+  hooks: { clock?: CleanupClock; runOptions?: CleanupOptions } | null,
+): void {
+  testHooks = hooks;
+}
+const clock = () => testHooks?.clock ?? realClock;
 
 /** Milliseconds until the pending scheduled run, or null (diagnostics and tests). */
 export function scheduledCleanupDueInMs(): number | null {
   const t = timerState();
-  return t ? Math.max(0, t.dueAt - Date.now()) : null;
+  return t ? Math.max(0, t.dueAt - clock().now()) : null;
 }
 
 /**
@@ -300,15 +343,17 @@ export function scheduledCleanupDueInMs(): number | null {
 export function schedulePhysicalCleanup(delayMs = 250, step = 0): void {
   try {
     const g = globalThis as unknown as Record<symbol, TimerState | undefined>;
-    const dueAt = Date.now() + delayMs;
+    const c = clock();
+    const dueAt = c.now() + delayMs;
     const current = g[TIMER];
     if (current) {
       if (current.dueAt <= dueAt) return;
-      clearTimeout(current.timer);
+      c.clearTimeout(current.timer);
     }
-    const timer = setTimeout(() => {
+    const timer = c.setTimeout(() => {
       g[TIMER] = undefined;
-      void runPhysicalCleanup().then((outcome) => {
+      // The returned promise is ignored by a real timer; a test clock awaits it.
+      return runPhysicalCleanup(testHooks?.runOptions).then((outcome) => {
         if (
           (outcome === "busy" || outcome === "failed" || outcome === "pending") &&
           step < RETRY_DELAYS_MS.length
@@ -316,7 +361,6 @@ export function schedulePhysicalCleanup(delayMs = 250, step = 0): void {
           schedulePhysicalCleanup(RETRY_DELAYS_MS[step], step + 1);
       });
     }, delayMs);
-    timer.unref?.();
     g[TIMER] = { timer, dueAt };
   } catch {
     // Scheduling is best effort; the durable mark is what matters.

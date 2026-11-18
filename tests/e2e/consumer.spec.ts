@@ -12,11 +12,11 @@ test("consumer can create, style, save, edit and reload wardrobe", async ({
     page.getByRole("button", { name: "Save look", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Save look", exact: true }).click();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Everyday tee", { exact: true })).toBeVisible();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Edit Everyday tee", exact: true })
@@ -27,10 +27,10 @@ test("consumer can create, style, save, edit and reload wardrobe", async ({
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("My white tee", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Everyday tee", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.screenshot({
@@ -64,7 +64,7 @@ test("backup merges into the signed-in account and invalid backup preserves data
   ).toBeVisible();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Everyday tee", { exact: true })).toHaveCount(2);
   await page.getByLabel("Restore backup", { exact: true }).setInputFiles({
@@ -137,7 +137,7 @@ test("upload review validates detections, crop, cancel, and persistence", async 
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
 });
@@ -191,7 +191,7 @@ test("manual item entry stays focused and Escape closes dialog", async ({
   await page.goto("/");
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await page.getByRole("button", { name: "Add an item manually" }).click();
   await page

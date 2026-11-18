@@ -127,9 +127,9 @@ test("winter with a hot day warns, and the chosen season is saved with the look"
   await page.getByLabel("Temperature · °C").fill("5");
   await expect(page.getByText(/Winter is selected but/)).toHaveCount(0);
   await page.getByRole("button", { name: "Save look", exact: true }).click();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText(/· everyday · winter/)).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText(/· everyday · winter/)).toBeVisible();
 });

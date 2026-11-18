@@ -19,6 +19,17 @@ npx tsx scripts/mail-worker.ts
 
 To use a different vision model locally, put `VISION_MODEL` in `.env.local`: the web process (Next.js) and the analysis worker both read it (the worker uses Next's own `@next/env` loader), and a variable already set in the shell wins. See `.env.example` for the accepted syntax. Restart both processes after changing it.
 
+An experimental fashion-specific provider is also available for the supported
+single-item workflow. Install `services/fashion-vision-requirements.txt` in an
+isolated Python environment, set `STYLE_VISION_PROVIDER=fashionclip`, and set
+`FASHION_MODEL_PYTHON` to that environment's Python executable. It runs the
+Apache-2.0 `Marqo/marqo-fashionCLIP` model in a separate process, extracts the dominant colour with a
+deterministic pixel algorithm, and falls back to the configured Qwen model when
+category confidence is low. This is benchmark infrastructure, not an accuracy
+claim. Keep it disabled for public use until the rights-cleared evaluation gates
+are met. BiRefNet Lite cutouts remain gated on a final training-data licence
+review and are not enabled by this setting.
+
 **Dev versus compiled launch.** The commands above (`npm run dev` plus a worker with no `NODE_ENV`) both use Next's development settings, so they read the same `.env*` files. The compiled app (`npm run build`, then `npm run start`) runs in production mode: start its worker the same way, `$env:NODE_ENV = 'production'; npx tsx scripts/analysis-worker.ts` in PowerShell (or just use `scripts/start-local.ps1`, which does). A worker started without it would read the development files while the compiled web process reads the production ones, and a setting in `.env.development` or `.env.production` could then differ between them; keep shared settings such as `VISION_MODEL` in `.env.local` (read in both modes) to avoid this.
 
 The mail worker is optional in development without `SMTP_URL` (the web process captures mail itself) and required whenever `SMTP_URL` is set.

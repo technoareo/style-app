@@ -25,6 +25,7 @@ import {
   type Analysis,
   type AnalysisMode,
 } from "../domain/analysis";
+import { analyzeWithFashionClip, fashionClipCanStart } from "./fashionClip";
 
 /** Thrown for any photo/model problem that should surface a safe, user-facing message. */
 export class VisionError extends Error {
@@ -369,11 +370,13 @@ export function ollamaUrl(): string {
 
 /** Whether the configured vision model is currently reachable and loaded. */
 export async function isModelAvailable(): Promise<boolean> {
-  const model = visionModelOrNull();
-  if (!model) return false;
   // A malformed STYLE_ANALYSIS_MODE refuses new jobs (see enqueueAnalysisJob),
   // so readiness must say so instead of offering uploads that cannot be accepted.
   if (parseAnalysisMode(process.env.STYLE_ANALYSIS_MODE) === null) return false;
+  if (process.env.STYLE_VISION_PROVIDER?.trim().toLowerCase() === "fashionclip")
+    return fashionClipCanStart();
+  const model = visionModelOrNull();
+  if (!model) return false;
   // Ollama lists an untagged pull as "<name>:latest".
   const wanted = model.includes(":") ? model : `${model}:latest`;
   try {
@@ -429,14 +432,38 @@ export async function analyzePhoto(
 ): Promise<VisionResult> {
   const mode = options.mode ?? ANALYSIS_MODE;
   const single = mode === "single";
-  const model = visionModelOrNull();
-  // A malformed VISION_MODEL is a server configuration fault: refundable, and
-  // no request is sent to Ollama.
-  if (!model) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
   const visionImage = await sharp(normalized)
     .resize(IMAGE_PROCESSING.modelCopy.maxSide, IMAGE_PROCESSING.modelCopy.maxSide, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: IMAGE_PROCESSING.modelCopy.jpegQuality })
     .toBuffer();
+
+  if (single && process.env.STYLE_VISION_PROVIDER?.trim().toLowerCase() === "fashionclip") {
+    try {
+      if (signal?.aborted) throw new Error("aborted");
+      const analysis = await analyzeWithFashionClip(visionImage);
+      if (signal?.aborted) throw new Error("aborted");
+      const item = analysis.items[0];
+      const confident = item && item.category !== "Unsorted" && item.confidence >= 0.42;
+      if (confident || process.env.FASHION_QWEN_FALLBACK === "0") {
+        return {
+          analysis,
+          image: `data:image/jpeg;base64,${normalized.toString("base64")}`,
+        };
+      }
+      // Low-confidence FashionCLIP results fall through to the existing Qwen
+      // path. This is intentionally deterministic and can be disabled for a
+      // fully offline FashionCLIP-only benchmark.
+    } catch {
+      if (process.env.FASHION_QWEN_FALLBACK === "0")
+        throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
+      // A model-load or inference failure uses the proven Qwen path below.
+    }
+  }
+
+  const model = visionModelOrNull();
+  // A malformed VISION_MODEL is a server configuration fault: refundable, and
+  // no request is sent to Ollama.
+  if (!model) throw new VisionError(UNAVAILABLE_MESSAGE, "unavailable");
 
   // One explicit deadline for the whole inference. Reaching it while the caller
   // has not aborted means the photo is too slow to analyze here; any other

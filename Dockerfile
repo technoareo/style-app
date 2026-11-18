@@ -33,3 +33,18 @@ COPY --from=build --chown=style:style /app/tsconfig.json ./tsconfig.json
 USER style
 EXPOSE 3000
 CMD ["node", "server.js"]
+
+# Optional benchmark image. The normal/default image above remains Python- and
+# Torch-free. Build explicitly with: docker build --target fashion-vision .
+FROM runtime AS fashion-vision
+USER root
+COPY --from=build /app/services/fashion-vision-requirements.txt /tmp/fashion-vision-requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv /opt/fashion-vision \
+    && /opt/fashion-vision/bin/pip install --no-cache-dir --require-hashes -r /tmp/fashion-vision-requirements.txt
+COPY --from=build --chown=style:style /app/scripts/fashion_clip_inference.py /app/scripts/setup_fashion_clip.py ./scripts/
+ENV FASHION_MODEL_PYTHON=/opt/fashion-vision/bin/python FASHION_MODEL_DIR=/models/fashionclip
+USER style
+
+# Keep the ordinary runtime as Docker's default final image.
+FROM runtime AS final

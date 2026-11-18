@@ -437,10 +437,15 @@ export async function analyzePhoto(
     .jpeg({ quality: IMAGE_PROCESSING.modelCopy.jpegQuality })
     .toBuffer();
 
+  let providerDeadline: AbortSignal | undefined;
   if (single && process.env.STYLE_VISION_PROVIDER?.trim().toLowerCase() === "fashionclip") {
+    // One budget covers FashionCLIP and any Qwen fallback. The established Qwen
+    // path keeps its existing deadline semantics when FashionCLIP is disabled.
+    providerDeadline = AbortSignal.timeout(limits().inferenceTimeoutMs);
+    const chainSignal = signal ? AbortSignal.any([providerDeadline, signal]) : providerDeadline;
     try {
       if (signal?.aborted) throw new Error("aborted");
-      const analysis = await analyzeWithFashionClip(visionImage);
+      const analysis = await analyzeWithFashionClip(visionImage, chainSignal);
       if (signal?.aborted) throw new Error("aborted");
       const item = analysis.items[0];
       const confident = item && item.category !== "Unsorted" && item.confidence >= 0.42;
@@ -468,10 +473,10 @@ export async function analyzePhoto(
   // One explicit deadline for the whole inference. Reaching it while the caller
   // has not aborted means the photo is too slow to analyze here; any other
   // failure (unreachable, reset, caller abort) stays "unavailable".
-  const deadline = AbortSignal.timeout(limits().inferenceTimeoutMs);
   // Aborted by us (never by the deadline or the caller) when the answer is
   // refused, so a server that keeps the connection open stops generating. It is
   // a third, separate signal: it cannot change the classification below.
+  const deadline = providerDeadline ?? AbortSignal.timeout(limits().inferenceTimeoutMs);
   const upstream = new AbortController();
   let text: string;
   let doneReason: string | undefined;

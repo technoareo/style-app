@@ -21,14 +21,22 @@ To use a different vision model locally, put `VISION_MODEL` in `.env.local`: the
 
 An experimental fashion-specific provider is also available for the supported
 single-item workflow. Install `services/fashion-vision-requirements.txt` in an
-isolated Python environment, set `STYLE_VISION_PROVIDER=fashionclip`, and set
-`FASHION_MODEL_PYTHON` to that environment's Python executable. It runs the
+isolated Python environment, run `python scripts/setup_fashion_clip.py` once to
+download the reviewed revision and write its checksum manifest, then set
+`STYLE_VISION_PROVIDER=fashionclip`, `FASHION_MODEL_PYTHON` and
+`FASHION_MODEL_DIR`. Inference is offline and verifies the safetensors weights
+before every isolated process. It runs the
 Apache-2.0 `Marqo/marqo-fashionCLIP` model in a separate process, extracts the dominant colour with a
 deterministic pixel algorithm, and falls back to the configured Qwen model when
 category confidence is low. This is benchmark infrastructure, not an accuracy
 claim. Keep it disabled for public use until the rights-cleared evaluation gates
 are met. BiRefNet Lite cutouts remain gated on a final training-data licence
 review and are not enabled by this setting.
+
+The normal Docker image does not contain Python or Torch. The optional image is
+built explicitly with `docker build --target fashion-vision .`; the model is
+still downloaded as a separate setup step and is never baked into either image.
+See `docs/MODEL_LICENSE_REGISTER.md` for the owner-test-only legal gate.
 
 **Dev versus compiled launch.** The commands above (`npm run dev` plus a worker with no `NODE_ENV`) both use Next's development settings, so they read the same `.env*` files. The compiled app (`npm run build`, then `npm run start`) runs in production mode: start its worker the same way, `$env:NODE_ENV = 'production'; npx tsx scripts/analysis-worker.ts` in PowerShell (or just use `scripts/start-local.ps1`, which does). A worker started without it would read the development files while the compiled web process reads the production ones, and a setting in `.env.development` or `.env.production` could then differ between them; keep shared settings such as `VISION_MODEL` in `.env.local` (read in both modes) to avoid this.
 

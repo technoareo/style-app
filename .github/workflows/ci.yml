@@ -53,6 +53,8 @@ jobs:
       # it is built (this job does not need the build job's result to be audited).
       - name: Audit runtime dependencies (fails on any vulnerability)
         run: npm audit --omit=dev
+      - name: Build optional FashionCLIP layer (model remains external and disabled)
+        run: docker build --target fashion-vision -t style-studio:fashion-vision-ci .
       - run: docker build -t style-studio:ci .
       - name: Start mock model, app, AI worker and mail worker
         run: |

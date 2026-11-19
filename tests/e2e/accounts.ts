@@ -2,6 +2,7 @@ import { test as base, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { getReadyAuth } from "../../src/server/auth";
+import { settleLocalCapture } from "../../src/server/mailOutbox";
 import { linkOf, waitForMail } from "../helpers/mailCapture";
 export { expect };
 
@@ -31,6 +32,11 @@ export const test = base.extend<{ accountId: string }>({
     await auth.api.verifyEmail({
       query: { token: url.searchParams.get("token")! },
     });
+    // Verification mail is written by the durable outbox drain. Wait for that
+    // writer to release the shared database gate before the browser begins its
+    // wardrobe writes; otherwise the first test in a new viewport can inherit
+    // a hidden writer from the previous project.
+    await settleLocalCapture();
     await use(JSON.stringify({ id: result.user.id, email }));
   },
   context: async ({ context, accountId }, use) => {

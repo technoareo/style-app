@@ -2,7 +2,6 @@ import { test, expect } from "./accounts";
 test("consumer can create, style, save, edit and reload wardrobe", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
   await page.goto("/");
   await expect(page.getByText("Opening your wardrobe…")).not.toBeVisible();
   await expect(page.getByText("Let’s build your first look")).toBeVisible();
@@ -34,10 +33,16 @@ test("consumer can create, style, save, edit and reload wardrobe", async ({
   await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Everyday tee", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Today", exact: true }).click();
-  await page.screenshot({
-    path: `docs/verification/${test.info().project.name}.png`,
-    fullPage: true,
-  });
+  // Documentation captures are useful locally, but full-page screenshots can
+  // stall behind fixed mobile navigation on headless Linux. CI validates the
+  // journey and responsive-width assertion below instead of creating an
+  // uncollected image artifact.
+  if (!process.env.CI) {
+    await page.screenshot({
+      path: `docs/verification/${test.info().project.name}.png`,
+      fullPage: true,
+    });
+  }
   await page.getByLabel("Occasion", { exact: true }).selectOption("formal");
   await expect(page.getByText(/No complete formal outfit yet/)).toBeVisible();
   expect(

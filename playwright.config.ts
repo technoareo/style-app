@@ -10,6 +10,8 @@ export default defineConfig({
   use: {
     baseURL,
     headless: true,
+    actionTimeout: 10000,
+    navigationTimeout: 15000,
     channel: process.env.CI ? undefined : "chrome",
   },
   projects: [

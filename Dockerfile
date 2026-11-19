@@ -51,8 +51,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && r
 COPY --from=runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=runtime --chown=style:style /app /app
 COPY --from=build /app/services/fashion-vision-requirements.txt /tmp/fashion-vision-requirements.txt
+# Install exactly the audited CPU lock. Torch advertises optional Linux CUDA
+# extras that are neither needed nor approved for this CPU provider; --no-deps
+# prevents pip from adding that unaudited GPU stack.
 RUN python3 -m venv /opt/fashion-vision \
-    && /opt/fashion-vision/bin/pip install --no-cache-dir --require-hashes -r /tmp/fashion-vision-requirements.txt
+    && /opt/fashion-vision/bin/pip install --no-cache-dir --require-hashes --no-deps -r /tmp/fashion-vision-requirements.txt \
+    && /opt/fashion-vision/bin/python -c "import open_clip, torch, torchvision; assert torch.tensor([1]).sum().item() == 1"
 COPY --from=build --chown=style:style /app/scripts/fashion_clip_inference.py /app/scripts/setup_fashion_clip.py ./scripts/
 ENV FASHION_MODEL_PYTHON=/opt/fashion-vision/bin/python FASHION_MODEL_DIR=/models/fashionclip
 USER style

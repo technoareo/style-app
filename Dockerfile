@@ -34,13 +34,18 @@ USER style
 EXPOSE 3000
 CMD ["node", "server.js"]
 
+# Supply the optional layer with the same Python minor used to generate its
+# hash-locked dependency graph. Copying /usr/local from the official image
+# keeps the ordinary Node runtime and the default final image Python-free.
+FROM python:3.13.15-slim-bookworm AS fashion-python
+
 # Optional benchmark image. The normal/default image above remains Python- and
 # Torch-free. Build explicitly with: docker build --target fashion-vision .
 FROM runtime AS fashion-vision
 USER root
+COPY --from=fashion-python /usr/local /usr/local
 COPY --from=build /app/services/fashion-vision-requirements.txt /tmp/fashion-vision-requirements.txt
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates && rm -rf /var/lib/apt/lists/* \
-    && python3 -m venv /opt/fashion-vision \
+RUN python3 -m venv /opt/fashion-vision \
     && /opt/fashion-vision/bin/pip install --no-cache-dir --require-hashes -r /tmp/fashion-vision-requirements.txt
 COPY --from=build --chown=style:style /app/scripts/fashion_clip_inference.py /app/scripts/setup_fashion_clip.py ./scripts/
 ENV FASHION_MODEL_PYTHON=/opt/fashion-vision/bin/python FASHION_MODEL_DIR=/models/fashionclip

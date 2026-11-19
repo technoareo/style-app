@@ -17,6 +17,9 @@ use.
 - Internal provider/model/version/per-field provenance. Consumer evidence no
   longer displays uncalibrated percentages.
 - Optional `fashion-vision` Docker target; the default image remains unchanged.
+- The Linux optional image installs the official hash-pinned PyTorch CPU wheels
+  before the cross-platform lock, refuses implicit dependencies, and proves
+  Torch, TorchVision and OpenCLIP imports plus a tensor operation while building.
 - Owner-test-only model licence register; FashionCLIP and BiRefNet remain
   blocked for beta/public use.
 

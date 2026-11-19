@@ -2,3 +2,7 @@ torch==2.15.0
 open_clip_torch==4.2.2
 pillow==13.0.0
 huggingface_hub==1.1.2
+# The optional image installs Debian bookworm's Python 3.11. NetworkX 3.7
+# requires Python 3.12+, so keep Torch's transitive dependency compatible with
+# the runtime we actually build and audit.
+networkx==3.6.1

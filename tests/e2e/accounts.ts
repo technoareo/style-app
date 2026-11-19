@@ -4,6 +4,10 @@ import path from "node:path";
 import { getReadyAuth } from "../../src/server/auth";
 import { linkOf, waitForMail } from "../helpers/mailCapture";
 export { expect };
+
+const testPort = process.env.PLAYWRIGHT_PORT ?? "3000";
+const testOrigin = `http://127.0.0.1:${testPort}`;
+
 export const test = base.extend<{ accountId: string }>({
   accountId: async ({}, use) => {
     // Disposable fixture accounts use the same auth implementation and private
@@ -42,7 +46,7 @@ export const test = base.extend<{ accountId: string }>({
       return {
         name: pair.slice(0, index),
         value: pair.slice(index + 1),
-        url: "http://127.0.0.1:3000",
+        url: testOrigin,
         httpOnly: true,
         sameSite: "Lax" as const,
       };

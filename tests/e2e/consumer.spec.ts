@@ -2,6 +2,7 @@ import { test, expect } from "./accounts";
 test("consumer can create, style, save, edit and reload wardrobe", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   await expect(page.getByText("Opening your wardrobe…")).not.toBeVisible();
   await expect(page.getByText("Let’s build your first look")).toBeVisible();

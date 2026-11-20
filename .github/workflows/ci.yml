@@ -39,7 +39,9 @@ jobs:
         with:
           name: build-038-mobile-review
           path: docs/verification/build-038
-          if-no-files-found: error
+          # A failure before Playwright starts already fails the job. Avoid
+          # adding a misleading second failure when no screenshots exist yet.
+          if-no-files-found: warn
           retention-days: 14
 
   # Build 008. Builds the real image and runs app + AI worker + mail worker in

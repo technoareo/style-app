@@ -149,7 +149,21 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
       .prepare("SELECT revision,data_json FROM wardrobe_spaces WHERE user_id=?")
       .get(alice) as { revision: number; data_json: string };
     assert.equal(wardrobeRow.revision, 3);
-    assert.equal(wardrobeRow.data_json, wardrobe, "wardrobe and saved looks intact");
+    assert.deepEqual(JSON.parse(wardrobeRow.data_json), {
+      version: 1,
+      name: "Alice",
+      wardrobe: [
+        {
+          id: "tee",
+          status: "available",
+          unavailableUntil: null,
+          fit: "unknown",
+          formality: "unknown",
+          warmth: "unknown",
+        },
+      ],
+      looks: [{ id: "look-1" }],
+    }, "wardrobe and saved looks survive with the additive capture backfill");
     assert.equal(
       Buffer.from(
         (

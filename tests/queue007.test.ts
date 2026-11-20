@@ -2,7 +2,7 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -19,6 +19,30 @@ process.env.STYLE_DATA_DIR = path.join(
 );
 process.env.APP_URL = "http://127.0.0.1:3000";
 mkdirSync(process.env.STYLE_DATA_DIR, { recursive: true });
+const DATA_DIR = process.env.STYLE_DATA_DIR;
+
+// Hermetic configuration. These tests drive the real worker against a mock
+// model, so any model/queue setting inherited from the launching shell (an
+// invalid VISION_MODEL, a short STYLE_INFERENCE_TIMEOUT_MS, a malformed
+// STYLE_ANALYSIS_MODE, ...) changes behaviour: with a bad VISION_MODEL every
+// worker test fails fast as "unavailable" and the mock never sees a request.
+// Cleared before anything is imported and again by every reset().
+const AMBIENT_CONFIG = [
+  "VISION_MODEL",
+  "VISION_PROMPT",
+  "STYLE_ANALYSIS_MODE",
+  "STYLE_ANALYSIS_ESTIMATE_MS",
+  "STYLE_DAILY_ANALYSES",
+  "STYLE_DAILY_ATTEMPTS",
+  "STYLE_INFERENCE_TIMEOUT_MS",
+  "STYLE_JOB_WATCH_MS",
+  "STYLE_QUEUE_MAX_ACTIVE",
+  "STYLE_REVIEW_BUDGET_MS",
+];
+const clearAmbientConfig = () => {
+  for (const name of AMBIENT_CONFIG) delete process.env[name];
+};
+clearAmbientConfig();
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function until(check: () => boolean, ms = 5000) {
@@ -108,13 +132,7 @@ function reset() {
   db.exec(
     "DELETE FROM analysis_jobs; DELETE FROM usage_daily; DELETE FROM analysis_timings;",
   );
-  for (const name of [
-    "STYLE_ANALYSIS_ESTIMATE_MS",
-    "STYLE_QUEUE_MAX_ACTIVE",
-    "STYLE_DAILY_ATTEMPTS",
-    "STYLE_REVIEW_BUDGET_MS",
-  ])
-    delete process.env[name];
+  clearAmbientConfig();
 }
 function failure(work: () => unknown) {
   try {
@@ -158,6 +176,12 @@ after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
   q?.releaseWorkerLock(OWNER);
   (await import("../src/server/database")).closeDatabases();
+  // Each run used to leave its data directory behind (thousands accumulated).
+  try {
+    rmSync(DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // Best effort: a locked file must not fail the run.
+  }
 });
 
 test("admission returns position, conservative wait and the server deadline, and refuses work that cannot be reviewed before expiry", async () => {
@@ -328,6 +352,47 @@ test("quota refunds are one-time, fair, and bounded by a separate attempts count
   assert.equal(blocked.status, 429);
   assert.equal(blocked.extra?.code, "attempt-limit");
   assert.ok((blocked.extra?.retryAfterSeconds as number) > 0);
+  reset();
+});
+
+test("refunds target the day that was charged, whatever created_at says (UTC-midnight independent)", async () => {
+  reset();
+  // The first hour of every UTC day used to break expiry refunds: the refund
+  // day was recomputed from created_at, so an upload older than the current day
+  // decremented a different row. Force that situation at any wall-clock time by
+  // moving created_at a full day back, then check every refund path.
+  const DAY = 86_400_000;
+  const u = await signUp("refund-day");
+  const job = q.enqueueAnalysisJob(u, image);
+  assert.equal(row(job.id)?.usage_day, new Date().toISOString().slice(0, 10));
+  assert.deepEqual(usage(u), { count: 1, attempts: 1 });
+  db.prepare("UPDATE analysis_jobs SET created_at=? WHERE id=?").run(
+    Date.now() - DAY - 3_600_001,
+    job.id,
+  );
+  q.cleanupOnStartup();
+  q.cleanupOnStartup();
+  assert.equal(row(job.id)?.status, "failed");
+  assert.deepEqual(usage(u), { count: 0, attempts: 1 }, "expiry refund hit the charged day");
+  assert.equal(row(job.id)?.refunded, 1);
+
+  // Cancelling while queued, with a skewed created_at, refunds the same row once.
+  const v = await signUp("refund-day");
+  const queued = q.enqueueAnalysisJob(v, image);
+  db.prepare("UPDATE analysis_jobs SET created_at=? WHERE id=?").run(
+    Date.now() - DAY,
+    queued.id,
+  );
+  assert.equal(q.cancelAnalysisJobForOwner(v, queued.id).refunded, true);
+  q.cancelAnalysisJobForOwner(v, queued.id);
+  assert.deepEqual(usage(v), { count: 0, attempts: 1 });
+
+  // Legacy rows without usage_day fall back to their upload day.
+  const w = await signUp("refund-day");
+  const legacy = q.enqueueAnalysisJob(w, image);
+  db.prepare("UPDATE analysis_jobs SET usage_day=NULL WHERE id=?").run(legacy.id);
+  assert.equal(q.cancelAnalysisJobForOwner(w, legacy.id).refunded, true);
+  assert.deepEqual(usage(w), { count: 0, attempts: 1 });
   reset();
 });
 

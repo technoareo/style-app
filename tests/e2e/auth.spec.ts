@@ -37,7 +37,7 @@ test("consumer signs up, verifies email, signs in and opens their wardrobe in an
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Let’s build your first look")).toBeVisible();
-  await page.getByRole("button", { name: "My wardrobe", exact: true }).click();
+  await page.getByRole("button", { name: "Closet", exact: true }).click();
   await page.getByRole("button", { name: "Add an item manually" }).click();
   await page
     .getByLabel("Item name", { exact: true })
@@ -53,7 +53,7 @@ test("consumer signs up, verifies email, signs in and opens their wardrobe in an
     await other.getByLabel("Password", { exact: true }).fill(password);
     await other.getByRole("button", { name: "Sign in", exact: true }).click();
     await other
-      .getByRole("button", { name: "My wardrobe", exact: true })
+      .getByRole("button", { name: "Closet", exact: true })
       .click();
     await expect(
       other.getByText("Cross-device white tee", { exact: true }),

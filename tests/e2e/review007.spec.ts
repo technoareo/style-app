@@ -222,7 +222,7 @@ test("a failed wardrobe save keeps the photo result; after reload and retry ther
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toHaveCount(1);
 });
@@ -258,7 +258,7 @@ test("a retry after a failed save in the same dialog adds the garment once", asy
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Corrected shirt", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Detected shirt", { exact: true })).toHaveCount(0);
@@ -293,7 +293,7 @@ test("a lost success response does not duplicate the garment when the same resul
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toHaveCount(1);
 });
@@ -324,7 +324,7 @@ test("a failed discard after a successful save is reported honestly and not offe
   state.failDelete = false;
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toHaveCount(1);
 });

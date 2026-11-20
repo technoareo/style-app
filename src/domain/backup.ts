@@ -51,6 +51,7 @@ export const backupSchema = z.object({
         id: z.string().max(100),
         name: z.string().max(100),
         occasion: z.string().max(60),
+        season: z.enum(SEASONS).optional(),
         createdAt: z.string().datetime(),
         items: z.array(garment).max(10),
       }),

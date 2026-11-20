@@ -2,6 +2,10 @@ import { test, expect } from "./accounts";
 test("consumer can create, style, save, edit and reload wardrobe", async ({
   page,
 }) => {
+  // This is deliberately a full consumer journey across five screens, two
+  // durable saves and a reload. Keep its overall budget realistic on mobile;
+  // the config's tighter per-action limit still identifies a stuck control.
+  test.setTimeout(60_000);
   await page.goto("/");
   await expect(page.getByText("Opening your wardrobe…")).not.toBeVisible();
   await expect(page.getByText("Let’s build your first look")).toBeVisible();
@@ -12,11 +16,11 @@ test("consumer can create, style, save, edit and reload wardrobe", async ({
     page.getByRole("button", { name: "Save look", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Save look", exact: true }).click();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Everyday tee", { exact: true })).toBeVisible();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Edit Everyday tee", exact: true })
@@ -27,16 +31,22 @@ test("consumer can create, style, save, edit and reload wardrobe", async ({
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("My white tee", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Saved looks", exact: true }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Everyday tee", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Today", exact: true }).click();
-  await page.screenshot({
-    path: `docs/verification/${test.info().project.name}.png`,
-    fullPage: true,
-  });
+  // Documentation captures are useful locally, but full-page screenshots can
+  // stall behind fixed mobile navigation on headless Linux. CI validates the
+  // journey and responsive-width assertion below instead of creating an
+  // uncollected image artifact.
+  if (!process.env.CI) {
+    await page.screenshot({
+      path: `docs/verification/${test.info().project.name}.png`,
+      fullPage: true,
+    });
+  }
   await page.getByLabel("Occasion", { exact: true }).selectOption("formal");
   await expect(page.getByText(/No complete formal outfit yet/)).toBeVisible();
   expect(
@@ -64,7 +74,7 @@ test("backup merges into the signed-in account and invalid backup preserves data
   ).toBeVisible();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Everyday tee", { exact: true })).toHaveCount(2);
   await page.getByLabel("Restore backup", { exact: true }).setInputFiles({
@@ -137,7 +147,7 @@ test("upload review validates detections, crop, cancel, and persistence", async 
   await page.reload();
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await expect(page.getByText("Detected shirt", { exact: true })).toBeVisible();
 });
@@ -191,7 +201,7 @@ test("manual item entry stays focused and Escape closes dialog", async ({
   await page.goto("/");
   await page
     .getByRole("complementary")
-    .getByRole("button", { name: "My wardrobe", exact: true })
+    .getByRole("button", { name: "Closet", exact: true })
     .click();
   await page.getByRole("button", { name: "Add an item manually" }).click();
   await page

@@ -7,10 +7,18 @@ services:
       STYLE_PUBLIC_DEPLOYMENT: "true"
       STYLE_DATA_DIR: /data
       OLLAMA_URL: http://ollama:11434
-      # Starting values, NOT measured capacity and not yet run in Docker.
+      # Build 032 launch information: STYLE_PRIVACY_URL, STYLE_TERMS_URL and
+      # STYLE_SUPPORT_URL are set in .env.production (this service's env_file),
+      # NOT here and NOT as Compose ${...} entries: an `environment:` entry with an
+      # empty default would silently override the .env.production value. Under
+      # STYLE_PUBLIC_DEPLOYMENT=true the app does not become ready (health stays
+      # { "ready": false }) unless all three are valid public https destinations
+      # (support may be a mailto: address); see docs/DEPLOYMENT.md. Only the app
+      # reads them; the worker and mailer ignore them.
+      # Starting values, NOT measured capacity (no load test has sized them).
       # Override in .env.production (STYLE_* names are in docs/DEPLOYMENT.md).
       NODE_OPTIONS: --max-old-space-size=768
-      # Build 017 (AUTHORED, NOT RUN): the ONE place the upload-body deadline is
+      # Build 017 (exercised in CI by the compose smoke test; not on an operator host): the ONE place the upload-body deadline is
       # set. Compose fills it from the project variable STYLE_BODY_READ_TIMEOUT_MS
       # in the project `.env` next to this file (shell and --env-file also work)
       # and the proxy gets the same expression and derives its own cap from it,
@@ -21,7 +29,7 @@ services:
       # because everything waits for this service to be healthy).
       STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ${STYLE_BODY_READ_TIMEOUT_MS:-20000}
     # Starting memory ceiling for the web process; size from the target-server
-    # load test. Untested here because Docker is unavailable.
+    # load test. Not sized by any load test yet.
     mem_limit: 1536m
     volumes:
       - app-data:/data
@@ -29,7 +37,8 @@ services:
       - "3000"
     depends_on:
       - ollama
-    # Build 017 guard (AUTHORED, NOT RUN). Two refusals, both before anything
+    # Build 017 guard (exercised in CI by the compose smoke test; not on an
+    # operator host). Two refusals, both before anything
     # starts, so the app never becomes healthy and the worker, mailer and proxy
     # (all wait for it) never start either:
     #  1. STYLE_BODY_READ_TIMEOUT_MS already present: it can only come from
@@ -41,10 +50,17 @@ services:
     #     proxy. The check text is identical to the proxy command's;
     #     tests/proxyConfig.test.ts keeps them identical.
     # Then the validated value is exported under the name the application reads.
+    # Build 029: the last step is `exec node server.js`, reached ONLY if
+    # init-auth succeeded (`&&`; a failed init-auth still exits non-zero and the
+    # server never starts). exec replaces the shell, so the Next server is PID 1
+    # and `docker stop` / `docker compose stop` deliver SIGTERM straight to it
+    # instead of to a shell that does not forward it and then waiting out Docker's
+    # stop timeout until SIGKILL. tests/composeAppSignal029.test.ts pins the exact
+    # command order; the CI compose smoke test measures the stop.
     command:
       - sh
       - -c
-      - 'if [ -n "$$STYLE_BODY_READ_TIMEOUT_MS" ]; then echo "STYLE_BODY_READ_TIMEOUT_MS is set in .env.production, where it is no longer read. Remove it there and set it in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; case "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" in ""|0*|*[!0-9]*|?|??|???|???????*) bad=1;; *) bad=0;; esac; if [ "$$bad" = 1 ] || [ "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" -gt 120000 ]; then echo "STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000 with no leading zero. Set it only in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; STYLE_BODY_READ_TIMEOUT_MS="$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS"; export STYLE_BODY_READ_TIMEOUT_MS; ./node_modules/.bin/tsx scripts/init-auth.ts && node server.js'
+      - 'if [ -n "$$STYLE_BODY_READ_TIMEOUT_MS" ]; then echo "STYLE_BODY_READ_TIMEOUT_MS is set in .env.production, where it is no longer read. Remove it there and set it in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; case "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" in ""|0*|*[!0-9]*|?|??|???|???????*) bad=1;; *) bad=0;; esac; if [ "$$bad" = 1 ] || [ "$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS" -gt 120000 ]; then echo "STYLE_BODY_READ_TIMEOUT_MS must be whole milliseconds from 1000 to 120000 with no leading zero. Set it only in the project .env next to compose.yaml, see docs/DEPLOYMENT.md" >&2; exit 1; fi; STYLE_BODY_READ_TIMEOUT_MS="$$STYLE_COMPOSE_BODY_READ_TIMEOUT_MS"; export STYLE_BODY_READ_TIMEOUT_MS; ./node_modules/.bin/tsx scripts/init-auth.ts && exec node server.js'
     healthcheck:
       test:
         [
@@ -79,7 +95,8 @@ services:
     cap_drop: [ALL]
   # Account mail (verification, password reset). Its own process so SMTP never
   # waits behind slow AI inference and never runs inside the web process.
-  # Delivery is at-least-once. Build 009; the container has NOT been run yet.
+  # Delivery is at-least-once. Build 009; run in CI against a stand-in, never
+  # against a real SMTP relay or on an operator host.
   mailer:
     build: .
     restart: unless-stopped
@@ -138,13 +155,13 @@ services:
     # makes a missing value fail clearly.
     environment:
       STYLE_DOMAIN: ${STYLE_DOMAIN:-}
-      # Build 017 (AUTHORED, NOT RUN): the same non-secret project variable the
+      # Build 017 (exercised in CI, not on an operator host): the same non-secret project variable the
       # app receives. The start command below validates it exactly as the app's
       # does and derives the Caddy body cap from it: ceil(ms / 1000) + 2 seconds
       # (20000 gives 22, 60000 gives 62, 120000 gives 122). There is no separate
       # proxy setting any more, so the two cannot be set apart.
       STYLE_COMPOSE_BODY_READ_TIMEOUT_MS: ${STYLE_BODY_READ_TIMEOUT_MS:-20000}
-    # Startup guard (build 015 revision 2; AUTHORED, NOT RUN): refuse to start
+    # Startup guard (build 015 revision 2; exercised in CI, not on an operator host): refuse to start
     # with a clear log line when the domain is empty, instead of handing Caddy a
     # Caddyfile with no site address. `$$` is Compose's escape: the container's
     # shell expands $STYLE_DOMAIN at start, Compose does not. Build 017 adds the
@@ -153,7 +170,7 @@ services:
     # as octal) and exports STYLE_PROXY_BODY_READ_TIMEOUT_S, which
     # deploy/Caddyfile reads. A space is kept inside the arithmetic parentheses
     # so no shell reads `$(((` as a command substitution. The exec line is the
-    # standard caddy:2 image command, unchanged. Assumes /bin/sh (unverified).
+    # standard caddy:2 image command, unchanged. Assumes /bin/sh (it ran in the CI smoke test).
     command:
       - sh
       - -c

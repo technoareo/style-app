@@ -9,6 +9,7 @@ import { SavedView } from "../components/SavedView";
 import { Sidebar, type Tab } from "../components/Sidebar";
 import { TodayView } from "../components/TodayView";
 import { WardrobeView } from "../components/WardrobeView";
+import { LaunchInfoLinks } from "../components/LaunchInfoLinks";
 import { UploadDialog } from "../components/UploadDialog";
 import { AnalysisBanner } from "../components/AnalysisBanner";
 import { useAnalysisJobs } from "../hooks/useAnalysisJobs";
@@ -50,6 +51,7 @@ function WardrobeApp({
   const analysisJobs = useAnalysisJobs(uploadOpen, user.id);
   const [context, setContext] = useState<StyleContext>({
     occasion: "everyday",
+    season: "any",
     temperature: 25,
     variation: 0,
   });
@@ -98,6 +100,13 @@ function WardrobeApp({
     setEditing(null);
     store.notify("Item updated. Saving to your account…");
   };
+  const changeTab = (next: Tab) => {
+    if (next === "Add") {
+      setUploadOpen(true);
+      return;
+    }
+    setTab(next);
+  };
   if (!store.ready)
     return (
       <main className="loading-screen" role="status">
@@ -115,7 +124,7 @@ function WardrobeApp({
     <main>
       <Sidebar
         tab={tab}
-        onTab={setTab}
+        onTab={changeTab}
         profileId={store.profileId}
         profileName={store.profileName || "My wardrobe"}
         onSignIn={() => setProfileOpen(true)}
@@ -155,7 +164,14 @@ function WardrobeApp({
             context={context}
             onContext={setContext}
             onSave={() =>
-              store.saveLook(result.items, result.message, context.occasion)
+              store.saveLook(
+                result.items,
+                result.message,
+                context.occasion,
+                context.season && context.season !== "any"
+                  ? context.season
+                  : undefined,
+              )
             }
             onAddPhotos={() => setUploadOpen(true)}
             onSample={store.loadSample}
@@ -171,12 +187,25 @@ function WardrobeApp({
             onEdit={setEditing}
           />
         )}
-        {tab === "Saved looks" && (
+        {tab === "Plan" && (
           <SavedView
             looks={store.looks}
             onRemove={store.removeLook}
-            onExplore={() => setTab("Today")}
+            onExplore={() => changeTab("Today")}
           />
+        )}
+        {tab === "Insights" && (
+          <section className="coming-soon" aria-labelledby="insights-title">
+            <span className="eyebrow">YOUR WEARING PATTERNS</span>
+            <h1 id="insights-title">Insights are learning.</h1>
+            <p>
+              Wear history, rotation and cost-per-wear arrive after the new
+              daily feedback loop. Your wardrobe is ready for that upgrade.
+            </p>
+            <button className="primary" onClick={() => changeTab("My wardrobe")}>
+              Review your closet
+            </button>
+          </section>
         )}
         <footer>
           <span>PRIVATE TO YOUR ACCOUNT · {store.status.toUpperCase()}</span>
@@ -196,6 +225,7 @@ function WardrobeApp({
               }}
             />
           </label>
+          <LaunchInfoLinks />
         </footer>
       </section>
       {store.toast && (
@@ -222,7 +252,7 @@ function WardrobeApp({
           // the photo results and the review choices.
           onSave={async (items) => {
             await store.commitGarments(items);
-            setTab("My wardrobe");
+            changeTab("My wardrobe");
             store.notify(`${items.length} items added and saved`);
           }}
           onClose={() => setUploadOpen(false)}

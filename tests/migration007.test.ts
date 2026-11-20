@@ -107,6 +107,7 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
       "ALTER TABLE analysis_jobs DROP COLUMN finished_at;" +
       "ALTER TABLE analysis_jobs DROP COLUMN refunded;" +
       "ALTER TABLE analysis_jobs DROP COLUMN failure_kind;" +
+      "ALTER TABLE analysis_jobs DROP COLUMN usage_day;" +
       "ALTER TABLE usage_daily DROP COLUMN attempts;" +
       "DROP TABLE analysis_timings;" +
       "DROP TABLE schema_migrations;",
@@ -123,7 +124,7 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
 
   const migrated = new DatabaseSync(path.join(directory, "app.db"));
   try {
-    for (const column of ["started_at", "finished_at", "refunded", "failure_kind"])
+    for (const column of ["started_at", "finished_at", "refunded", "failure_kind", "usage_day"])
       assert.ok(columns(migrated, "analysis_jobs").includes(column), column);
     assert.ok(columns(migrated, "usage_daily").includes("attempts"));
     assert.ok(tableExists(migrated, "analysis_timings"));
@@ -148,7 +149,21 @@ test("build 006 databases migrate in place without losing users, wardrobes, phot
       .prepare("SELECT revision,data_json FROM wardrobe_spaces WHERE user_id=?")
       .get(alice) as { revision: number; data_json: string };
     assert.equal(wardrobeRow.revision, 3);
-    assert.equal(wardrobeRow.data_json, wardrobe, "wardrobe and saved looks intact");
+    assert.deepEqual(JSON.parse(wardrobeRow.data_json), {
+      version: 1,
+      name: "Alice",
+      wardrobe: [
+        {
+          id: "tee",
+          status: "available",
+          unavailableUntil: null,
+          fit: "unknown",
+          formality: "unknown",
+          warmth: "unknown",
+        },
+      ],
+      looks: [{ id: "look-1" }],
+    }, "wardrobe and saved looks survive with the additive capture backfill");
     assert.equal(
       Buffer.from(
         (

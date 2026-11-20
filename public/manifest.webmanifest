@@ -1,0 +1,10 @@
+{
+  "name": "Style Studio",
+  "short_name": "Style Studio",
+  "description": "Wear more of what you own, and buy less of what you won’t.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f5f0",
+  "theme_color": "#5b294d",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

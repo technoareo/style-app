@@ -1,0 +1,7 @@
+torch==2.15.0
+open_clip_torch==4.2.2
+pillow==13.0.0
+huggingface_hub==1.1.2
+# Keep this direct pin explicit so the audited transitive dependency cannot
+# drift independently of the hash-locked optional image.
+networkx==3.6.1

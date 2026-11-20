@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { getMigrations } from "better-auth/db/migration";
 import type { BetterAuthOptions } from "better-auth";
 import lockfile from "proper-lockfile";
+import { tableExists } from "./sensitiveTables";
 import { holdPresence, type PresenceHold } from "./processPresence";
 import { retryBusy } from "./sqliteRetry";
 import { acquireWriteGate } from "./writeGate";
@@ -14,10 +15,19 @@ import { acquireWriteGate } from "./writeGate";
  * from request input.
  */
 export function getDataDir(): string {
-  const dir =
-    process.env.STYLE_DATA_DIR?.trim() || path.join(process.cwd(), ".data");
+  const dir = resolveDataDir();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
+}
+
+/**
+ * The configured data directory, resolved WITHOUT touching the filesystem (no
+ * mkdir, no stat). Read-only commands (status, inspection) use this so that
+ * pointing them at a path that does not exist creates nothing; everything that
+ * opens or writes uses {@link getDataDir}, which creates the directory.
+ */
+export function resolveDataDir(): string {
+  return process.env.STYLE_DATA_DIR?.trim() || path.join(process.cwd(), ".data");
 }
 
 let database: DatabaseSync | null = null;
@@ -90,10 +100,46 @@ function releasePresenceIfIdle(): void {
   hold.release();
 }
 
+/** Raised when a live connection cannot be proven to have secure_delete=ON. */
+export class SecureDeleteError extends Error {
+  constructor() {
+    super("The database connection could not enable secure_delete.");
+    this.name = "SecureDeleteError";
+  }
+}
+
+/**
+ * Build 034: `PRAGMA secure_delete` is per connection and defaults to OFF, so
+ * every live connection turns it on and READS IT BACK (a build compiled with a
+ * different default, or a refused pragma, must not pass silently). 1 = ON; 2 =
+ * FAST does not zero-fill everything and is rejected. Never throws.
+ */
+export function secureDeleteActive(db: DatabaseSync): boolean {
+  try {
+    const row = db.prepare("PRAGMA secure_delete").get() as
+      | { secure_delete?: number }
+      | undefined;
+    return row?.secure_delete === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when every connection this process has open reports secure_delete=ON.
+ * A pure read (no connection is opened), so /api/health may call it any time.
+ */
+export function secureDeleteVerified(): boolean {
+  return [database, authDatabase].every(
+    (db) => db === null || !db.isOpen || secureDeleteActive(db),
+  );
+}
+
 function openConnection(timeoutMs: number): DatabaseSync {
   ensurePresence();
+  let db: DatabaseSync | null = null;
   try {
-    return new DatabaseSync(path.join(getDataDir(), "app.db"), {
+    db = new DatabaseSync(path.join(getDataDir(), "app.db"), {
       // Explicit despite matching the node:sqlite default: a schema with
       // ON DELETE CASCADE relies on this being on for every connection.
       enableForeignKeyConstraints: true,
@@ -101,7 +147,11 @@ function openConnection(timeoutMs: number): DatabaseSync {
       // immediately failing with SQLITE_BUSY.
       timeout: timeoutMs,
     });
+    db.exec("PRAGMA secure_delete = ON");
+    if (!secureDeleteActive(db)) throw new SecureDeleteError();
+    return db;
   } catch (error) {
+    if (db) closeTracked(db);
     releasePresenceIfIdle();
     throw error;
   }
@@ -123,6 +173,11 @@ export function getDatabase(): DatabaseSync {
   // WAL.
   database = openConnection(50);
   return database;
+}
+
+/** Whether the shared main connection is currently open (never opens one). */
+export function mainConnectionOpen(): boolean {
+  return database !== null && database.isOpen;
 }
 
 /**
@@ -359,6 +414,8 @@ CREATE INDEX IF NOT EXISTS photo_assets_user_id_idx ON photo_assets(user_id);
 `;
 
 export const QUEUE_METADATA_MIGRATION = "007-queue-metadata";
+export const PHYSICAL_CLEANUP_MIGRATION = "034-physical-cleanup";
+export const CAPTURE_FOUNDATION_MIGRATION = "038-capture-foundation";
 
 function columnExists(
   db: DatabaseSync,
@@ -380,6 +437,9 @@ function columnExists(
  *  analysis_jobs.started_at / finished_at  inference timing (admission ETA)
  *  analysis_jobs.refunded                  one-time quota refund marker
  *  analysis_jobs.failure_kind              'server' | 'model' | 'expired' ...
+ *  analysis_jobs.usage_day                 UTC day whose allowance the job was
+ *                                          charged to (refunds target this, not
+ *                                          a day recomputed from created_at)
  *  usage_daily.attempts                    accepted attempts, never refunded
  *  analysis_timings                        anonymous recent job durations
  */
@@ -395,6 +455,11 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
   add("analysis_jobs", "finished_at", "INTEGER");
   add("analysis_jobs", "refunded", "INTEGER NOT NULL DEFAULT 0");
   add("analysis_jobs", "failure_kind", "TEXT");
+  add("analysis_jobs", "usage_day", "TEXT");
+  // Jobs charged before this column existed were charged on their upload day.
+  db.exec(
+    "UPDATE analysis_jobs SET usage_day = strftime('%Y-%m-%d', created_at / 1000, 'unixepoch') WHERE usage_day IS NULL",
+  );
   add("usage_daily", "attempts", "INTEGER NOT NULL DEFAULT 0");
   // Existing days keep their already-spent allowance as attempts too.
   db.exec("UPDATE usage_daily SET attempts = count WHERE attempts < count");
@@ -412,6 +477,193 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
   ).run(QUEUE_METADATA_MIGRATION, Date.now());
   migrateMailOutbox(db);
   migrateAnalysisMode(db);
+  migratePhysicalCleanup(db);
+  migrateCaptureFoundation(db);
+}
+
+/**
+ * Build 038: schema needed by the flag-protected Build 2 capture flow.
+ * Existing wardrobes are backed up byte-for-byte before additive defaults are
+ * written, so a staging rollback can restore the exact pre-migration JSON.
+ */
+export function migrateCaptureFoundation(db: DatabaseSync): void {
+  const applied = db
+    .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+    .get(CAPTURE_FOUNDATION_MIGRATION);
+  if (applied) return;
+  db.exec(`
+CREATE TABLE IF NOT EXISTS capture_migration_backups (
+  user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE,
+  data_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS extraction_jobs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  photo_asset_id TEXT REFERENCES photo_assets(id) ON DELETE SET NULL,
+  status TEXT NOT NULL CHECK (status IN ('queued','running','review','completed','failed','cancelled')),
+  provider TEXT,
+  result_json TEXT,
+  error_code TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS extraction_jobs_user_status_idx ON extraction_jobs(user_id,status);
+CREATE TABLE IF NOT EXISTS field_edits (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  extraction_job_id TEXT NOT NULL REFERENCES extraction_jobs(id) ON DELETE CASCADE,
+  item_id TEXT,
+  field_name TEXT NOT NULL,
+  original_json TEXT,
+  corrected_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS field_edits_job_idx ON field_edits(extraction_job_id);
+CREATE TABLE IF NOT EXISTS consents (
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL,
+  granted INTEGER NOT NULL CHECK (granted IN (0,1)),
+  policy_version TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,purpose)
+);
+`);
+
+  const rows = db.prepare("SELECT user_id,data_json FROM wardrobe_spaces").all() as Array<{
+    user_id: string;
+    data_json: string;
+  }>;
+  const backup = db.prepare(
+    "INSERT OR IGNORE INTO capture_migration_backups(user_id,data_json) VALUES(?,?)",
+  );
+  const update = db.prepare("UPDATE wardrobe_spaces SET data_json=? WHERE user_id=?");
+  for (const row of rows) {
+    let parsed: { wardrobe?: Array<Record<string, unknown>> };
+    try {
+      parsed = JSON.parse(row.data_json) as typeof parsed;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(parsed.wardrobe)) continue;
+    backup.run(row.user_id, row.data_json);
+    parsed.wardrobe = parsed.wardrobe.map((item) => ({
+      ...item,
+      status: item.status ?? (item.available === false ? "laundry" : "available"),
+      unavailableUntil: item.unavailableUntil ?? null,
+      fit: item.fit ?? "unknown",
+      formality: item.formality ?? "unknown",
+      warmth: item.warmth ?? "unknown",
+    }));
+    update.run(JSON.stringify(parsed), row.user_id);
+  }
+  db.prepare(
+    "INSERT INTO schema_migrations(id,applied_at) VALUES(?,?)",
+  ).run(CAPTURE_FOUNDATION_MIGRATION, Date.now());
+}
+
+/** Staging/test rollback only; production rollback keeps additive schema. */
+export function rollbackCaptureFoundationForStaging(db: DatabaseSync): void {
+  if (tableExists(db, "capture_migration_backups")) {
+    db.exec(`
+UPDATE wardrobe_spaces
+SET data_json=(SELECT data_json FROM capture_migration_backups b WHERE b.user_id=wardrobe_spaces.user_id)
+WHERE user_id IN (SELECT user_id FROM capture_migration_backups);
+DROP TABLE IF EXISTS field_edits;
+DROP TABLE IF EXISTS extraction_jobs;
+DROP TABLE IF EXISTS consents;
+DROP TABLE IF EXISTS capture_migration_backups;
+`);
+  }
+  db.prepare("DELETE FROM schema_migrations WHERE id=?").run(CAPTURE_FOUNDATION_MIGRATION);
+}
+
+/**
+ * Build 034: the durable "physical cleanup owed" mark and the replacement of the
+ * deletion trigger. Additive: one single-row table, no existing row rewritten.
+ *
+ * `CREATE TRIGGER IF NOT EXISTS` (APPLICATION_SCHEMA) never upgrades a trigger a
+ * current database already has, so the trigger is dropped and recreated here,
+ * inside the caller's BEGIN IMMEDIATE (atomic: there is never a moment without a
+ * ledger trigger). The new trigger, in the SAME statement that deletes the user:
+ *   1. records the tombstone in account_deletions (unchanged),
+ *   2. deletes the user's `verification` rows. Better Auth does not: it keys
+ *      them by token/identifier, so reset and delete-account tokens (value =
+ *      user id) and tokens addressed to the user's e-mail outlived the account,
+ *   3. bumps physical_cleanup.requested (see physicalCleanup.ts).
+ * Step 2 is only emitted when the table exists (Better Auth creates it first).
+ *
+ * `legacy_deletions` is the number of deletions already recorded when this
+ * migration first ran: those happened without secure_delete or WAL truncation
+ * and may leave residue in free pages (see docs/DEPLOYMENT.md).
+ */
+function migratePhysicalCleanup(db: DatabaseSync): void {
+  // Needs Better Auth's `user` table and the ledger table (APPLICATION_SCHEMA).
+  // Without them there is nothing to attach to: not recorded, so it re-runs.
+  if (!tableExists(db, "user") || !tableExists(db, "account_deletions")) return;
+  // Decide BEFORE creating anything whether this is the FIRST 034 migration of
+  // this database. The table is created and the counter row inserted in this
+  // same transaction, so a database that already has the table or the recorded
+  // migration but NO counter row was damaged (hand edit, partial restore, bug).
+  const firstMigration =
+    !tableExists(db, "physical_cleanup") &&
+    !db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(PHYSICAL_CLEANUP_MIGRATION);
+  db.exec(`
+CREATE TABLE IF NOT EXISTS physical_cleanup (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  requested INTEGER NOT NULL DEFAULT 0,
+  completed INTEGER NOT NULL DEFAULT 0,
+  pending_since INTEGER,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at INTEGER,
+  last_success_at INTEGER,
+  last_failure_code TEXT,
+  legacy_deletions INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+`);
+  if (!db.prepare("SELECT 1 AS ok FROM physical_cleanup WHERE id=1").get()) {
+    const now = Date.now();
+    if (firstMigration) {
+      // Every ledger row so far predates secure_delete: legacy, nothing owed.
+      db.prepare(
+        "INSERT INTO physical_cleanup(id,legacy_deletions,created_at) VALUES(1,(SELECT COUNT(*) FROM account_deletions),?)",
+      ).run(now);
+    } else {
+      // Damaged: the counters are lost and the ledger (tombstones only) cannot
+      // say which deletions were already cleaned, so the state is unknowable.
+      // Assume the worst and NEVER recreate it clean: one cleanup is owed (a
+      // single truncating checkpoint cleans everything committed so far) and
+      // every ledger row is counted as possible legacy residue (an upper bound
+      // that may over-report, never under-report). A needless extra checkpoint
+      // is the whole cost of being wrong.
+      db.prepare(
+        "INSERT INTO physical_cleanup(id,requested,completed,pending_since,legacy_deletions,created_at) VALUES(1,1,0,?,(SELECT COUNT(*) FROM account_deletions),?)",
+      ).run(now, now);
+    }
+  }
+  const verification = tableExists(db, "verification")
+    ? "DELETE FROM verification WHERE value = OLD.id OR identifier = OLD.email;"
+    : "";
+  db.exec(`
+DROP TRIGGER IF EXISTS user_deletion_ledger;
+CREATE TRIGGER user_deletion_ledger
+AFTER DELETE ON user
+BEGIN
+  INSERT OR REPLACE INTO account_deletions(user_id, deleted_at)
+  VALUES (OLD.id, CAST(strftime('%s','now') AS INTEGER) * 1000);
+  ${verification}
+  UPDATE physical_cleanup
+     SET requested = requested + 1,
+         pending_since = COALESCE(pending_since, CAST(strftime('%s','now') AS INTEGER) * 1000)
+   WHERE id = 1;
+END;
+`);
+  db.prepare(
+    "INSERT OR IGNORE INTO schema_migrations(id, applied_at) VALUES(?, ?)",
+  ).run(PHYSICAL_CLEANUP_MIGRATION, Date.now());
 }
 
 export const ANALYSIS_MODE_MIGRATION = "018-analysis-mode";
@@ -487,7 +739,7 @@ CREATE TABLE IF NOT EXISTS mail_worker_state (
  * write lock just to learn there is nothing to do. Any doubt (including a
  * read error) returns false and the locked, idempotent migration runs.
  */
-function applicationMigrationApplied(db: DatabaseSync): boolean {
+export function applicationMigrationApplied(db: DatabaseSync): boolean {
   try {
     const recorded = db
       .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
@@ -503,17 +755,52 @@ function applicationMigrationApplied(db: DatabaseSync): boolean {
           )
           .get(name),
       );
+    const cleanupRecorded = db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(PHYSICAL_CLEANUP_MIGRATION);
+    // The trigger must be the build 034 one AND, when the verification table
+    // exists, must delete the person's verification rows: a trigger written
+    // before that table existed (a partial or direct earlier migration) is not
+    // current and is rebuilt by the locked migration. The single counter row
+    // must exist too (a missing row makes every deletion silently owe nothing).
+    const triggerSql = (
+      db
+        .prepare(
+          "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='user_deletion_ledger'",
+        )
+        .get() as { sql: string } | undefined
+    )?.sql;
+    const triggerCurrent =
+      typeof triggerSql === "string" &&
+      triggerSql.includes("physical_cleanup") &&
+      (!tableExists(db, "verification") ||
+        triggerSql.includes("DELETE FROM verification"));
+    const counterRow = db
+      .prepare("SELECT 1 AS ok FROM physical_cleanup WHERE id=1")
+      .get();
     const modeRecorded = db
       .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
       .get(ANALYSIS_MODE_MIGRATION);
+    const captureRecorded = db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(CAPTURE_FOUNDATION_MIGRATION);
     return (
       Boolean(recorded) &&
       Boolean(mailRecorded) &&
       Boolean(modeRecorded) &&
+      Boolean(cleanupRecorded) &&
+      Boolean(captureRecorded) &&
+      triggerCurrent &&
+      tablePresent("physical_cleanup") &&
+      Boolean(counterRow) &&
       columnExists(db, "analysis_jobs", "analysis_mode") &&
       tablePresent("mail_outbox") &&
       tablePresent("mail_worker_state") &&
-      ["started_at", "finished_at", "refunded", "failure_kind"].every((c) =>
+      tablePresent("capture_migration_backups") &&
+      tablePresent("extraction_jobs") &&
+      tablePresent("field_edits") &&
+      tablePresent("consents") &&
+      ["started_at", "finished_at", "refunded", "failure_kind", "usage_day"].every((c) =>
         columnExists(db, "analysis_jobs", c),
       ) &&
       columnExists(db, "usage_daily", "attempts") &&

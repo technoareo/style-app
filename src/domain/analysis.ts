@@ -87,9 +87,18 @@ export const detectedItemSchema = z.object({
  */
 export const MAX_DETECTED_ITEMS = 6;
 export const CROWDED_WARNING = `This photo may show more than ${MAX_DETECTED_ITEMS} items, and only up to ${MAX_DETECTED_ITEMS} are listed. For better results, upload a clearer photo of one to three items with space between them.`;
+const analysisProvenanceSchema = z.object({
+  provider: z.string().max(40),
+  model: z.string().max(120),
+  modelVersion: z.string().max(80),
+  fieldConfidence: z.record(z.string().max(40), z.number().min(0).max(1)),
+}).strict();
+
 export const analysisSchema = z.object({
   items: z.array(detectedItemSchema).max(30),
   warning: z.string().max(500),
+  /** Internal audit data. The consumer UI must not present these uncalibrated values as percentages. */
+  provenance: analysisProvenanceSchema.optional(),
 });
 export type Analysis = z.infer<typeof analysisSchema>;
 /**
@@ -101,6 +110,7 @@ export type Analysis = z.infer<typeof analysisSchema>;
 export const reviewAnalysisSchema = z.object({
   items: z.array(detectedItemSchema.extend({ name: z.string().max(100) })).max(30),
   warning: z.string().max(500),
+  provenance: analysisProvenanceSchema.optional(),
 });
 export const visionOutputSchema = {
   type: "object",

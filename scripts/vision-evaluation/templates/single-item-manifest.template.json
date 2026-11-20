@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "single-item-manifest",
+  "benchmarkId": "single-item-v1",
+  "split": "heldout",
+  "frozenAt": null,
+  "purpose": "Held-out single-prominent-item benchmark. Freeze with single-freeze BEFORE any model sees an image.",
+  "fixtures": [
+    {
+      "id": "REPLACE-lowercase-id",
+      "file": "REPLACE-file-name.jpg",
+      "sha256": "REPLACE-64-hex-from-inspect",
+      "dimensions": null,
+      "addedAt": "REPLACE-iso-timestamp",
+      "sceneType": "REPLACE-flat_lay|hanging|mannequin|worn|surface_or_floor|product_shot|other",
+      "stratum": "REPLACE-in_scope|rejection",
+      "rejectionReason": null,
+      "sourceShootId": "REPLACE-same-shoot-or-uploader-session-id",
+      "garmentId": "REPLACE-same-physical-garment-or-product-id",
+      "priorInference": false,
+      "priorInferenceNote": null,
+      "rights": {
+        "sourceCollection": "REPLACE-wikimedia-commons|open-images|self-owned-with-release",
+        "sourcePageUrl": "REPLACE-https-page-a-person-opened",
+        "originalUrl": "REPLACE-https-file-url",
+        "creator": "REPLACE-creator-name",
+        "license": {
+          "id": "REPLACE-CC0|PDM|CC-BY|CC-BY-SA",
+          "version": "REPLACE-version",
+          "url": "REPLACE-https-licence-url"
+        },
+        "retrievedAt": "REPLACE-iso-date",
+        "attribution": "REPLACE-attribution-text",
+        "modifications": [],
+        "originalSha256": "REPLACE-64-hex",
+        "distributedSha256": "REPLACE-64-hex",
+        "verifiedBy": "REPLACE-person-who-checked-rights",
+        "verifiedAt": "REPLACE-iso-date"
+      },
+      "notes": null
+    }
+  ]
+}

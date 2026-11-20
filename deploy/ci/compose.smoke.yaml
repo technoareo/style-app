@@ -1,0 +1,44 @@
+# Build 023. CI-ONLY override for the Compose + Caddy smoke test
+# (scripts/ci-compose-smoke.ts). It is never used by an operator and nothing in
+# the production flow reads it: compose.yaml and deploy/Caddyfile stay exactly
+# as shipped and are merged with this file only inside a throw-away project
+# folder. `!override` needs Docker Compose 2.24 or newer (the runner checks).
+#
+# It may change ONLY the paths listed in ALLOWED_OVERRIDE_DIFFS in
+# scripts/ci-compose-smoke-plan.ts; the runner compares `docker compose config`
+# with and without this file and fails on any other difference. The commands,
+# healthchecks, environment, mounts, security options and capabilities of `app`
+# and `proxy` are therefore the shipped ones.
+services:
+  # Use the image the CI job just built from this checkout (`docker build -t
+  # style-studio:ci .`); the smoke run starts these with --no-build and never
+  # pulls them. Other images (caddy:2, node:24-bookworm-slim for the mock model)
+  # are NOT built here and may be pulled on first use.
+  app:
+    image: style-studio:ci
+    pull_policy: never
+    # A refused start must stay stopped so the fail-closed checks can read the
+    # exit code. (Production keeps `unless-stopped`; that is not exercised.)
+    restart: "no"
+  worker:
+    image: style-studio:ci
+    pull_policy: never
+  mailer:
+    image: style-studio:ci
+    pull_policy: never
+  # The model is the CI mock from build 008: no model download, no inference.
+  # The mount path is relative to the throw-away project folder the runner
+  # creates (it copies deploy/ci/mock-ollama.mjs there); it is not meant to
+  # work from the repository root.
+  ollama:
+    image: node:24-bookworm-slim
+    restart: "no"
+    command: ["node", "/mock.mjs"]
+    volumes: !override
+      - ./deploy/ci/mock-ollama.mjs:/mock.mjs:ro
+  proxy:
+    restart: "no"
+    # Loopback only, unprivileged ports, instead of 80 and 443 on all addresses.
+    ports: !override
+      - "127.0.0.1:18080:80"
+      - "127.0.0.1:18443:443"

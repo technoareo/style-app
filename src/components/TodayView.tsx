@@ -1,6 +1,10 @@
 import { Heart, Plus, Shuffle, Sparkles } from "lucide-react";
 import type { Garment } from "../domain/types";
-import type { LookResult, StyleContext } from "../domain/outfit";
+import {
+  seasonTemperatureWarning,
+  type LookResult,
+  type StyleContext,
+} from "../domain/outfit";
 import { GarmentThumb } from "./GarmentThumb";
 import { WardrobeCard } from "./WardrobeCard";
 type Props = {
@@ -84,6 +88,27 @@ export function TodayView({
             <option value="formal">Formal event</option>
           </select>
         </label>
+        <label htmlFor="style-season">
+          Season
+          <select
+            id="style-season"
+            aria-label="Season"
+            value={context.season ?? "any"}
+            onChange={(e) =>
+              onContext({
+                ...context,
+                season: e.target.value as NonNullable<StyleContext["season"]>,
+                variation: 0,
+              })
+            }
+          >
+            <option value="any">Any season</option>
+            <option value="spring">Spring</option>
+            <option value="summer">Summer</option>
+            <option value="autumn">Autumn</option>
+            <option value="winter">Winter</option>
+          </select>
+        </label>
         <label htmlFor="style-temperature">
           Temperature · °C
           <input
@@ -113,6 +138,11 @@ export function TodayView({
           <Shuffle size={15} /> Another combination
         </button>
       </div>
+      {seasonTemperatureWarning(context) && (
+        <p className="styling-warning" role="status">
+          {seasonTemperatureWarning(context)}
+        </p>
+      )}
       <div className="outfit-panel">
         <div className="outfit-top">
           <div>
@@ -120,9 +150,11 @@ export function TodayView({
               {result.complete ? result.message : "Let’s build your first look"}
             </div>
             <p className="look-description">
-              {result.complete
-                ? "A combination from your wardrobe, ready to make your own."
-                : result.message}
+              {!result.complete
+                ? result.message
+                : result.suitability === "mismatch"
+                  ? "The closest combination from your wardrobe. It is not confirmed for this plan."
+                  : "A combination from your wardrobe, ready to make your own."}
             </p>
           </div>
           {result.complete && (

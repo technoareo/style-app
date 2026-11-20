@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getReadyAuth } from "../../../server/auth";
-import { mainConnectionUnusable } from "../../../server/database";
+import { mainConnectionUnusable, secureDeleteVerified } from "../../../server/database";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,10 @@ export async function GET() {
     // closed. That state refuses every later write until the process restarts:
     // report it with the same fixed body, never a reason (this route is public).
     if (mainConnectionUnusable()) return NOT_READY();
+    // Build 034: every open connection must still report secure_delete=ON.
+    // A cleanup that is merely owed does NOT make the app unready (the
+    // deletion is committed; see /docs/DEPLOYMENT.md).
+    if (!secureDeleteVerified()) return NOT_READY();
     return NextResponse.json(
       { ready: true },
       { headers: { "Cache-Control": "no-store" } },

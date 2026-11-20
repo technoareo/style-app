@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "kind": "single-item-gold",
+  "benchmarkId": "single-item-v1",
+  "split": "heldout",
+  "labels": [
+    {
+      "imageId": "REPLACE-fixture-id",
+      "imageSha256": "REPLACE-64-hex",
+      "outcome": "REPLACE-single_item|reject",
+      "rejectionReason": null,
+      "item": {
+        "category": "REPLACE-top|bottom|dress|outerwear|shoe|accessory",
+        "color": "REPLACE-coarse-colour",
+        "pattern": "REPLACE-solid|striped|checked|floral|dotted|graphic|other_pattern",
+        "fit": "REPLACE-fitted|regular|relaxed|oversized|unknown",
+        "material": "REPLACE-visible-texture|none_visible|unknown",
+        "box": null,
+        "seasons": [],
+        "occasions": []
+      },
+      "annotation": {
+        "status": "REPLACE-single_human|double_human_adjudicated",
+        "annotators": [
+          {
+            "id": "REPLACE-person",
+            "kind": "human"
+          }
+        ],
+        "completedAt": "REPLACE-iso-timestamp",
+        "tool": null,
+        "modelAssisted": false,
+        "notes": null
+      }
+    }
+  ]
+}

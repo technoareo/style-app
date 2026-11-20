@@ -90,7 +90,7 @@ test("several reviewed items from one photo save together, and a refused upload 
     page.getByRole("article").filter({
       has: page.getByText(name, { exact: true }),
     });
-  await sidebar.getByRole("button", { name: "My wardrobe", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Closet", exact: true }).click();
   for (const name of names)
     await expect(wardrobeCard(name)).toHaveCount(1, { timeout: 20_000 });
   for (const name of names)
@@ -100,7 +100,7 @@ test("several reviewed items from one photo save together, and a refused upload 
   expect(uploads, "the refused upload was repeated").toBeGreaterThanOrEqual(2);
 
   await page.reload();
-  await sidebar.getByRole("button", { name: "My wardrobe", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Closet", exact: true }).click();
   for (const name of names) {
     await expect(wardrobeCard(name)).toHaveCount(1);
     await expect(wardrobeCard(name)).toBeVisible();

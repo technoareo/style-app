@@ -4,7 +4,9 @@ import path from "node:path";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { ensureDatabaseReady, getAuthDatabase, getDataDir } from "./database";
 import { createImmediateSqliteDialect } from "./authDialect";
+import { assertLaunchInfoConfigured } from "./launchInfo";
 import { assertMailConfigured } from "./mail";
+import { schedulePhysicalCleanup } from "./physicalCleanup";
 import { queuePasswordResetEmail, queueVerificationEmail } from "./mailOutbox";
 
 type AuthInstance = ReturnType<typeof betterAuth>;
@@ -103,6 +105,10 @@ async function build(): Promise<{
   const appUrl = resolveAppUrl(publicDeployment);
   const secret = resolveSecret(publicDeployment);
   if (publicDeployment) assertMailConfigured();
+  // Build 032: a public deployment is not ready without a privacy notice, terms and a support contact (fixed
+  // message, names only the variables; nothing about the configured values). /api/health reports it as the
+  // same fixed { ready: false } as every other readiness failure.
+  assertLaunchInfoConfigured();
 
   const options: BetterAuthOptions = {
     baseURL: appUrl,
@@ -219,6 +225,9 @@ export function getReadyAuth(): Promise<AuthInstance> {
     readyPromise = (async () => {
       const { auth, options } = await getBuilt();
       await ensureDatabaseReady(options);
+      // Build 034: finish any deletion cleanup a crashed or busy earlier run
+      // left owed (durable mark in the database). Never awaited, never throws.
+      schedulePhysicalCleanup(1_000);
       return auth;
     })().catch((error) => {
       readyPromise = null;

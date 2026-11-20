@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { authClient } from "../services/authClient";
+import { LaunchInfoLinks } from "./LaunchInfoLinks";
 export function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [email, setEmail] = useState(""),
@@ -152,6 +153,7 @@ export function AuthScreen() {
           suggestions before adding items. No subscription is required for this
           version.
         </small>
+        <LaunchInfoLinks />
       </section>
     </main>
   );

@@ -21,9 +21,41 @@ AUTH_SECRET=generate-a-unique-random-secret-at-least-32-characters
 SMTP_URL=smtps://your-mail-provider-credentials@your-mail-host:465
 MAIL_FROM=Style Studio <your-verified-sender@your-real-domain.example>
 VISION_MODEL=qwen3-vl:4b-instruct
+STYLE_CAPTURE_V2_ENABLED=false
+STYLE_PWA_CACHE_ENABLED=true
 ```
 
 These are examples, not functioning credentials. Generate the secret privately and retain it in your password manager. Configure a real verified mail sender; test verification and recovery delivery to independent email providers. The public application refuses to initialize accounts without an HTTPS origin, an authentication secret and mail configuration. Its public mode is forced on in Compose.
+
+## Capture rollout and PWA kill switch (build 038)
+
+`STYLE_CAPTURE_V2_ENABLED` is the server-owned rollout flag for the Build 2
+capture experience. It defaults to `false`; a malformed value also fails
+closed. The existing capture flow remains available while the new flow is off.
+
+`STYLE_PWA_CACHE_ENABLED` controls service-worker registration. It defaults to
+`true`. Set it to `false` and recreate the app service to disable the PWA cache.
+On the next app visit, `/api/runtime-config` is fetched with `no-store`, all
+Style Studio service workers are unregistered, and only cache names beginning
+`style-studio-` are deleted. A malformed value disables caching. The service
+worker still caches only the manifest and icon; authenticated HTML, API data and
+photos are never cached.
+
+Build 2 schema migration `038-capture-foundation` creates `extraction_jobs`,
+`field_edits` and `consents`. Existing wardrobe JSON is backed up byte-for-byte
+before status, return date, fit, formality and warmth defaults are added.
+`rollbackCaptureFoundationForStaging` exists only for a copied staging database;
+the production rollback is to disable `STYLE_CAPTURE_V2_ENABLED` and retain the
+additive schema. The automated staging test proves byte-identical JSON restore
+and removal of capture-only objects without removing the wardrobe table.
+
+The owner phone-test host is the shipped Linux Compose stack behind Caddy, not
+the Windows development server. CI verifies that stack, but installation from
+real iPhone Safari and Android Chrome remains an owner-device acceptance step.
+The optional FashionCLIP CI gate downloads the exact pinned publisher revision
+into a fresh cache, deletes that cache, then runs the rights-cleared public-shirt
+fixture in a second container with `--network none`; inference rechecks every
+runtime model file against `SHA256SUMS` before loading it.
 
 **Vision model (`VISION_MODEL`, build 018).** The model used for photo analysis is read from `VISION_MODEL` in `.env.production`; when it is unset or blank the default `qwen3-vl:4b-instruct` is used. The web app (readiness check), the AI worker (inference) and the readiness answer all read the same setting through one function, so they cannot disagree. The value must be a model reference Ollama can pull: ASCII letters, digits, `.`, `_`, `-`, optional `/` namespace parts and one optional `:tag`, at most 100 characters (for example `qwen3-vl:4b-instruct`, `llava:7b`). A **malformed value is not replaced by the default**: photo analysis then reports unavailable (no request reaches Ollama, the attempt is not charged) and the app logs `[vision] VISION_MODEL is not a valid model name` once, so a typo is visible instead of silently running another model. The model must also be **pulled under exactly that name**: `docker compose exec ollama ollama pull <the same value>`; the readiness check lists Ollama's installed models and reports not ready if the name is absent (an untagged name matches `<name>:latest`). After changing the value, recreate the services that read it with `docker compose up -d` (the `app` and `worker`). The prompt, output schema and token bounds are written for the Qwen3-VL instruct models; another model may ignore the schema, answer slowly or label poorly, and **only the two Qwen3-VL instruct models, the 4B default and the 2B, have been tried, in a handful of development runs on one machine**. See "Single-item photo analysis" below for what has and has not been verified.
 

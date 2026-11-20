@@ -21,6 +21,10 @@ export type Garment = {
   occasions?: Array<"everyday" | "work" | "evening" | "active" | "lounge" | "event">;
   formality?: "casual" | "smart" | "formal" | "unknown";
   warmth?: "light" | "medium" | "warm" | "unknown";
+  /** Build 2 availability state. `available` remains for backwards compatibility. */
+  status?: "available" | "laundry" | "loaned" | "repair" | "archived";
+  /** ISO date (YYYY-MM-DD) when a temporarily unavailable item returns. */
+  unavailableUntil?: string | null;
   available?: boolean;
   reviewed?: boolean;
   confidence?: number;

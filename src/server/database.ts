@@ -415,6 +415,7 @@ CREATE INDEX IF NOT EXISTS photo_assets_user_id_idx ON photo_assets(user_id);
 
 export const QUEUE_METADATA_MIGRATION = "007-queue-metadata";
 export const PHYSICAL_CLEANUP_MIGRATION = "034-physical-cleanup";
+export const CAPTURE_FOUNDATION_MIGRATION = "038-capture-foundation";
 
 function columnExists(
   db: DatabaseSync,
@@ -477,6 +478,104 @@ export function migrateApplicationSchema(db: DatabaseSync): void {
   migrateMailOutbox(db);
   migrateAnalysisMode(db);
   migratePhysicalCleanup(db);
+  migrateCaptureFoundation(db);
+}
+
+/**
+ * Build 038: schema needed by the flag-protected Build 2 capture flow.
+ * Existing wardrobes are backed up byte-for-byte before additive defaults are
+ * written, so a staging rollback can restore the exact pre-migration JSON.
+ */
+export function migrateCaptureFoundation(db: DatabaseSync): void {
+  const applied = db
+    .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+    .get(CAPTURE_FOUNDATION_MIGRATION);
+  if (applied) return;
+  db.exec(`
+CREATE TABLE IF NOT EXISTS capture_migration_backups (
+  user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE,
+  data_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS extraction_jobs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  photo_asset_id TEXT REFERENCES photo_assets(id) ON DELETE SET NULL,
+  status TEXT NOT NULL CHECK (status IN ('queued','running','review','completed','failed','cancelled')),
+  provider TEXT,
+  result_json TEXT,
+  error_code TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS extraction_jobs_user_status_idx ON extraction_jobs(user_id,status);
+CREATE TABLE IF NOT EXISTS field_edits (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  extraction_job_id TEXT NOT NULL REFERENCES extraction_jobs(id) ON DELETE CASCADE,
+  item_id TEXT,
+  field_name TEXT NOT NULL,
+  original_json TEXT,
+  corrected_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS field_edits_job_idx ON field_edits(extraction_job_id);
+CREATE TABLE IF NOT EXISTS consents (
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL,
+  granted INTEGER NOT NULL CHECK (granted IN (0,1)),
+  policy_version TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,purpose)
+);
+`);
+
+  const rows = db.prepare("SELECT user_id,data_json FROM wardrobe_spaces").all() as Array<{
+    user_id: string;
+    data_json: string;
+  }>;
+  const backup = db.prepare(
+    "INSERT OR IGNORE INTO capture_migration_backups(user_id,data_json) VALUES(?,?)",
+  );
+  const update = db.prepare("UPDATE wardrobe_spaces SET data_json=? WHERE user_id=?");
+  for (const row of rows) {
+    let parsed: { wardrobe?: Array<Record<string, unknown>> };
+    try {
+      parsed = JSON.parse(row.data_json) as typeof parsed;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(parsed.wardrobe)) continue;
+    backup.run(row.user_id, row.data_json);
+    parsed.wardrobe = parsed.wardrobe.map((item) => ({
+      ...item,
+      status: item.status ?? (item.available === false ? "laundry" : "available"),
+      unavailableUntil: item.unavailableUntil ?? null,
+      fit: item.fit ?? "unknown",
+      formality: item.formality ?? "unknown",
+      warmth: item.warmth ?? "unknown",
+    }));
+    update.run(JSON.stringify(parsed), row.user_id);
+  }
+  db.prepare(
+    "INSERT INTO schema_migrations(id,applied_at) VALUES(?,?)",
+  ).run(CAPTURE_FOUNDATION_MIGRATION, Date.now());
+}
+
+/** Staging/test rollback only; production rollback keeps additive schema. */
+export function rollbackCaptureFoundationForStaging(db: DatabaseSync): void {
+  if (tableExists(db, "capture_migration_backups")) {
+    db.exec(`
+UPDATE wardrobe_spaces
+SET data_json=(SELECT data_json FROM capture_migration_backups b WHERE b.user_id=wardrobe_spaces.user_id)
+WHERE user_id IN (SELECT user_id FROM capture_migration_backups);
+DROP TABLE IF EXISTS field_edits;
+DROP TABLE IF EXISTS extraction_jobs;
+DROP TABLE IF EXISTS consents;
+DROP TABLE IF EXISTS capture_migration_backups;
+`);
+  }
+  db.prepare("DELETE FROM schema_migrations WHERE id=?").run(CAPTURE_FOUNDATION_MIGRATION);
 }
 
 /**
@@ -682,17 +781,25 @@ export function applicationMigrationApplied(db: DatabaseSync): boolean {
     const modeRecorded = db
       .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
       .get(ANALYSIS_MODE_MIGRATION);
+    const captureRecorded = db
+      .prepare("SELECT 1 AS ok FROM schema_migrations WHERE id=?")
+      .get(CAPTURE_FOUNDATION_MIGRATION);
     return (
       Boolean(recorded) &&
       Boolean(mailRecorded) &&
       Boolean(modeRecorded) &&
       Boolean(cleanupRecorded) &&
+      Boolean(captureRecorded) &&
       triggerCurrent &&
       tablePresent("physical_cleanup") &&
       Boolean(counterRow) &&
       columnExists(db, "analysis_jobs", "analysis_mode") &&
       tablePresent("mail_outbox") &&
       tablePresent("mail_worker_state") &&
+      tablePresent("capture_migration_backups") &&
+      tablePresent("extraction_jobs") &&
+      tablePresent("field_edits") &&
+      tablePresent("consents") &&
       ["started_at", "finished_at", "refunded", "failure_kind", "usage_day"].every((c) =>
         columnExists(db, "analysis_jobs", c),
       ) &&

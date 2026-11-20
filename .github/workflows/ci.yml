@@ -33,6 +33,14 @@ jobs:
       - run: npm run verify:standalone
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Upload mobile visual and accessibility review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-038-mobile-review
+          path: docs/verification/build-038
+          if-no-files-found: error
+          retention-days: 14
 
   # Build 008. Builds the real image and runs app + AI worker + mail worker in
   # containers against a MOCK model (no model download, no real AI, no real
@@ -55,6 +63,25 @@ jobs:
         run: npm audit --omit=dev
       - name: Build optional FashionCLIP layer (model remains external and disabled)
         run: docker build --target fashion-vision -t style-studio:fashion-vision-ci .
+      - name: Prove FashionCLIP offline on a rights-cleared image
+        timeout-minutes: 15
+        run: |
+          set -eu
+          model="$RUNNER_TEMP/fashion-model"
+          mkdir -p "$model" && chmod 777 "$model"
+          docker run --rm \
+            -e FASHION_MODEL_DIR=/models/fashionclip \
+            -e HF_HOME=/models/hf-cache \
+            -v "$model:/models" \
+            style-studio:fashion-vision-ci \
+            /opt/fashion-vision/bin/python scripts/setup_fashion_clip.py
+          rm -rf "$model/hf-cache"
+          docker run --rm --network none \
+            -e FASHION_MODEL_DIR=/models/fashionclip \
+            -v "$model:/models:ro" \
+            -v "$PWD/tests/fixtures/public-shirt.jpg:/tmp/rights-cleared-item.jpg:ro" \
+            style-studio:fashion-vision-ci \
+            ./node_modules/.bin/tsx scripts/verify-fashionclip.ts /tmp/rights-cleared-item.jpg
       - run: docker build -t style-studio:ci .
       - name: Start mock model, app, AI worker and mail worker
         run: |

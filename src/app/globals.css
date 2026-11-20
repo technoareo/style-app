@@ -1225,6 +1225,11 @@ footer .launch-links {
   --sage: #56705c;
   --sage-light: #e8efe8;
   --coral: #c86658;
+  /* Never communicate a verdict with colour alone. Buy / Wait / Skip must
+     always include its word and icon and pass a colour-blindness simulation. */
+  --verdict-buy: var(--sage);
+  --verdict-wait: var(--coral);
+  --verdict-skip: var(--plum);
   --line: #e8e0dc;
   --shadow-sm: 0 8px 30px rgb(50 32 43 / 7%);
   --radius-sm: 12px;
